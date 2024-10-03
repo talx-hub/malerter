@@ -4,6 +4,7 @@
 *.dll
 *.so
 *.dylib
+metricstest-darwin-arm64
 
 # Test binary, built with `go test -c`
 *.test
