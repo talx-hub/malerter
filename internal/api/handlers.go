@@ -30,7 +30,7 @@ func (h *HTTPHandler) DumpMetric(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	rawMetric := r.URL.RawQuery
+	rawMetric := r.URL.Path
 	if err := h.service.DumpMetric(rawMetric); err != nil {
 		switch err.(type) {
 		case *customerror.NotFoundError:
