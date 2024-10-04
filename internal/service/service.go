@@ -38,23 +38,31 @@ func parseURL(rawMetric string) (repo.Metric, error) {
 	parts := strings.Split(rawMetric, "/")
 	if len(parts) != 5 {
 		return repo.Metric{},
+			&customerror.NotFoundError{RawMetric: rawMetric}
+	}
+
+	mType := &parts[2]
+	mName := &parts[3]
+	mValue := &parts[4]
+	if *mType == "" || *mName == "" || *mValue == "" {
+		return repo.Metric{},
 			&customerror.IvalidArgumentError{RawMetric: rawMetric}
 	}
 
-	if parts[2] == "gauge" {
-		fValue, err := strconv.ParseFloat(parts[4], 64)
+	if *mType == "gauge" {
+		fValue, err := strconv.ParseFloat(*mValue, 64)
 		if err != nil {
 			return repo.Metric{},
 				&customerror.IvalidArgumentError{RawMetric: rawMetric}
 		}
-		return repo.Metric{Type: parts[2], Name: parts[3], FValue: fValue}, nil
-	} else if parts[2] == "counter" {
-		iValue, err := strconv.Atoi(parts[4])
+		return repo.Metric{Type: *mType, Name: *mName, FValue: fValue}, nil
+	} else if *mType == "counter" {
+		iValue, err := strconv.Atoi(*mValue)
 		if err != nil {
 			return repo.Metric{},
 				&customerror.IvalidArgumentError{RawMetric: rawMetric}
 		}
-		return repo.Metric{Type: parts[2], Name: parts[3], IValue: iValue}, nil
+		return repo.Metric{Type: *mType, Name: *mName, IValue: iValue}, nil
 	}
 	return repo.Metric{},
 		&customerror.IvalidArgumentError{RawMetric: rawMetric}
