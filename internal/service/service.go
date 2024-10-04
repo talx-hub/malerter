@@ -21,7 +21,7 @@ func NewMetricsDumper(repo repo.Repository) *MetricsDumper {
 }
 
 func (d *MetricsDumper) DumpMetric(rawMetric string) error {
-	var metric Metric
+	var metric repo.Metric
 	var err error
 	if metric, err = parseURL(rawMetric); err != nil {
 		return err
@@ -34,28 +34,28 @@ func (d *MetricsDumper) DumpMetric(rawMetric string) error {
 	return nil
 }
 
-func parseURL(rawMetric string) (Metric, error) {
+func parseURL(rawMetric string) (repo.Metric, error) {
 	parts := strings.Split(rawMetric, "/")
 	if len(parts) != 4 {
-		return Metric{},
+		return repo.Metric{},
 			&customerror.IvalidArgumentError{RawMetric: rawMetric}
 	}
 
 	if parts[1] == "gauge" {
 		fValue, err := strconv.ParseFloat(parts[3], 64)
 		if err != nil {
-			return Metric{},
+			return repo.Metric{},
 				&customerror.IvalidArgumentError{RawMetric: rawMetric}
 		}
-		return Metric{mType: parts[1], name: parts[2], fValue: fValue}, nil
+		return repo.Metric{Type: parts[1], Name: parts[2], FValue: fValue}, nil
 	} else if parts[1] == "counter" {
 		iValue, err := strconv.Atoi(parts[3])
 		if err != nil {
-			return Metric{},
+			return repo.Metric{},
 				&customerror.IvalidArgumentError{RawMetric: rawMetric}
 		}
-		return Metric{mType: parts[1], name: parts[2], iValue: iValue}, nil
+		return repo.Metric{Type: parts[1], Name: parts[2], IValue: iValue}, nil
 	}
-	return Metric{},
+	return repo.Metric{},
 		&customerror.IvalidArgumentError{RawMetric: rawMetric}
 }
