@@ -23,3 +23,11 @@ func (m *Metric) String() string {
 	var mSlice = []string{m.Type, m.Name, value}
 	return strings.Join(mSlice, "/")
 }
+
+func (m *Metric) Update(other Metric) {
+	if m.Type == "gauge" {
+		m.FValue = other.FValue
+	} else {
+		m.IValue += other.IValue
+	}
+}

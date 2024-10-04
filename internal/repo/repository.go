@@ -10,23 +10,29 @@ type Repository interface {
 }
 
 type MemRepository struct {
-	data []Metric
+	data map[string]Metric
 }
 
 func NewMemRepository() *MemRepository {
-	return &MemRepository{}
+	return &MemRepository{data: make(map[string]Metric)}
 }
 
 func (r *MemRepository) Store(metric Metric) error {
-	r.data = append(r.data, metric)
+	dummyKey := metric.Type + metric.Name
+	if old, found := r.data[dummyKey]; found {
+		old.Update(metric)
+		n := old
+		r.data[dummyKey] = n
+	} else {
+		r.data[dummyKey] = metric
+	}
 	return nil
 }
 
 func (r *MemRepository) Get(metric Metric) (Metric, error) {
-	for _, e := range r.data {
-		if e == metric {
-			return e, nil
-		}
+	dummyKey := metric.Type + metric.Name
+	if m, found := r.data[dummyKey]; found {
+		return m, nil
 	}
 	// TODO: почему тут нужно возвращать адрес???
 	return Metric{},
