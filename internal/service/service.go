@@ -36,25 +36,25 @@ func (d *MetricsDumper) DumpMetric(rawMetric string) error {
 
 func parseURL(rawMetric string) (repo.Metric, error) {
 	parts := strings.Split(rawMetric, "/")
-	if len(parts) != 4 {
+	if len(parts) != 5 {
 		return repo.Metric{},
 			&customerror.IvalidArgumentError{RawMetric: rawMetric}
 	}
 
-	if parts[1] == "gauge" {
-		fValue, err := strconv.ParseFloat(parts[3], 64)
+	if parts[2] == "gauge" {
+		fValue, err := strconv.ParseFloat(parts[4], 64)
 		if err != nil {
 			return repo.Metric{},
 				&customerror.IvalidArgumentError{RawMetric: rawMetric}
 		}
-		return repo.Metric{Type: parts[1], Name: parts[2], FValue: fValue}, nil
-	} else if parts[1] == "counter" {
-		iValue, err := strconv.Atoi(parts[3])
+		return repo.Metric{Type: parts[2], Name: parts[3], FValue: fValue}, nil
+	} else if parts[2] == "counter" {
+		iValue, err := strconv.Atoi(parts[4])
 		if err != nil {
 			return repo.Metric{},
 				&customerror.IvalidArgumentError{RawMetric: rawMetric}
 		}
-		return repo.Metric{Type: parts[1], Name: parts[2], IValue: iValue}, nil
+		return repo.Metric{Type: parts[2], Name: parts[3], IValue: iValue}, nil
 	}
 	return repo.Metric{},
 		&customerror.IvalidArgumentError{RawMetric: rawMetric}
