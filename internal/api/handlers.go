@@ -35,7 +35,7 @@ func (h *HTTPHandler) DumpMetric(w http.ResponseWriter, r *http.Request) {
 		switch err.(type) {
 		case *customerror.NotFoundError:
 			http.Error(w, err.Error(), http.StatusNotFound)
-		case *customerror.WrongTypeError:
+		case *customerror.IvalidArgumentError:
 			http.Error(w, err.Error(), http.StatusBadRequest)
 		default:
 			http.Error(w, err.Error(), http.StatusInternalServerError)

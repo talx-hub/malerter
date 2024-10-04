@@ -1,6 +1,11 @@
 package service
 
-import "github.com/alant1t/metricscoll/internal/repo"
+import (
+	"github.com/alant1t/metricscoll/internal/customerror"
+	"github.com/alant1t/metricscoll/internal/repo"
+	"strconv"
+	"strings"
+)
 
 type Service interface {
 	DumpMetric(string) error
@@ -16,7 +21,7 @@ func NewMetricsDumper(repo repo.Repository) *MetricsDumper {
 }
 
 func (d *MetricsDumper) DumpMetric(rawMetric string) error {
-	var metric string
+	var metric Metric
 	var err error
 	if metric, err = parseURL(rawMetric); err != nil {
 		return err
@@ -29,6 +34,28 @@ func (d *MetricsDumper) DumpMetric(rawMetric string) error {
 	return nil
 }
 
-func parseURL(metricURL string) (string, error) {
-	return metricURL, nil
+func parseURL(rawMetric string) (Metric, error) {
+	parts := strings.Split(rawMetric, "/")
+	if len(parts) != 4 {
+		return Metric{},
+			&customerror.IvalidArgumentError{RawMetric: rawMetric}
+	}
+
+	if parts[1] == "gauge" {
+		fValue, err := strconv.ParseFloat(parts[3], 64)
+		if err != nil {
+			return Metric{},
+				&customerror.IvalidArgumentError{RawMetric: rawMetric}
+		}
+		return Metric{mType: parts[1], name: parts[2], fValue: fValue}, nil
+	} else if parts[1] == "counter" {
+		iValue, err := strconv.Atoi(parts[3])
+		if err != nil {
+			return Metric{},
+				&customerror.IvalidArgumentError{RawMetric: rawMetric}
+		}
+		return Metric{mType: parts[1], name: parts[2], iValue: iValue}, nil
+	}
+	return Metric{},
+		&customerror.IvalidArgumentError{RawMetric: rawMetric}
 }
