@@ -11,7 +11,7 @@ type MetricsDumper struct {
 }
 
 func NewMetricsDumper(repo repo.Repository) *MetricsDumper {
-	// почему тут возвращаем адрес?
+	// TODO: почему тут нужно возвращать адрес?
 	return &MetricsDumper{repo: repo}
 }
 

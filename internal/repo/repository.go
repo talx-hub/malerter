@@ -11,6 +11,10 @@ type MemRepository struct {
 	data []string
 }
 
+func NewMemRepository() *MemRepository {
+	return &MemRepository{}
+}
+
 func (r *MemRepository) Store(metric string) error {
 	r.data = append(r.data, metric)
 	return nil
@@ -22,6 +26,6 @@ func (r *MemRepository) Get(metric string) (string, error) {
 			return e, nil
 		}
 	}
-	// почему тут нужно брать адрес???
+	// TODO: почему тут нужно возвращать адрес???
 	return "", &customerror.NotFoundError{Metric: metric}
 }

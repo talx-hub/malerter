@@ -8,8 +8,8 @@ import (
 )
 
 func main() {
-	rep := repo.MemRepository{}
-	serv := service.NewMetricsDumper(&rep)
+	rep := repo.NewMemRepository()
+	serv := service.NewMetricsDumper(rep)
 	handler := api.NewHTTPHandler(serv)
 
 	var updateHandler http.Handler = http.HandlerFunc(handler.DumpMetric)
