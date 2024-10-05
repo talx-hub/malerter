@@ -21,7 +21,7 @@ func NewMemRepository() *MemRepository {
 }
 
 func (r *MemRepository) Store(metric Metric) {
-	dummyKey := metric.Type + metric.Name
+	dummyKey := metric.Type.String() + metric.Name
 	if old, found := r.data[dummyKey]; found {
 		old.Update(metric)
 		n := old
@@ -32,7 +32,7 @@ func (r *MemRepository) Store(metric Metric) {
 }
 
 func (r *MemRepository) Get(metric Metric) (Metric, error) {
-	dummyKey := metric.Type + metric.Name
+	dummyKey := metric.Type.String() + metric.Name
 	if m, found := r.data[dummyKey]; found {
 		return m, nil
 	}

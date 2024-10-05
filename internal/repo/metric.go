@@ -45,36 +45,47 @@ func (m MetricName) String() string {
 	return string(m)
 }
 
+type MetricType string
+
+const (
+	MetricTypeGauge   MetricType = "gauge"
+	MetricTypeCounter MetricType = "counter"
+)
+
+func (t MetricType) String() string {
+	return string(t)
+}
+
 type Metric struct {
-	Type  string
+	Type  MetricType
 	Name  string
 	Value any
 }
 
 func NewMetric(name MetricName, value any) Metric {
-	var mType string
+	var mType MetricType
 	if name == MetricPollCount {
-		mType = "counter"
+		mType = MetricTypeCounter
 	} else {
-		mType = "gauge"
+		mType = MetricTypeGauge
 	}
 	return Metric{Type: mType, Name: name.String(), Value: value}
 }
 
 func (m *Metric) String() string {
 	var value string
-	if m.Type == "gauge" {
+	if m.Type == MetricTypeGauge {
 		value = strconv.FormatFloat(m.Value.(float64), 'f', 2, 64)
 	} else {
 		value = strconv.Itoa(m.Value.(int))
 	}
 
-	var mSlice = []string{m.Type, m.Name, value}
+	var mSlice = []string{m.Type.String(), m.Name, value}
 	return strings.Join(mSlice, "/")
 }
 
 func (m *Metric) Update(other Metric) {
-	if m.Type == "gauge" {
+	if m.Type == MetricTypeGauge {
 		m.Value = other.Value
 	} else {
 		updated := m.Value.(int) + other.Value.(int)

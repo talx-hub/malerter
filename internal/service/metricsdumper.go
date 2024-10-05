@@ -22,11 +22,7 @@ func (d *MetricsDumper) DumpMetric(rawMetric string) error {
 	if metric, err = parseURL(rawMetric); err != nil {
 		return err
 	}
-
-	if err = d.repo.Store(metric); err != nil {
-		return err
-	}
-
+	d.repo.Store(metric)
 	return nil
 }
 
@@ -51,14 +47,14 @@ func parseURL(rawMetric string) (repo.Metric, error) {
 			return repo.Metric{},
 				&customerror.IvalidArgumentError{RawMetric: rawMetric}
 		}
-		return repo.Metric{Type: *mType, Name: *mName, Value: fValue}, nil
+		return repo.Metric{Type: repo.MetricTypeGauge, Name: *mName, Value: fValue}, nil
 	} else if *mType == "counter" {
 		iValue, err := strconv.Atoi(*mValue)
 		if err != nil {
 			return repo.Metric{},
 				&customerror.IvalidArgumentError{RawMetric: rawMetric}
 		}
-		return repo.Metric{Type: *mType, Name: *mName, Value: iValue}, nil
+		return repo.Metric{Type: repo.MetricTypeCounter, Name: *mName, Value: iValue}, nil
 	}
 	return repo.Metric{},
 		&customerror.IvalidArgumentError{RawMetric: rawMetric}
