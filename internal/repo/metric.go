@@ -6,18 +6,17 @@ import (
 )
 
 type Metric struct {
-	Type   string
-	Name   string
-	IValue int
-	FValue float64
+	Type  string
+	Name  string
+	Value any
 }
 
 func (m *Metric) String() string {
 	var value string
 	if m.Type == "gauge" {
-		value = strconv.FormatFloat(m.FValue, 'f', 2, 64)
+		value = strconv.FormatFloat(m.Value.(float64), 'f', 2, 64)
 	} else {
-		value = strconv.Itoa(m.IValue)
+		value = strconv.Itoa(m.Value.(int))
 	}
 
 	var mSlice = []string{m.Type, m.Name, value}
@@ -26,8 +25,9 @@ func (m *Metric) String() string {
 
 func (m *Metric) Update(other Metric) {
 	if m.Type == "gauge" {
-		m.FValue = other.FValue
+		m.Value = other.Value
 	} else {
-		m.IValue += other.IValue
+		updated := m.Value.(int) + other.Value.(int)
+		m.Value = updated
 	}
 }
