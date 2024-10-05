@@ -7,6 +7,7 @@ import (
 type Repository interface {
 	Store(metric Metric) error
 	Get(metric Metric) (Metric, error)
+	GetAll() []Metric
 }
 
 // TODO: подумать над тем, чтобы передать на массив
@@ -39,4 +40,12 @@ func (r *MemRepository) Get(metric Metric) (Metric, error) {
 	// TODO: почему тут нужно возвращать адрес???
 	return Metric{},
 		&customerror.NotFoundError{RawMetric: metric.String()}
+}
+
+func (r *MemRepository) GetAll() []Metric {
+	var metrics []Metric
+	for _, m := range r.data {
+		metrics = append(metrics, m)
+	}
+	return metrics
 }
