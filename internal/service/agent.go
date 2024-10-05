@@ -69,11 +69,10 @@ func collect() []r.Metric {
 	return metrics
 }
 
-func (a *Agent) store(metrics []r.Metric) error {
+func (a *Agent) store(metrics []r.Metric) {
 	for _, m := range metrics {
 		a.repo.Store(m)
 	}
-	return nil
 }
 
 func (a *Agent) get() []r.Metric {
