@@ -2,8 +2,10 @@ package service
 
 import (
 	r "github.com/alant1t/metricscoll/internal/repo"
+	"io"
 	"math/rand"
 	"net/http"
+	"os"
 	"runtime"
 )
 
@@ -91,6 +93,7 @@ func convertToURLs(metrics []r.Metric) []string {
 func send(urls []string) {
 	for _, url := range urls {
 		response, _ := http.Post(url, "text/plain", nil)
+		io.Copy(os.Stdout, response.Body) // вывод ответа в консоль
 		response.Body.Close()
 	}
 }
