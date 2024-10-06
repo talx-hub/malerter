@@ -24,11 +24,11 @@ func (h *HTTPHandler) DumpMetric(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if r.Header.Get("Content-Type") != "text/plain" {
-		e := "content-Type must be \"text/plain\""
-		http.Error(w, e, http.StatusBadRequest)
-		return
-	}
+	//if r.Header.Get("Content-Type") != "text/plain" {
+	//	e := "content-Type must be \"text/plain\""
+	//	http.Error(w, e, http.StatusBadRequest)
+	//	return
+	//}
 
 	rawMetric := r.URL.Path
 	if err := h.service.DumpMetric(rawMetric); err != nil {
