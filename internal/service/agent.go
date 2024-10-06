@@ -5,7 +5,6 @@ import (
 	"io"
 	"math/rand"
 	"net/http"
-	"os"
 	"runtime"
 )
 
@@ -92,8 +91,11 @@ func convertToURLs(metrics []r.Metric) []string {
 
 func send(urls []string) {
 	for _, url := range urls {
-		response, _ := http.Post(url, "text/plain", nil)
-		io.Copy(os.Stdout, response.Body) // вывод ответа в консоль
+		response, err := http.Post(url, "text/plain", nil)
+		if err != nil {
+			continue
+		}
+		io.ReadAll(response.Body)
 		response.Body.Close()
 	}
 }
