@@ -19,13 +19,13 @@ func NewHTTPHandler(service service.Service) *HTTPHandler {
 
 func (h *HTTPHandler) DumpMetric(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		e := "Only POST requests are allowed"
+		e := "only POST requests are allowed"
 		http.Error(w, e, http.StatusBadRequest)
 		return
 	}
 
 	if r.Header.Get("Content-Type") != "text/plain" {
-		e := "Content-Type must be \"text/plain\""
+		e := "content-Type must be \"text/plain\""
 		http.Error(w, e, http.StatusBadRequest)
 		return
 	}
@@ -35,7 +35,7 @@ func (h *HTTPHandler) DumpMetric(w http.ResponseWriter, r *http.Request) {
 		switch err.(type) {
 		case *customerror.NotFoundError:
 			http.Error(w, err.Error(), http.StatusNotFound)
-		case *customerror.IvalidArgumentError:
+		case *customerror.InvalidArgumentError:
 			http.Error(w, err.Error(), http.StatusBadRequest)
 		default:
 			http.Error(w, err.Error(), http.StatusInternalServerError)

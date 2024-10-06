@@ -7,13 +7,13 @@ type NotFoundError struct {
 }
 
 func (e *NotFoundError) Error() string {
-	return fmt.Sprintf("Metric %v not found", e.RawMetric)
+	return fmt.Sprintf("metric %v not found", e.RawMetric)
 }
 
-type IvalidArgumentError struct {
+type InvalidArgumentError struct {
 	RawMetric string
 }
 
-func (e *IvalidArgumentError) Error() string {
-	return fmt.Sprintf("Raw metric %v is incorrect", e.RawMetric)
+func (e *InvalidArgumentError) Error() string {
+	return fmt.Sprintf("metric %v is incorrect", e.RawMetric)
 }

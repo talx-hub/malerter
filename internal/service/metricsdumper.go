@@ -38,24 +38,24 @@ func parseURL(rawMetric string) (repo.Metric, error) {
 	mValue := &parts[4]
 	if *mType == "" || *mName == "" || *mValue == "" {
 		return repo.Metric{},
-			&customerror.IvalidArgumentError{RawMetric: rawMetric}
+			&customerror.InvalidArgumentError{RawMetric: rawMetric}
 	}
 
 	if *mType == "gauge" {
 		fValue, err := strconv.ParseFloat(*mValue, 64)
 		if err != nil {
 			return repo.Metric{},
-				&customerror.IvalidArgumentError{RawMetric: rawMetric}
+				&customerror.InvalidArgumentError{RawMetric: rawMetric}
 		}
 		return repo.Metric{Type: repo.MetricTypeGauge, Name: *mName, Value: fValue}, nil
 	} else if *mType == "counter" {
 		iValue, err := strconv.Atoi(*mValue)
 		if err != nil {
 			return repo.Metric{},
-				&customerror.IvalidArgumentError{RawMetric: rawMetric}
+				&customerror.InvalidArgumentError{RawMetric: rawMetric}
 		}
 		return repo.Metric{Type: repo.MetricTypeCounter, Name: *mName, Value: iValue}, nil
 	}
 	return repo.Metric{},
-		&customerror.IvalidArgumentError{RawMetric: rawMetric}
+		&customerror.InvalidArgumentError{RawMetric: rawMetric}
 }
