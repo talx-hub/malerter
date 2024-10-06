@@ -34,7 +34,7 @@ func collect() []r.Metric {
 	var memStats runtime.MemStats
 	runtime.ReadMemStats(&memStats)
 	var randomValue = rand.Float64()
-	var metrics = make([]r.Metric, r.MetricCount, r.MetricCount)
+	var metrics = make([]r.Metric, r.MetricCount)
 
 	metrics[0] = r.NewMetric(r.MetricAlloc, float64(memStats.Alloc))
 	metrics[1] = r.NewMetric(r.MetricBuckHashSys, float64(memStats.BuckHashSys))
@@ -90,6 +90,7 @@ func convertToURLs(metrics []r.Metric) []string {
 
 func send(urls []string) {
 	for _, url := range urls {
-		http.Post(url, "text/plain", nil)
+		response, _ := http.Post(url, "text/plain", nil)
+		response.Body.Close()
 	}
 }
