@@ -14,10 +14,12 @@ func main() {
 
 	var updateHandler http.Handler = http.HandlerFunc(handler.DumpMetric)
 	var getHandler http.Handler = http.HandlerFunc(handler.GetMetric)
+	var getAllHandler http.Handler = http.HandlerFunc(handler.GetAll)
 
 	mux := http.NewServeMux()
 	mux.Handle("/update/", updateHandler)
-	mux.Handle("value", getHandler)
+	mux.Handle("/value/", getHandler)
+	mux.Handle("/", getAllHandler)
 
 	err := http.ListenAndServe(":8080", mux)
 	if err != nil {

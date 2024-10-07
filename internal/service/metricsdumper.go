@@ -40,6 +40,10 @@ func (d *MetricsDumper) Get(rawMetric string) (repo.Metric, error) {
 	return res, nil
 }
 
+func (d *MetricsDumper) GetAll() []repo.Metric {
+	return d.repo.GetAll()
+}
+
 func parseURL(rawMetric string) (repo.Metric, error) {
 	parts := strings.Split(rawMetric, "/")
 	if len(parts) < 4 {
@@ -68,7 +72,7 @@ func parseURL(rawMetric string) (repo.Metric, error) {
 
 	// значение должно быть числом и соответствовать типу
 	mValue := &parts[4]
-	iVal, iErr := strconv.Atoi(*mValue)
+	iVal, iErr := strconv.ParseInt(*mValue, 10, 64)
 	if mType == repo.MetricTypeCounter && iErr == nil {
 		return repo.Metric{Type: mType, Name: *mName, Value: iVal}, nil
 	}

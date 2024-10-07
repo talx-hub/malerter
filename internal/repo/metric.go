@@ -1,8 +1,7 @@
 package repo
 
 import (
-	"strconv"
-	"strings"
+	"fmt"
 )
 
 const MetricCount = 29
@@ -77,24 +76,15 @@ func NewMetric(name MetricName, value any) Metric {
 }
 
 func (m *Metric) String() string {
-	var value string
-	if m.Value == nil {
-		value = ""
-	} else if m.Type == MetricTypeGauge {
-		value = strconv.FormatFloat(m.Value.(float64), 'f', 2, 64)
-	} else {
-		value = strconv.Itoa(m.Value.(int))
-	}
-
-	var mSlice = []string{m.Type.String(), m.Name, value}
-	return strings.Join(mSlice, "/")
+	return fmt.Sprintf("%s(%s): %v",
+		m.Name, m.Type.String(), m.Value)
 }
 
 func (m *Metric) Update(other Metric) {
 	if m.Type == MetricTypeGauge {
 		m.Value = other.Value
 	} else {
-		updated := m.Value.(int) + other.Value.(int)
+		updated := m.Value.(int64) + other.Value.(int64)
 		m.Value = updated
 	}
 }

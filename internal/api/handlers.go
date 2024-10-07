@@ -1,12 +1,12 @@
 package api
 
 import (
+	"fmt"
 	"github.com/alant1t/metricscoll/internal/customerror"
 	"github.com/alant1t/metricscoll/internal/repo"
 	"github.com/alant1t/metricscoll/internal/service"
 	"log"
 	"net/http"
-	"strconv"
 )
 
 type HTTPHandler struct {
@@ -59,18 +59,43 @@ func (h *HTTPHandler) GetMetric(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var valueStr string
-	if m.Type == repo.MetricTypeCounter {
-		valueStr = strconv.FormatInt(m.Value.(int64), 10)
-	} else {
-		valueStr = strconv.FormatFloat(
-			m.Value.(float64), 'f', 2, 64)
-	}
-
+	valueStr := fmt.Sprintf("%v", m.Value)
 	_, err = w.Write([]byte(valueStr))
 	if err != nil {
 		log.Fatal(err)
 	}
 
+	w.Header().Set("content-type", "text/plain")
 	w.WriteHeader(http.StatusOK)
+}
+
+func (h *HTTPHandler) GetAll(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		e := "only GET requests are allowed"
+		http.Error(w, e, http.StatusBadRequest)
+		return
+	}
+
+	metrics := h.service.GetAll()
+	page := createMetricsPage(metrics)
+	_, err := w.Write([]byte(page))
+	if err != nil {
+		log.Fatal(err)
+	}
+	w.Header().Set("content-type", "text/html")
+	w.WriteHeader(http.StatusOK)
+}
+
+func createMetricsPage(metrics []repo.Metric) string {
+	var page = `<html>
+	<body>
+%s	</body>
+</html>`
+
+	var data string
+	for _, m := range metrics {
+		data += fmt.Sprintf("\t\t<p>%s</p>\n", m.String())
+	}
+	fmt.Printf(page, data)
+	return fmt.Sprintf(page, data)
 }

@@ -95,7 +95,7 @@ type mockRepo struct {
 	d map[string]repo.Metric
 }
 
-func (r *mockRepo) Store(m repo.Metric) {}
+func (r *mockRepo) Store(repo.Metric) {}
 func (r *mockRepo) Get(m repo.Metric) (repo.Metric, error) {
 	dummyKey := m.Type.String() + m.Name
 	if mm, found := r.d[dummyKey]; found {
@@ -117,8 +117,8 @@ func TestHTTPHandler_GetMetric(t *testing.T) {
 		{"/value/counter/mainQuestion", "42", 200},
 		{"/value/gauge/pi", "3.14", 200},
 		{"/value/wrong/pi", "metric /value/wrong/pi is incorrect\n", 400},
-		{"/value/gauge/wrong", "metric gauge/wrong/ not found\n", 404},
-		{"/value/counter/wrong", "metric counter/wrong/ not found\n", 404},
+		{"/value/gauge/wrong", "metric wrong(gauge): <nil> not found\n", 404},
+		{"/value/counter/wrong", "metric wrong(counter): <nil> not found\n", 404},
 		{"/value/counter", "metric /value/counter not found\n", 404},
 		{"/value/gauge", "metric /value/gauge not found\n", 404},
 	}
