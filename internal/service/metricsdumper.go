@@ -12,18 +12,32 @@ type MetricsDumper struct {
 }
 
 func NewMetricsDumper(repo repo.Repository) *MetricsDumper {
-	// TODO: почему тут нужно возвращать адрес?
 	return &MetricsDumper{repo: repo}
 }
 
 func (d *MetricsDumper) DumpMetric(rawMetric string) error {
-	var metric repo.Metric
-	var err error
-	if metric, err = parseURL(rawMetric); err != nil {
+	metric, err := parseURL(rawMetric)
+	if err != nil {
 		return err
+	}
+	if metric.Value == nil {
+		return &customerror.InvalidArgumentError{RawMetric: rawMetric}
 	}
 	d.repo.Store(metric)
 	return nil
+}
+
+func (d *MetricsDumper) GetMetric(rawMetric string) (repo.Metric, error) {
+	m, err := parseURL(rawMetric)
+	if err != nil {
+		return repo.Metric{}, err
+	}
+
+	res, err := d.repo.Get(m)
+	if err != nil {
+		return repo.Metric{}, err
+	}
+	return res, nil
 }
 
 func parseURL(rawMetric string) (repo.Metric, error) {
