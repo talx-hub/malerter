@@ -13,9 +13,11 @@ func main() {
 	handler := api.NewHTTPHandler(serv)
 
 	var updateHandler http.Handler = http.HandlerFunc(handler.DumpMetric)
+	var getHandler http.Handler = http.HandlerFunc(handler.GetMetric)
 
 	mux := http.NewServeMux()
 	mux.Handle("/update/", updateHandler)
+	mux.Handle("value", getHandler)
 
 	err := http.ListenAndServe(":8080", mux)
 	if err != nil {
