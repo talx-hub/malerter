@@ -2,7 +2,7 @@ package service
 
 import (
 	r "github.com/alant1t/metricscoll/internal/repo"
-	"io"
+	"log"
 	"math/rand"
 	"net/http"
 	"runtime"
@@ -95,7 +95,8 @@ func send(urls []string) {
 		if err != nil {
 			continue
 		}
-		io.ReadAll(response.Body)
-		response.Body.Close()
+		if err := response.Body.Close(); err != nil {
+			log.Fatal(err)
+		}
 	}
 }

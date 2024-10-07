@@ -81,6 +81,9 @@ func TestHTTPHandler_DumpMetric(t *testing.T) {
 		resp, got := testRequest(t, ts, http.MethodGet, wrongMethodTest.url)
 		assert.Equal(t, wrongMethodTest.status, resp.StatusCode)
 		assert.Equal(t, wrongMethodTest.want, got)
+		if err := resp.Body.Close(); err != nil {
+			log.Fatal(err)
+		}
 	})
 
 	for _, tt := range tests {
@@ -88,6 +91,9 @@ func TestHTTPHandler_DumpMetric(t *testing.T) {
 			resp, got := testRequest(t, ts, http.MethodPost, tt.url)
 			assert.Equal(t, tt.status, resp.StatusCode)
 			assert.Equal(t, tt.want, got)
+			if err := resp.Body.Close(); err != nil {
+				log.Fatal(err)
+			}
 		})
 	}
 }
@@ -138,6 +144,9 @@ func TestHTTPHandler_GetMetric(t *testing.T) {
 			resp, got := testRequest(t, ts, http.MethodGet, tt.url)
 			assert.Equal(t, tt.status, resp.StatusCode)
 			assert.Equal(t, tt.want, got)
+			if err := resp.Body.Close(); err != nil {
+				log.Fatal(err)
+			}
 		})
 	}
 }
@@ -153,10 +162,6 @@ func testRequest(t *testing.T, ts *httptest.Server,
 
 	body, err := io.ReadAll(resp.Body)
 	require.NoError(t, err)
-	got := string(body)
-	if err := resp.Body.Close(); err != nil {
-		log.Fatal(err)
-	}
 
-	return resp, got
+	return resp, string(body)
 }
