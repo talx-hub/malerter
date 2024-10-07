@@ -77,16 +77,16 @@ func TestHTTPHandler_DumpMetric(t *testing.T) {
 		status: 400,
 	}
 	t.Run("wrong method test", func(t *testing.T) {
-		resp, body := testRequest(t, ts, http.MethodGet, wrongMethodTest.url)
+		resp, got := testRequest(t, ts, http.MethodGet, wrongMethodTest.url)
 		assert.Equal(t, wrongMethodTest.status, resp.StatusCode)
-		assert.Equal(t, wrongMethodTest.want, body)
+		assert.Equal(t, wrongMethodTest.want, got)
 	})
 
 	for _, tt := range tests {
 		t.Run(tt.url, func(t *testing.T) {
-			resp, body := testRequest(t, ts, http.MethodPost, tt.url)
+			resp, got := testRequest(t, ts, http.MethodPost, tt.url)
 			assert.Equal(t, tt.status, resp.StatusCode)
-			assert.Equal(t, tt.want, body)
+			assert.Equal(t, tt.want, got)
 		})
 	}
 }
@@ -134,9 +134,9 @@ func TestHTTPHandler_GetMetric(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.url, func(t *testing.T) {
-			resp, body := testRequest(t, ts, http.MethodGet, tt.url)
+			resp, got := testRequest(t, ts, http.MethodGet, tt.url)
 			assert.Equal(t, tt.status, resp.StatusCode)
-			assert.Equal(t, tt.want, body)
+			assert.Equal(t, tt.want, got)
 		})
 	}
 }

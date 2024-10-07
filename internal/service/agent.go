@@ -65,7 +65,7 @@ func collect() []r.Metric {
 	metrics[25] = r.NewMetric(r.MetricSys, float64(memStats.Sys))
 	metrics[26] = r.NewMetric(r.MetricTotalAlloc, float64(memStats.TotalAlloc))
 	metrics[27] = r.NewMetric(r.MetricRandomValue, randomValue)
-	metrics[28] = r.NewMetric(r.MetricPollCount, 1)
+	metrics[28] = r.NewMetric(r.MetricPollCount, int64(1))
 
 	return metrics
 }
