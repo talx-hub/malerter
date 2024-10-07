@@ -24,12 +24,6 @@ func (h *HTTPHandler) DumpMetric(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	//if r.Header.Get("Content-Type") != "text/plain" {
-	//	e := "content-Type must be \"text/plain\""
-	//	http.Error(w, e, http.StatusBadRequest)
-	//	return
-	//}
-
 	rawMetric := r.URL.Path
 	if err := h.service.DumpMetric(rawMetric); err != nil {
 		switch err.(type) {
@@ -43,5 +37,22 @@ func (h *HTTPHandler) DumpMetric(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	w.WriteHeader(http.StatusOK)
+}
+
+func (h *HTTPHandler) GetMetric(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		e := "only GET requests are allowed"
+		http.Error(w, e, http.StatusBadRequest)
+		return
+	}
+
+	rawMetric := r.URL.Path
+	m, err := h.service.GetMetric(rawMetric)
+	if err != nil {
+		return
+	}
+
+	w.Write([]byte(m.Value))
 	w.WriteHeader(http.StatusOK)
 }
