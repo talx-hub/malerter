@@ -72,10 +72,10 @@ func TestHTTPHandler_DumpMetric(t *testing.T) {
 		{
 			name:   "negative test #3: wrong metric type",
 			method: http.MethodPost,
-			reqURL: "/update/gage/someMetric/1",
+			reqURL: "/update/WRONG/someMetric/1",
 			want: want{
 				code:     400,
-				response: "metric /update/gage/someMetric/1 is incorrect\n",
+				response: "metric /update/WRONG/someMetric/1 is incorrect\n",
 			},
 		},
 		{

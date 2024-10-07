@@ -2,13 +2,13 @@ package api
 
 import (
 	"github.com/alant1t/metricscoll/internal/customerror"
+	"github.com/alant1t/metricscoll/internal/repo"
 	"github.com/alant1t/metricscoll/internal/service"
+	"log"
 	"net/http"
+	"strconv"
 )
 
-// TODO: Зачем мы создаем свою структуру хэндлера?
-//   - Почему просто не сделать пакет с экспортируемыми
-//   - функциями?
 type HTTPHandler struct {
 	service service.Service
 }
@@ -25,7 +25,7 @@ func (h *HTTPHandler) DumpMetric(w http.ResponseWriter, r *http.Request) {
 	}
 
 	rawMetric := r.URL.Path
-	if err := h.service.DumpMetric(rawMetric); err != nil {
+	if err := h.service.Store(rawMetric); err != nil {
 		switch err.(type) {
 		case *customerror.NotFoundError:
 			http.Error(w, err.Error(), http.StatusNotFound)
@@ -48,11 +48,23 @@ func (h *HTTPHandler) GetMetric(w http.ResponseWriter, r *http.Request) {
 	}
 
 	rawMetric := r.URL.Path
-	m, err := h.service.GetMetric(rawMetric)
+	m, err := h.service.Get(rawMetric)
 	if err != nil {
 		return
 	}
 
-	w.Write([]byte(m.Value))
+	var valueStr string
+	if m.Type == repo.MetricTypeCounter {
+		valueStr = strconv.FormatInt(m.Value.(int64), 10)
+	} else {
+		valueStr = strconv.FormatFloat(
+			m.Value.(float64), 'f', 2, 64)
+	}
+
+	_, err = w.Write([]byte(valueStr))
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	w.WriteHeader(http.StatusOK)
 }
