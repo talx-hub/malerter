@@ -74,7 +74,7 @@ func parseURL(rawMetric string) (repo.Metric, error) {
 	}
 
 	fVal, fErr := strconv.ParseFloat(*mValue, 64)
-	if mType == repo.MetricTypeGauge && fErr != nil {
+	if mType == repo.MetricTypeGauge && fErr == nil {
 		return repo.Metric{Type: mType, Name: *mName, Value: fVal}, nil
 	}
 
