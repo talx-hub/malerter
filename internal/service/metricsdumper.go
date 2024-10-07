@@ -21,7 +21,7 @@ func (d *MetricsDumper) Store(rawMetric string) error {
 		return err
 	}
 	if metric.Value == nil {
-		return &customerror.InvalidArgumentError{RawMetric: rawMetric}
+		return &customerror.NotFoundError{RawMetric: rawMetric}
 	}
 	d.repo.Store(metric)
 	return nil
