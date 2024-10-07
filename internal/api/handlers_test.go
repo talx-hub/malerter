@@ -1,6 +1,7 @@
 package api
 
 import (
+	"github.com/alant1t/metricscoll/internal/customerror"
 	"github.com/alant1t/metricscoll/internal/repo"
 	"github.com/alant1t/metricscoll/internal/service"
 	"github.com/stretchr/testify/assert"
@@ -84,6 +85,56 @@ func TestHTTPHandler_DumpMetric(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.url, func(t *testing.T) {
 			resp, body := testRequest(t, ts, http.MethodPost, tt.url)
+			assert.Equal(t, tt.status, resp.StatusCode)
+			assert.Equal(t, tt.want, body)
+		})
+	}
+}
+
+type mockRepo struct {
+	d map[string]repo.Metric
+}
+
+func (r *mockRepo) Store(m repo.Metric) {}
+func (r *mockRepo) Get(m repo.Metric) (repo.Metric, error) {
+	dummyKey := m.Type.String() + m.Name
+	if mm, found := r.d[dummyKey]; found {
+		return mm, nil
+	}
+	return repo.Metric{},
+		&customerror.NotFoundError{RawMetric: m.String()}
+}
+func (r *mockRepo) GetAll() []repo.Metric {
+	var metrics []repo.Metric
+	for _, m := range r.d {
+		metrics = append(metrics, m)
+	}
+	return metrics
+}
+
+func TestHTTPHandler_GetMetric(t *testing.T) {
+	tests := []test{
+		{"/value/counter/mainQuestion", "42", 200},
+		{"/value/gauge/pi", "3.14", 200},
+		{"/value/wrong/pi", "metric /value/wrong/pi is incorrect\n", 400},
+		{"/value/gauge/wrong", "metric gauge/wrong/ not found\n", 404},
+		{"/value/counter/wrong", "metric counter/wrong/ not found\n", 404},
+		{"/value/counter", "metric /value/counter not found\n", 404},
+		{"/value/gauge", "metric /value/gauge not found\n", 404},
+	}
+	m := map[string]repo.Metric{
+		"countermainQuestion": {Type: repo.MetricTypeCounter, Name: "mainQuestion", Value: int64(42)},
+		"gaugepi":             {Type: repo.MetricTypeGauge, Name: "pi", Value: 3.14},
+	}
+	mock := mockRepo{d: m}
+	serv := service.NewMetricsDumper(&mock)
+	handler := NewHTTPHandler(serv)
+	ts := httptest.NewServer(http.HandlerFunc(handler.GetMetric))
+	defer ts.Close()
+
+	for _, tt := range tests {
+		t.Run(tt.url, func(t *testing.T) {
+			resp, body := testRequest(t, ts, http.MethodGet, tt.url)
 			assert.Equal(t, tt.status, resp.StatusCode)
 			assert.Equal(t, tt.want, body)
 		})
