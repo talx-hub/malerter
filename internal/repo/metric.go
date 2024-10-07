@@ -78,7 +78,9 @@ func NewMetric(name MetricName, value any) Metric {
 
 func (m *Metric) String() string {
 	var value string
-	if m.Type == MetricTypeGauge {
+	if m.Value == nil {
+		value = ""
+	} else if m.Type == MetricTypeGauge {
 		value = strconv.FormatFloat(m.Value.(float64), 'f', 2, 64)
 	} else {
 		value = strconv.Itoa(m.Value.(int))

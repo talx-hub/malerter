@@ -50,6 +50,12 @@ func (h *HTTPHandler) GetMetric(w http.ResponseWriter, r *http.Request) {
 	rawMetric := r.URL.Path
 	m, err := h.service.Get(rawMetric)
 	if err != nil {
+		switch err.(type) {
+		case *customerror.NotFoundError:
+			http.Error(w, err.Error(), http.StatusNotFound)
+		case *customerror.InvalidArgumentError:
+			http.Error(w, err.Error(), http.StatusBadRequest)
+		}
 		return
 	}
 
