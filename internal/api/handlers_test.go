@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"io"
+	"log"
 	"net/http"
 	"net/http/httptest"
 	"reflect"
@@ -152,7 +153,10 @@ func testRequest(t *testing.T, ts *httptest.Server,
 
 	body, err := io.ReadAll(resp.Body)
 	require.NoError(t, err)
-	defer resp.Body.Close()
+	got := string(body)
+	if err := resp.Body.Close(); err != nil {
+		log.Fatal(err)
+	}
 
-	return resp, string(body)
+	return resp, got
 }
