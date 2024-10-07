@@ -4,6 +4,7 @@ import (
 	"github.com/alant1t/metricscoll/internal/api"
 	"github.com/alant1t/metricscoll/internal/repo"
 	"github.com/alant1t/metricscoll/internal/service"
+	"github.com/go-chi/chi/v5"
 	"net/http"
 )
 
@@ -12,16 +13,17 @@ func main() {
 	serv := service.NewMetricsDumper(rep)
 	handler := api.NewHTTPHandler(serv)
 
-	var updateHandler http.Handler = http.HandlerFunc(handler.DumpMetric)
-	var getHandler http.Handler = http.HandlerFunc(handler.GetMetric)
-	var getAllHandler http.Handler = http.HandlerFunc(handler.GetAll)
+	router := chi.NewRouter()
 
-	mux := http.NewServeMux()
-	mux.Handle("/update/", updateHandler)
-	mux.Handle("/value/", getHandler)
-	mux.Handle("/", getAllHandler)
+	var updateHandler = http.HandlerFunc(handler.DumpMetric)
+	var getHandler = http.HandlerFunc(handler.GetMetric)
+	var getAllHandler = http.HandlerFunc(handler.GetAll)
 
-	err := http.ListenAndServe(":8080", mux)
+	router.Get("/", getAllHandler)
+	router.Get("/value/{type}/{name}", getHandler)
+	router.Post("/update/{type}/{name}/{val}", updateHandler)
+
+	err := http.ListenAndServe(":8080", router)
 	if err != nil {
 		panic(err)
 	}
