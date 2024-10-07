@@ -1,5 +1,9 @@
 package service
 
+import "github.com/alant1t/metricscoll/internal/repo"
+
 type Service interface {
-	DumpMetric(string) error
+	Store(string) error
+	Get(string) (repo.Metric, error)
+	//GetAll() []repo.Metric
 }

@@ -15,7 +15,7 @@ func NewMetricsDumper(repo repo.Repository) *MetricsDumper {
 	return &MetricsDumper{repo: repo}
 }
 
-func (d *MetricsDumper) DumpMetric(rawMetric string) error {
+func (d *MetricsDumper) Store(rawMetric string) error {
 	metric, err := parseURL(rawMetric)
 	if err != nil {
 		return err
@@ -27,7 +27,7 @@ func (d *MetricsDumper) DumpMetric(rawMetric string) error {
 	return nil
 }
 
-func (d *MetricsDumper) GetMetric(rawMetric string) (repo.Metric, error) {
+func (d *MetricsDumper) Get(rawMetric string) (repo.Metric, error) {
 	m, err := parseURL(rawMetric)
 	if err != nil {
 		return repo.Metric{}, err

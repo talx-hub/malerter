@@ -36,7 +36,6 @@ func (r *MemRepository) Get(metric Metric) (Metric, error) {
 	if m, found := r.data[dummyKey]; found {
 		return m, nil
 	}
-	// TODO: почему тут нужно возвращать адрес???
 	return Metric{},
 		&customerror.NotFoundError{RawMetric: metric.String()}
 }
