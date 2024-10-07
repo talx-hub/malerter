@@ -52,6 +52,10 @@ const (
 	MetricTypeCounter MetricType = "counter"
 )
 
+func (t MetricType) IsValid() bool {
+	return t == MetricTypeGauge || t == MetricTypeCounter
+}
+
 func (t MetricType) String() string {
 	return string(t)
 }

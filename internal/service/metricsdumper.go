@@ -42,34 +42,42 @@ func (d *MetricsDumper) GetMetric(rawMetric string) (repo.Metric, error) {
 
 func parseURL(rawMetric string) (repo.Metric, error) {
 	parts := strings.Split(rawMetric, "/")
-	if len(parts) != 5 {
+	if len(parts) < 4 {
 		return repo.Metric{},
 			&customerror.NotFoundError{RawMetric: rawMetric}
 	}
 
-	mType := &parts[2]
-	mName := &parts[3]
-	mValue := &parts[4]
-	if *mType == "" || *mName == "" || *mValue == "" {
+	// только два типа метрик позволены
+	mType := repo.MetricType(parts[2])
+	if !mType.IsValid() {
 		return repo.Metric{},
 			&customerror.InvalidArgumentError{RawMetric: rawMetric}
 	}
 
-	if *mType == "gauge" {
-		fValue, err := strconv.ParseFloat(*mValue, 64)
-		if err != nil {
-			return repo.Metric{},
-				&customerror.InvalidArgumentError{RawMetric: rawMetric}
-		}
-		return repo.Metric{Type: repo.MetricTypeGauge, Name: *mName, Value: fValue}, nil
-	} else if *mType == "counter" {
-		iValue, err := strconv.Atoi(*mValue)
-		if err != nil {
-			return repo.Metric{},
-				&customerror.InvalidArgumentError{RawMetric: rawMetric}
-		}
-		return repo.Metric{Type: repo.MetricTypeCounter, Name: *mName, Value: iValue}, nil
+	// имя не должно быть числом
+	mName := &parts[3]
+	_, errF := strconv.ParseFloat(*mName, 64)
+	_, errI := strconv.Atoi(*mName)
+	if errF == nil || errI == nil {
+		return repo.Metric{},
+			&customerror.NotFoundError{RawMetric: rawMetric}
 	}
+	if len(parts) == 4 {
+		return repo.Metric{Type: mType, Name: *mName, Value: nil}, nil
+	}
+
+	// значение должно быть числом и соответствовать типу
+	mValue := &parts[4]
+	iVal, iErr := strconv.Atoi(*mValue)
+	if mType == repo.MetricTypeCounter && iErr == nil {
+		return repo.Metric{Type: mType, Name: *mName, Value: iVal}, nil
+	}
+
+	fVal, fErr := strconv.ParseFloat(*mValue, 64)
+	if mType == repo.MetricTypeGauge && fErr != nil {
+		return repo.Metric{Type: mType, Name: *mName, Value: fVal}, nil
+	}
+
 	return repo.Metric{},
 		&customerror.InvalidArgumentError{RawMetric: rawMetric}
 }
