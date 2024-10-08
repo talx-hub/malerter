@@ -21,7 +21,7 @@ func NewAgent(repo r.Repository, config *config.AgentConfig) *Agent {
 }
 
 func (a *Agent) Run() {
-	var i = 0
+	var i = 1
 	var updateToSendRatio = int(a.config.ReportInterval / a.config.PollInterval)
 	for {
 		if err := a.Update(); err != nil {
@@ -39,7 +39,7 @@ func (a *Agent) Run() {
 			i = 0
 		}
 		i++
-		time.Sleep(a.config.ReportInterval * time.Second)
+		time.Sleep(a.config.PollInterval * time.Second)
 	}
 }
 

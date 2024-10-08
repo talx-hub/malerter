@@ -15,13 +15,13 @@ import (
 //		- но как сделать нотификацию???
 
 func main() {
-	config, err := config.LoadAgentConfig()
+	conf, err := config.LoadAgentConfig()
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	rep := repo.NewMemRepository()
-	agent := service.NewAgent(rep, config)
+	agent := service.NewAgent(rep, conf)
 
 	agent.Run()
 
