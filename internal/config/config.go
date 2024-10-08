@@ -33,6 +33,13 @@ type AgentConfig struct {
 
 func LoadAgentConfig() (*AgentConfig, error) {
 	var config AgentConfig
+	loadAgentCLConfig(&config)
+	loadAgentEnvConfig(&config)
+
+	return &config, nil
+}
+
+func loadAgentCLConfig(config *AgentConfig) {
 	flag.StringVar(&config.ServerAddress, "a", "localhost:8080",
 		"alert server address")
 
@@ -51,8 +58,11 @@ func LoadAgentConfig() (*AgentConfig, error) {
 		log.Fatal("poll interval must be positive")
 	}
 	config.PollInterval = time.Duration(tempPollI)
-	flag.Parse()
 
+	flag.Parse()
+}
+
+func loadAgentEnvConfig(config *AgentConfig) {
 	if a, found := os.LookupEnv("ADDRESS"); found {
 		config.ServerAddress = a
 	}
@@ -76,6 +86,4 @@ func LoadAgentConfig() (*AgentConfig, error) {
 		}
 		config.PollInterval = time.Duration(rpInt)
 	}
-
-	return &config, nil
 }
