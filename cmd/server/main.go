@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"github.com/alant1t/metricscoll/internal/api"
 	"github.com/alant1t/metricscoll/internal/repo"
 	"github.com/alant1t/metricscoll/internal/service"
@@ -8,7 +9,20 @@ import (
 	"net/http"
 )
 
+var options struct {
+	addr string
+}
+
+func init() {
+	flag.StringVar(
+		&options.addr,
+		"a",
+		"localhost:8080",
+		"server root address")
+}
+
 func main() {
+	flag.Parse()
 	rep := repo.NewMemRepository()
 	serv := service.NewMetricsDumper(rep)
 	handler := api.NewHTTPHandler(serv)
@@ -23,7 +37,7 @@ func main() {
 	router.Get("/value/{type}/{name}", getHandler)
 	router.Post("/update/{type}/{name}/{val}", updateHandler)
 
-	err := http.ListenAndServe(":8080", router)
+	err := http.ListenAndServe(options.addr, router)
 	if err != nil {
 		panic(err)
 	}
