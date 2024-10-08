@@ -1,21 +1,46 @@
 package service
 
 import (
+	"github.com/alant1t/metricscoll/internal/config"
 	r "github.com/alant1t/metricscoll/internal/repo"
 	"log"
 	"math/rand"
 	"net/http"
+	"os"
 	"runtime"
+	"time"
 )
 
-const host = "http://localhost:8080"
-
 type Agent struct {
-	repo r.Repository
+	repo   r.Repository
+	config *config.AgentConfig
 }
 
-func NewAgent(repo r.Repository) *Agent {
-	return &Agent{repo: repo}
+func NewAgent(repo r.Repository, config *config.AgentConfig) *Agent {
+	return &Agent{repo: repo, config: config}
+}
+
+func (a *Agent) Run() {
+	var i = 0
+	var updateToSendRatio = int(a.config.ReportInterval / a.config.PollInterval)
+	for {
+		if err := a.Update(); err != nil {
+			if _, e := os.Stderr.WriteString(err.Error()); e != nil {
+				log.Fatal(e)
+			}
+		}
+
+		if i%updateToSendRatio == 0 {
+			if err := a.Send(); err != nil {
+				if _, e := os.Stderr.WriteString(err.Error()); e != nil {
+					log.Fatal(e)
+				}
+			}
+			i = 0
+		}
+		i++
+		time.Sleep(a.config.ReportInterval * time.Second)
+	}
 }
 
 func (a *Agent) Update() error {
@@ -26,7 +51,7 @@ func (a *Agent) Update() error {
 
 func (a *Agent) Send() error {
 	metrics := a.get()
-	urls := convertToURLs(metrics)
+	urls := convertToURLs(metrics, a.config.ServerAddress)
 	send(urls)
 	return nil
 }
@@ -80,10 +105,10 @@ func (a *Agent) get() []r.Metric {
 	return a.repo.GetAll()
 }
 
-func convertToURLs(metrics []r.Metric) []string {
+func convertToURLs(metrics []r.Metric, host string) []string {
 	var urls []string
 	for _, m := range metrics {
-		url := host + "/update/" + m.String()
+		url := "http://" + host + "/update/" + m.String()
 		urls = append(urls, url)
 	}
 	return urls

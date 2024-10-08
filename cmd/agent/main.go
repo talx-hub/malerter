@@ -1,9 +1,10 @@
 package main
 
 import (
+	"github.com/alant1t/metricscoll/internal/config"
 	"github.com/alant1t/metricscoll/internal/repo"
 	"github.com/alant1t/metricscoll/internal/service"
-	"time"
+	"log"
 )
 
 // TODO: сделать клиент модульным:
@@ -14,18 +15,14 @@ import (
 //		- но как сделать нотификацию???
 
 func main() {
-	rep := repo.NewMemRepository()
-	agent := service.NewAgent(rep)
-
-	var i = 0
-	for {
-		agent.Update()
-
-		if i%5 == 0 {
-			agent.Send()
-			i = 0
-		}
-		i++
-		time.Sleep(2 * time.Second)
+	config, err := config.LoadAgentConfig()
+	if err != nil {
+		log.Fatal(err)
 	}
+
+	rep := repo.NewMemRepository()
+	agent := service.NewAgent(rep, config)
+
+	agent.Run()
+
 }
