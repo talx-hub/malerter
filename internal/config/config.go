@@ -3,6 +3,8 @@ package config
 import (
 	"flag"
 	"log"
+	"os"
+	"strconv"
 	"time"
 )
 
@@ -15,6 +17,10 @@ func LoadServerConfig() (*ServerConfig, error) {
 	flag.StringVar(&config.RootAddress, "a", "localhost:8080",
 		"server root address")
 	flag.Parse()
+
+	if a, found := os.LookupEnv("ADDRESS"); found {
+		config.RootAddress = a
+	}
 
 	return &config, nil
 }
@@ -34,7 +40,7 @@ func LoadAgentConfig() (*AgentConfig, error) {
 	flag.IntVar(&tempReportI, "r", 10,
 		"interval in seconds of sending metrics to alert server")
 	if tempReportI < 0 {
-		log.Fatal("interval must be positive")
+		log.Fatal("report interval must be positive")
 	}
 	config.ReportInterval = time.Duration(tempReportI)
 
@@ -42,10 +48,34 @@ func LoadAgentConfig() (*AgentConfig, error) {
 	flag.IntVar(&tempPollI, "p", 2,
 		"interval in seconds of polling and metric collection")
 	if tempPollI < 0 {
-		log.Fatal("interval must be positive")
+		log.Fatal("poll interval must be positive")
 	}
 	config.PollInterval = time.Duration(tempPollI)
 	flag.Parse()
+
+	if a, found := os.LookupEnv("ADDRESS"); found {
+		config.ServerAddress = a
+	}
+	if ri, found := os.LookupEnv("REPORT_INTERVAL"); found {
+		riInt, err := strconv.Atoi(ri)
+		if err != nil {
+			log.Fatal(err)
+		}
+		if riInt < 0 {
+			log.Fatal("report interval must be positive")
+		}
+		config.ReportInterval = time.Duration(riInt)
+	}
+	if rp, found := os.LookupEnv("POLL_INTERVAL"); found {
+		rpInt, err := strconv.Atoi(rp)
+		if err != nil {
+			log.Fatal(err)
+		}
+		if rpInt < 0 {
+			log.Fatal("poll interval must be positive")
+		}
+		config.PollInterval = time.Duration(rpInt)
+	}
 
 	return &config, nil
 }
