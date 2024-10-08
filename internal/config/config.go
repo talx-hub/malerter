@@ -3,7 +3,6 @@ package config
 import (
 	"flag"
 	"log"
-	"strings"
 	"time"
 )
 
@@ -30,10 +29,6 @@ func LoadAgentConfig() (*AgentConfig, error) {
 	var config AgentConfig
 	flag.StringVar(&config.ServerAddress, "a", "localhost:8080",
 		"alert server address")
-	if strings.HasPrefix(config.ServerAddress, "http://") {
-		config.ServerAddress =
-			strings.TrimPrefix(config.ServerAddress, "http://")
-	}
 
 	var tempReportI int
 	flag.IntVar(&tempReportI, "r", 10,

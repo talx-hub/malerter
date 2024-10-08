@@ -108,7 +108,7 @@ func (a *Agent) get() []r.Metric {
 func convertToURLs(metrics []r.Metric, host string) []string {
 	var urls []string
 	for _, m := range metrics {
-		url := "http://" + host + "/update/" + m.String()
+		url := "http://" + host + "/update/" + m.ToURL()
 		urls = append(urls, url)
 	}
 	return urls

@@ -80,6 +80,10 @@ func (m *Metric) String() string {
 		m.Name, m.Type.String(), m.Value)
 }
 
+func (m *Metric) ToURL() string {
+	return fmt.Sprintf("%s/%s/%v", m.Type.String(), m.Name, m.Value)
+}
+
 func (m *Metric) Update(other Metric) {
 	if m.Type == MetricTypeGauge {
 		m.Value = other.Value
