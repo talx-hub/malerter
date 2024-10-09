@@ -43,8 +43,8 @@ type proxy struct {
 
 func LoadAgentConfig() *AgentConfig {
 	var config AgentConfig
-	loadAgentEnvConfig(&config)
 	loadAgentCLConfig(&config)
+	loadAgentEnvConfig(&config)
 
 	// convert because time.Duration is in nanoseconds
 	config.PollInterval *= time.Second
