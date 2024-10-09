@@ -6,15 +6,11 @@ import (
 	"github.com/alant1t/metricscoll/internal/repo"
 	"github.com/alant1t/metricscoll/internal/service"
 	"github.com/go-chi/chi/v5"
-	"log"
 	"net/http"
 )
 
 func main() {
-	conf, err := config.LoadServerConfig()
-	if err != nil {
-		log.Fatal(err)
-	}
+	conf := config.LoadServerConfig()
 
 	rep := repo.NewMemRepository()
 	serv := service.NewMetricsDumper(rep)
@@ -30,7 +26,7 @@ func main() {
 	router.Get("/value/{type}/{name}", getHandler)
 	router.Post("/update/{type}/{name}/{val}", updateHandler)
 
-	err = http.ListenAndServe(conf.RootAddress, router)
+	err := http.ListenAndServe(conf.RootAddress, router)
 	if err != nil {
 		panic(err)
 	}
