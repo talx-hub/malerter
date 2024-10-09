@@ -51,7 +51,7 @@ func (a *Agent) Update() error {
 
 func (a *Agent) Send() error {
 	metrics := a.get()
-	urls := convertToURLs(metrics, a.config.Address)
+	urls := convertToURLs(metrics, a.config.ServerAddress)
 	send(urls)
 	return nil
 }
