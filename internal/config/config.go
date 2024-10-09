@@ -12,7 +12,7 @@ type ServerConfig struct {
 	RootAddress string
 }
 
-func LoadServerConfig() (*ServerConfig, error) {
+func LoadServerConfig() *ServerConfig {
 	var config ServerConfig
 	flag.StringVar(&config.RootAddress, "a", "localhost:8080",
 		"server root address")
@@ -22,7 +22,7 @@ func LoadServerConfig() (*ServerConfig, error) {
 		config.RootAddress = a
 	}
 
-	return &config, nil
+	return &config
 }
 
 type AgentConfig struct {
@@ -31,33 +31,29 @@ type AgentConfig struct {
 	PollInterval   time.Duration
 }
 
-func LoadAgentConfig() (*AgentConfig, error) {
+func LoadAgentConfig() *AgentConfig {
 	var config AgentConfig
 	loadAgentCLConfig(&config)
 	loadAgentEnvConfig(&config)
 
-	return &config, nil
+	return &config
 }
 
 func loadAgentCLConfig(config *AgentConfig) {
 	flag.StringVar(&config.ServerAddress, "a", "localhost:8080",
 		"alert server address")
 
-	var tempReportI int
-	flag.IntVar(&tempReportI, "r", 10,
+	flag.DurationVar(&config.ReportInterval, "r", 10,
 		"interval in seconds of sending metrics to alert server")
-	if tempReportI < 0 {
+	if config.ReportInterval < 0 {
 		log.Fatal("report interval must be positive")
 	}
-	config.ReportInterval = time.Duration(tempReportI)
 
-	var tempPollI int
-	flag.IntVar(&tempPollI, "p", 2,
+	flag.DurationVar(&config.PollInterval, "p", 2,
 		"interval in seconds of polling and metric collection")
-	if tempPollI < 0 {
+	if config.PollInterval < 0 {
 		log.Fatal("poll interval must be positive")
 	}
-	config.PollInterval = time.Duration(tempPollI)
 
 	flag.Parse()
 }

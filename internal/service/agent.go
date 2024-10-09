@@ -16,8 +16,8 @@ type Agent struct {
 	config *config.AgentConfig
 }
 
-func NewAgent(repo r.Repository, config *config.AgentConfig) *Agent {
-	return &Agent{repo: repo, config: config}
+func NewAgent(repo r.Repository, cfg *config.AgentConfig) *Agent {
+	return &Agent{repo: repo, config: cfg}
 }
 
 func (a *Agent) Run() {
