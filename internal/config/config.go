@@ -31,9 +31,14 @@ func LoadServerConfig() *ServerConfig {
 }
 
 type AgentConfig struct {
-	Address        string        `env:"ADDRESS" envDefault:"localhost:8080"`
-	ReportInterval time.Duration `env:"REPORT_INTERVAL" envDefault:"10"`
-	PollInterval   time.Duration `env:"POLL_INTERVAL" envDefault:"2"`
+	Address        string
+	ReportInterval time.Duration
+	PollInterval   time.Duration
+}
+type proxy struct {
+	A  string `env:"ADDRESS" envDefault:"localhost:8080"`
+	RI int64  `env:"REPORT_INTERVAL" envDefault:"10"`
+	PI int64  `env:"POLL_INTERVAL" envDefault:"2"`
 }
 
 func LoadAgentConfig() *AgentConfig {
@@ -63,11 +68,16 @@ func loadAgentCLConfig(cfg *AgentConfig) {
 }
 
 func loadAgentEnvConfig(cfg *AgentConfig) {
-	if err := env.Parse(&cfg); err != nil {
+	// unable to env.Parse directly into cfg due to time.Duration field
+	var p proxy
+	if err := env.Parse(&p); err != nil {
 		log.Fatal(err)
 	}
-
-	if cfg.ReportInterval < 0 || cfg.PollInterval < 0 {
+	if p.RI < 0 || p.PI < 0 {
 		log.Fatal("interval environment variables must be positive")
 	}
+
+	cfg.Address = p.A
+	cfg.ReportInterval = time.Duration(p.RI)
+	cfg.PollInterval = time.Duration(p.PI)
 }
