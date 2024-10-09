@@ -39,7 +39,7 @@ func (a *Agent) Run() {
 			i = 0
 		}
 		i++
-		time.Sleep(a.config.PollInterval * time.Second)
+		time.Sleep(a.config.PollInterval)
 	}
 }
 
@@ -51,7 +51,7 @@ func (a *Agent) Update() error {
 
 func (a *Agent) Send() error {
 	metrics := a.get()
-	urls := convertToURLs(metrics, a.config.ServerAddress)
+	urls := convertToURLs(metrics, a.config.Address)
 	send(urls)
 	return nil
 }

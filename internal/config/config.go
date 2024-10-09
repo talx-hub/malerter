@@ -2,9 +2,9 @@ package config
 
 import (
 	"flag"
+	"github.com/caarlos0/env/v11"
 	"log"
 	"os"
-	"strconv"
 	"time"
 )
 
@@ -13,15 +13,8 @@ type ServerConfig struct {
 }
 
 const (
-	hostDefault           = "localhost:8080"
-	reportIntervalDefault = 10
-	poolIntervalDefault   = 2
-)
-
-const (
-	envAddress        = "ADDRESS"
-	envReportInterval = "REPORT_INTERVAL"
-	envPollInterval   = "POLL_INTERVAL"
+	hostDefault = "localhost:8080"
+	envAddress  = "ADDRESS"
 )
 
 func LoadServerConfig() *ServerConfig {
@@ -38,60 +31,43 @@ func LoadServerConfig() *ServerConfig {
 }
 
 type AgentConfig struct {
-	ServerAddress  string
-	ReportInterval time.Duration
-	PollInterval   time.Duration
+	Address        string        `env:"ADDRESS" envDefault:"localhost:8080"`
+	ReportInterval time.Duration `env:"REPORT_INTERVAL" envDefault:"10"`
+	PollInterval   time.Duration `env:"POLL_INTERVAL" envDefault:"2"`
 }
 
 func LoadAgentConfig() *AgentConfig {
 	var config AgentConfig
-	loadAgentCLConfig(&config)
 	loadAgentEnvConfig(&config)
+	loadAgentCLConfig(&config)
+
+	// convert because time.Duration is in nanoseconds
+	config.PollInterval *= time.Second
+	config.ReportInterval *= time.Second
 
 	return &config
 }
 
-func loadAgentCLConfig(config *AgentConfig) {
-	flag.StringVar(&config.ServerAddress, "a", hostDefault,
-		"alert host address")
-
-	flag.DurationVar(&config.ReportInterval, "r", reportIntervalDefault,
+func loadAgentCLConfig(cfg *AgentConfig) {
+	flag.StringVar(&cfg.Address, "a", cfg.Address, "alert host address")
+	flag.DurationVar(&cfg.ReportInterval, "r", cfg.ReportInterval,
 		"interval in seconds of sending metrics to alert server")
-	if config.ReportInterval < 0 {
-		log.Fatal("report interval must be positive")
-	}
-
-	flag.DurationVar(&config.PollInterval, "p", poolIntervalDefault,
+	flag.DurationVar(&cfg.PollInterval, "p", cfg.PollInterval,
 		"interval in seconds of polling and metric collection")
-	if config.PollInterval < 0 {
-		log.Fatal("poll interval must be positive")
+
+	if cfg.ReportInterval < 0 || cfg.PollInterval < 0 {
+		log.Fatal("interval flags must be positive")
 	}
 
 	flag.Parse()
 }
 
-func loadAgentEnvConfig(config *AgentConfig) {
-	if a, found := os.LookupEnv(envAddress); found {
-		config.ServerAddress = a
+func loadAgentEnvConfig(cfg *AgentConfig) {
+	if err := env.Parse(&cfg); err != nil {
+		log.Fatal(err)
 	}
-	if ri, found := os.LookupEnv(envReportInterval); found {
-		riInt, err := strconv.Atoi(ri)
-		if err != nil {
-			log.Fatal(err)
-		}
-		if riInt < 0 {
-			log.Fatal("report interval must be positive")
-		}
-		config.ReportInterval = time.Duration(riInt)
-	}
-	if rp, found := os.LookupEnv(envPollInterval); found {
-		rpInt, err := strconv.Atoi(rp)
-		if err != nil {
-			log.Fatal(err)
-		}
-		if rpInt < 0 {
-			log.Fatal("poll interval must be positive")
-		}
-		config.PollInterval = time.Duration(rpInt)
+
+	if cfg.ReportInterval < 0 || cfg.PollInterval < 0 {
+		log.Fatal("interval environment variables must be positive")
 	}
 }
