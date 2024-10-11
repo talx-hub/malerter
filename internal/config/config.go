@@ -87,7 +87,7 @@ func loadAgentEnvConfig(config *AgentConfig) {
 		if riInt < 0 {
 			log.Fatal("report interval must be positive")
 		}
-		config.ReportInterval = time.Duration(riInt)
+		config.ReportInterval = time.Duration(riInt) * time.Second
 	}
 	if rp, found := os.LookupEnv(envPollInterval); found {
 		rpInt, err := strconv.Atoi(rp)
@@ -97,6 +97,6 @@ func loadAgentEnvConfig(config *AgentConfig) {
 		if rpInt < 0 {
 			log.Fatal("poll interval must be positive")
 		}
-		config.PollInterval = time.Duration(rpInt)
+		config.PollInterval = time.Duration(rpInt) * time.Second
 	}
 }
