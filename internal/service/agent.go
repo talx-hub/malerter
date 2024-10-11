@@ -1,8 +1,8 @@
 package service
 
 import (
-	"github.com/alant1t/metricscoll/internal/config"
-	r "github.com/alant1t/metricscoll/internal/repo"
+	"github.com/talx-hub/malerter/internal/config"
+	r "github.com/talx-hub/malerter/internal/repo"
 	"log"
 	"math/rand"
 	"net/http"

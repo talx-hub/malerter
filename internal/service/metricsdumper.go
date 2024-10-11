@@ -1,8 +1,8 @@
 package service
 
 import (
-	"github.com/alant1t/metricscoll/internal/customerror"
-	"github.com/alant1t/metricscoll/internal/repo"
+	"github.com/talx-hub/malerter/internal/customerror"
+	"github.com/talx-hub/malerter/internal/repo"
 	"strconv"
 	"strings"
 )

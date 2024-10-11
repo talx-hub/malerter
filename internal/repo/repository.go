@@ -1,7 +1,7 @@
 package repo
 
 import (
-	"github.com/alant1t/metricscoll/internal/customerror"
+	"github.com/talx-hub/malerter/internal/customerror"
 )
 
 type Repository interface {

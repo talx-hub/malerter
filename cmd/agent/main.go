@@ -1,9 +1,9 @@
 package main
 
 import (
-	"github.com/alant1t/metricscoll/internal/config"
-	"github.com/alant1t/metricscoll/internal/repo"
-	"github.com/alant1t/metricscoll/internal/service"
+	"github.com/talx-hub/malerter/internal/config"
+	"github.com/talx-hub/malerter/internal/repo"
+	"github.com/talx-hub/malerter/internal/service"
 )
 
 // TODO: сделать клиент модульным:

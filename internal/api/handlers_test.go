@@ -1,11 +1,11 @@
 package api
 
 import (
-	"github.com/alant1t/metricscoll/internal/customerror"
-	"github.com/alant1t/metricscoll/internal/repo"
-	"github.com/alant1t/metricscoll/internal/service"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/talx-hub/malerter/internal/customerror"
+	"github.com/talx-hub/malerter/internal/repo"
+	"github.com/talx-hub/malerter/internal/service"
 	"io"
 	"log"
 	"net/http"

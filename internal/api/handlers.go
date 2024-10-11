@@ -2,9 +2,9 @@ package api
 
 import (
 	"fmt"
-	"github.com/alant1t/metricscoll/internal/customerror"
-	"github.com/alant1t/metricscoll/internal/repo"
-	"github.com/alant1t/metricscoll/internal/service"
+	"github.com/talx-hub/malerter/internal/customerror"
+	"github.com/talx-hub/malerter/internal/repo"
+	"github.com/talx-hub/malerter/internal/service"
 	"log"
 	"net/http"
 )

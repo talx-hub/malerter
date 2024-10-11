@@ -1,6 +1,6 @@
 package service
 
-import "github.com/alant1t/metricscoll/internal/repo"
+import "github.com/talx-hub/malerter/internal/repo"
 
 type Service interface {
 	Store(string) error

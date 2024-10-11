@@ -1,4 +1,4 @@
-module github.com/alant1t/metricscoll
+module github.com/talx-hub/malerter
 
 go 1.22.7
 
