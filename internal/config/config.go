@@ -69,10 +69,10 @@ func loadAgentCLConfig(config *AgentConfig) {
 	var pi int64
 	flag.Int64Var(&pi, "p", poolIntervalDefault,
 		"interval in seconds of polling and metric collection")
+	flag.Parse()
 
 	config.ReportInterval = time.Duration(ri) * time.Second
 	config.PollInterval = time.Duration(pi) * time.Second
-	flag.Parse()
 }
 
 func loadAgentEnvConfig(config *AgentConfig) {
