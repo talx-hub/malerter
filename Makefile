@@ -1,14 +1,22 @@
-all: clean fmt lint test build-server build-agent
+all: preproc build-all
+.PHONY : all
 
-build-server:
+.PHONY : preproc
+preproc: clean fmt lint test check-coverage
+
+.PHONY : build-all
+build-all: clean server agent
+
+server:
 	go build -o ./bin/server ./cmd/server/main.go
 
-build-agent:
+agent:
 	go build -o ./bin/agent ./cmd/agent/main.go
 
 test:
 	go test ./... -coverprofile cover.out
 
+.PHONY : clean
 clean:
 	-rm ./bin/agent 2>/dev/null
 	-rm ./bin/server 2>/dev/null
@@ -17,16 +25,19 @@ clean:
 check-coverage:
 	go tool cover -html cover.out
 
+.PHONY : fmt
 fmt:
 	go fmt ./...
 
+.PHONY : lint
 lint:
+	golangci-lint run ./...
 
-
-SERVER_PORT=37797
-ADDRESS="localhost:37797"
-TEMP_FILE="./temp"
+SERVER_PORT := 37797
+ADDRESS := "localhost:37797"
+TEMP_FILE := "./temp"
 run-autotests: iter1 iter2 iter3 iter4 iter5
+.PHONY : run-autotests
 
 iter1:
 	./bin/metricstest $(v) -test.run=^TestIteration1$$ -binary-path=./bin/server
