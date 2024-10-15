@@ -14,7 +14,7 @@ agent:
 	go build -o ./bin/agent ./cmd/agent/main.go
 
 test:
-	go test ./... -coverprofile cover.out
+	go test ./... -race -coverprofile=cover.out -covermode=atomic
 
 .PHONY : clean
 clean:
@@ -28,6 +28,7 @@ check-coverage:
 .PHONY : fmt
 fmt:
 	go fmt ./...
+	goimports -v -w .
 
 .PHONY : lint
 lint:
