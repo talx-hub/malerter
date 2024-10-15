@@ -1,14 +1,15 @@
 package service
 
 import (
-	"github.com/talx-hub/malerter/internal/config"
-	r "github.com/talx-hub/malerter/internal/repo"
 	"log"
 	"math/rand"
 	"net/http"
 	"os"
 	"runtime"
 	"time"
+
+	"github.com/talx-hub/malerter/internal/config"
+	r "github.com/talx-hub/malerter/internal/repo"
 )
 
 type Agent struct {

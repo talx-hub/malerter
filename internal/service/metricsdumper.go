@@ -1,10 +1,11 @@
 package service
 
 import (
-	"github.com/talx-hub/malerter/internal/customerror"
-	"github.com/talx-hub/malerter/internal/repo"
 	"strconv"
 	"strings"
+
+	"github.com/talx-hub/malerter/internal/customerror"
+	"github.com/talx-hub/malerter/internal/repo"
 )
 
 type MetricsDumper struct {

@@ -1,12 +1,13 @@
 package main
 
 import (
+	"net/http"
+
 	"github.com/go-chi/chi/v5"
 	"github.com/talx-hub/malerter/internal/api"
 	"github.com/talx-hub/malerter/internal/config"
 	"github.com/talx-hub/malerter/internal/repo"
 	"github.com/talx-hub/malerter/internal/service"
-	"net/http"
 )
 
 func main() {
