@@ -1,17 +1,18 @@
 package api
 
 import (
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
-	"github.com/talx-hub/malerter/internal/customerror"
-	"github.com/talx-hub/malerter/internal/repo"
-	"github.com/talx-hub/malerter/internal/service"
 	"io"
 	"log"
 	"net/http"
 	"net/http/httptest"
 	"reflect"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"github.com/talx-hub/malerter/internal/customerror"
+	"github.com/talx-hub/malerter/internal/repo"
+	"github.com/talx-hub/malerter/internal/service"
 )
 
 func TestNewHTTPHandler(t *testing.T) {

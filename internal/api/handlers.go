@@ -2,11 +2,12 @@ package api
 
 import (
 	"fmt"
+	"log"
+	"net/http"
+
 	"github.com/talx-hub/malerter/internal/customerror"
 	"github.com/talx-hub/malerter/internal/repo"
 	"github.com/talx-hub/malerter/internal/service"
-	"log"
-	"net/http"
 )
 
 type HTTPHandler struct {
