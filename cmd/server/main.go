@@ -11,7 +11,8 @@ import (
 )
 
 func main() {
-	conf := config.LoadServerConfig()
+	cfg := config.NewServer()
+	cfg.Load()
 
 	rep := repo.NewMemRepository()
 	serv := service.NewMetricsDumper(rep)
@@ -27,7 +28,7 @@ func main() {
 	router.Get("/value/{type}/{name}", getHandler)
 	router.Post("/update/{type}/{name}/{val}", updateHandler)
 
-	err := http.ListenAndServe(conf.RootAddress, router)
+	err := http.ListenAndServe(cfg.RootAddress, router)
 	if err != nil {
 		panic(err)
 	}
