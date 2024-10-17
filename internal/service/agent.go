@@ -9,15 +9,15 @@ import (
 	"time"
 
 	"github.com/talx-hub/malerter/internal/config"
-	r "github.com/talx-hub/malerter/internal/repo"
+	"github.com/talx-hub/malerter/internal/repo"
 )
 
 type Agent struct {
-	repo   r.Repository
-	config *config.AgentConfig
+	repo   repo.Repository
+	config *config.Agent
 }
 
-func NewAgent(repo r.Repository, cfg *config.AgentConfig) *Agent {
+func NewAgent(repo repo.Repository, cfg *config.Agent) *Agent {
 	return &Agent{repo: repo, config: cfg}
 }
 
@@ -57,56 +57,56 @@ func (a *Agent) Send() error {
 	return nil
 }
 
-func collect() []r.Metric {
+func collect() []repo.Metric {
 	var memStats runtime.MemStats
 	runtime.ReadMemStats(&memStats)
 	var randomValue = rand.Float64()
-	var metrics = make([]r.Metric, r.MetricCount)
+	var metrics = make([]repo.Metric, repo.MetricCount)
 
-	metrics[0] = r.NewMetric(r.MetricAlloc, float64(memStats.Alloc))
-	metrics[1] = r.NewMetric(r.MetricBuckHashSys, float64(memStats.BuckHashSys))
-	metrics[2] = r.NewMetric(r.MetricFrees, float64(memStats.Frees))
-	metrics[3] = r.NewMetric(r.MetricGCCPUFraction, memStats.GCCPUFraction)
-	metrics[4] = r.NewMetric(r.MetricGCSys, float64(memStats.GCSys))
-	metrics[5] = r.NewMetric(r.MetricHeapAlloc, float64(memStats.HeapAlloc))
-	metrics[6] = r.NewMetric(r.MetricHeapIdle, float64(memStats.HeapIdle))
-	metrics[7] = r.NewMetric(r.MetricHeapInuse, float64(memStats.HeapInuse))
-	metrics[8] = r.NewMetric(r.MetricHeapObjects, float64(memStats.HeapObjects))
-	metrics[9] = r.NewMetric(r.MetricHeapReleased, float64(memStats.HeapReleased))
-	metrics[10] = r.NewMetric(r.MetricHeapSys, float64(memStats.HeapSys))
-	metrics[11] = r.NewMetric(r.MetricLastGC, float64(memStats.LastGC))
-	metrics[12] = r.NewMetric(r.MetricLookups, float64(memStats.Lookups))
-	metrics[13] = r.NewMetric(r.MetricMCacheInuse, float64(memStats.MCacheInuse))
-	metrics[14] = r.NewMetric(r.MetricMCacheSys, float64(memStats.MCacheSys))
-	metrics[15] = r.NewMetric(r.MetricMSpanInuse, float64(memStats.MSpanInuse))
-	metrics[16] = r.NewMetric(r.MetricMSpanSys, float64(memStats.MSpanSys))
-	metrics[17] = r.NewMetric(r.MetricMallocs, float64(memStats.Mallocs))
-	metrics[18] = r.NewMetric(r.MetricNextGC, float64(memStats.NextGC))
-	metrics[19] = r.NewMetric(r.MetricNumForcedGC, float64(memStats.NumForcedGC))
-	metrics[20] = r.NewMetric(r.MetricNumGC, float64(memStats.NumGC))
-	metrics[21] = r.NewMetric(r.MetricOtherSys, float64(memStats.OtherSys))
-	metrics[22] = r.NewMetric(r.MetricPauseTotalNs, float64(memStats.PauseTotalNs))
-	metrics[23] = r.NewMetric(r.MetricStackInuse, float64(memStats.StackInuse))
-	metrics[24] = r.NewMetric(r.MetricStackSys, float64(memStats.StackSys))
-	metrics[25] = r.NewMetric(r.MetricSys, float64(memStats.Sys))
-	metrics[26] = r.NewMetric(r.MetricTotalAlloc, float64(memStats.TotalAlloc))
-	metrics[27] = r.NewMetric(r.MetricRandomValue, randomValue)
-	metrics[28] = r.NewMetric(r.MetricPollCount, int64(1))
+	metrics[0] = repo.NewMetric(repo.MetricAlloc, float64(memStats.Alloc))
+	metrics[1] = repo.NewMetric(repo.MetricBuckHashSys, float64(memStats.BuckHashSys))
+	metrics[2] = repo.NewMetric(repo.MetricFrees, float64(memStats.Frees))
+	metrics[3] = repo.NewMetric(repo.MetricGCCPUFraction, memStats.GCCPUFraction)
+	metrics[4] = repo.NewMetric(repo.MetricGCSys, float64(memStats.GCSys))
+	metrics[5] = repo.NewMetric(repo.MetricHeapAlloc, float64(memStats.HeapAlloc))
+	metrics[6] = repo.NewMetric(repo.MetricHeapIdle, float64(memStats.HeapIdle))
+	metrics[7] = repo.NewMetric(repo.MetricHeapInuse, float64(memStats.HeapInuse))
+	metrics[8] = repo.NewMetric(repo.MetricHeapObjects, float64(memStats.HeapObjects))
+	metrics[9] = repo.NewMetric(repo.MetricHeapReleased, float64(memStats.HeapReleased))
+	metrics[10] = repo.NewMetric(repo.MetricHeapSys, float64(memStats.HeapSys))
+	metrics[11] = repo.NewMetric(repo.MetricLastGC, float64(memStats.LastGC))
+	metrics[12] = repo.NewMetric(repo.MetricLookups, float64(memStats.Lookups))
+	metrics[13] = repo.NewMetric(repo.MetricMCacheInuse, float64(memStats.MCacheInuse))
+	metrics[14] = repo.NewMetric(repo.MetricMCacheSys, float64(memStats.MCacheSys))
+	metrics[15] = repo.NewMetric(repo.MetricMSpanInuse, float64(memStats.MSpanInuse))
+	metrics[16] = repo.NewMetric(repo.MetricMSpanSys, float64(memStats.MSpanSys))
+	metrics[17] = repo.NewMetric(repo.MetricMallocs, float64(memStats.Mallocs))
+	metrics[18] = repo.NewMetric(repo.MetricNextGC, float64(memStats.NextGC))
+	metrics[19] = repo.NewMetric(repo.MetricNumForcedGC, float64(memStats.NumForcedGC))
+	metrics[20] = repo.NewMetric(repo.MetricNumGC, float64(memStats.NumGC))
+	metrics[21] = repo.NewMetric(repo.MetricOtherSys, float64(memStats.OtherSys))
+	metrics[22] = repo.NewMetric(repo.MetricPauseTotalNs, float64(memStats.PauseTotalNs))
+	metrics[23] = repo.NewMetric(repo.MetricStackInuse, float64(memStats.StackInuse))
+	metrics[24] = repo.NewMetric(repo.MetricStackSys, float64(memStats.StackSys))
+	metrics[25] = repo.NewMetric(repo.MetricSys, float64(memStats.Sys))
+	metrics[26] = repo.NewMetric(repo.MetricTotalAlloc, float64(memStats.TotalAlloc))
+	metrics[27] = repo.NewMetric(repo.MetricRandomValue, randomValue)
+	metrics[28] = repo.NewMetric(repo.MetricPollCount, int64(1))
 
 	return metrics
 }
 
-func (a *Agent) store(metrics []r.Metric) {
+func (a *Agent) store(metrics []repo.Metric) {
 	for _, m := range metrics {
 		a.repo.Store(m)
 	}
 }
 
-func (a *Agent) get() []r.Metric {
+func (a *Agent) get() []repo.Metric {
 	return a.repo.GetAll()
 }
 
-func convertToURLs(metrics []r.Metric, host string) []string {
+func convertToURLs(metrics []repo.Metric, host string) []string {
 	var urls []string
 	for _, m := range metrics {
 		url := "http://" + host + "/update/" + m.ToURL()

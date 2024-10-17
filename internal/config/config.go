@@ -8,12 +8,15 @@ import (
 	"time"
 )
 
-type ServerConfig struct {
-	RootAddress string
+type Cfg interface {
+	Load()
 }
 
 const (
-	hostDefault           = "localhost:8080"
+	hostDefault = "localhost:8080"
+)
+
+const (
 	reportIntervalDefault = 10
 	poolIntervalDefault   = 2
 )
@@ -24,41 +27,47 @@ const (
 	envPollInterval   = "POLL_INTERVAL"
 )
 
-func LoadServerConfig() *ServerConfig {
-	var config ServerConfig
-	flag.StringVar(&config.RootAddress, "a", hostDefault,
+type Server struct {
+	RootAddress string
+}
+
+func NewServer() *Server {
+	return &Server{}
+}
+
+func (s *Server) Load() {
+	flag.StringVar(&s.RootAddress, "a", hostDefault,
 		"server root address")
 	flag.Parse()
 
 	if a, found := os.LookupEnv(envAddress); found {
-		config.RootAddress = a
+		s.RootAddress = a
 	}
-
-	return &config
 }
 
-type AgentConfig struct {
+type Agent struct {
 	ServerAddress  string
 	ReportInterval time.Duration
 	PollInterval   time.Duration
 }
 
-func LoadAgentConfig() *AgentConfig {
-	var config AgentConfig
-	loadAgentCLConfig(&config)
-	loadAgentEnvConfig(&config)
-
-	if config.ReportInterval < 0 {
-		log.Fatal("report interval must be positive")
-	}
-	if config.PollInterval < 0 {
-		log.Fatal("poll interval must be positive")
-	}
-
-	return &config
+func NewAgent() *Agent {
+	return &Agent{}
 }
 
-func loadAgentCLConfig(config *AgentConfig) {
+func (a *Agent) Load() {
+	loadAgentCLConfig(a)
+	loadAgentEnvConfig(a)
+
+	if a.ReportInterval < 0 {
+		log.Fatal("report interval must be positive")
+	}
+	if a.PollInterval < 0 {
+		log.Fatal("poll interval must be positive")
+	}
+}
+
+func loadAgentCLConfig(config *Agent) {
 	flag.StringVar(&config.ServerAddress, "a", hostDefault,
 		"alert host address")
 
@@ -75,28 +84,22 @@ func loadAgentCLConfig(config *AgentConfig) {
 	config.PollInterval = time.Duration(pi) * time.Second
 }
 
-func loadAgentEnvConfig(config *AgentConfig) {
-	if a, found := os.LookupEnv(envAddress); found {
-		config.ServerAddress = a
+func loadAgentEnvConfig(config *Agent) {
+	if addr, found := os.LookupEnv(envAddress); found {
+		config.ServerAddress = addr
 	}
 	if ri, found := os.LookupEnv(envReportInterval); found {
 		riInt, err := strconv.Atoi(ri)
 		if err != nil {
 			log.Fatal(err)
 		}
-		if riInt < 0 {
-			log.Fatal("report interval must be positive")
-		}
 		config.ReportInterval = time.Duration(riInt) * time.Second
 	}
-	if rp, found := os.LookupEnv(envPollInterval); found {
-		rpInt, err := strconv.Atoi(rp)
+	if pi, found := os.LookupEnv(envPollInterval); found {
+		piInt, err := strconv.Atoi(pi)
 		if err != nil {
 			log.Fatal(err)
 		}
-		if rpInt < 0 {
-			log.Fatal("poll interval must be positive")
-		}
-		config.PollInterval = time.Duration(rpInt) * time.Second
+		config.PollInterval = time.Duration(piInt) * time.Second
 	}
 }
