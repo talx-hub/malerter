@@ -1,6 +1,8 @@
 package main
 
 import (
+    "log"
+
     "github.com/talx-hub/malerter/internal/config"
     "github.com/talx-hub/malerter/internal/repo"
     "github.com/talx-hub/malerter/internal/service"
@@ -14,11 +16,14 @@ import (
 //		- но как сделать нотификацию???
 
 func main() {
-    cfg := config.NewAgent()
-    cfg.Load()
+    director := config.NewAgentDirector()
+    cfg, ok := director.Build().(config.Agent)
+    if !ok {
+        log.Fatal("unable to load agent config")
+    }
 
     rep := repo.NewMemRepository()
-    agent := service.NewAgent(rep, cfg)
+    agent := service.NewAgent(rep, &cfg)
 
     agent.Run()
 }
