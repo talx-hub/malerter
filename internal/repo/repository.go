@@ -10,8 +10,6 @@ type Repository interface {
 	GetAll() []Metric
 }
 
-// TODO: подумать над тем, чтобы передать на массив
-//   - если набор метрик фиксирован
 type MemRepository struct {
 	data map[string]Metric
 }

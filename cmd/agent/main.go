@@ -1,11 +1,11 @@
 package main
 
 import (
-    "log"
+	"log"
 
-    "github.com/talx-hub/malerter/internal/config"
-    "github.com/talx-hub/malerter/internal/repo"
-    "github.com/talx-hub/malerter/internal/service"
+	"github.com/talx-hub/malerter/internal/config"
+	"github.com/talx-hub/malerter/internal/repo"
+	"github.com/talx-hub/malerter/internal/service"
 )
 
 // TODO: сделать клиент модульным:
@@ -16,14 +16,14 @@ import (
 //		- но как сделать нотификацию???
 
 func main() {
-    director := config.NewAgentDirector()
-    cfg, ok := director.Build().(config.Agent)
-    if !ok {
-        log.Fatal("unable to load agent config")
-    }
+	director := config.NewAgentDirector()
+	cfg, ok := director.Build().(config.Agent)
+	if !ok {
+		log.Fatal("unable to load agent config")
+	}
 
-    rep := repo.NewMemRepository()
-    agent := service.NewAgent(rep, &cfg)
+	rep := repo.NewMemRepository()
+	agent := service.NewAgent(rep, &cfg)
 
-    agent.Run()
+	agent.Run()
 }
