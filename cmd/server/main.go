@@ -4,6 +4,8 @@ import (
 	"log"
 	"net/http"
 
+	"github.com/talx-hub/malerter/internal/logger"
+
 	"github.com/go-chi/chi/v5"
 	"github.com/talx-hub/malerter/internal/api"
 	"github.com/talx-hub/malerter/internal/config"
@@ -24,9 +26,10 @@ func main() {
 
 	router := chi.NewRouter()
 
-	var updateHandler = http.HandlerFunc(handler.DumpMetric)
-	var getHandler = http.HandlerFunc(handler.GetMetric)
-	var getAllHandler = http.HandlerFunc(handler.GetAll)
+	lggr := logger.New()
+	var updateHandler = lggr.WrapHandler(handler.DumpMetric)
+	var getHandler = lggr.WrapHandler(handler.GetMetric)
+	var getAllHandler = lggr.WrapHandler(handler.GetAll)
 
 	router.Get("/", getAllHandler)
 	router.Get("/value/{type}/{name}", getHandler)
