@@ -31,9 +31,15 @@ func main() {
 	var getHandler = lggr.WrapHandler(handler.GetMetric)
 	var getAllHandler = lggr.WrapHandler(handler.GetAll)
 
-	router.Get("/", getAllHandler)
-	router.Get("/value/{type}/{name}", getHandler)
-	router.Post("/update/{type}/{name}/{val}", updateHandler)
+	router.Route("/", func(r chi.Router) {
+		r.Get("/", getAllHandler)
+		r.Route("/value", func(r chi.Router) {
+			r.Get("/{type}/{name}", getHandler)
+		})
+		r.Route("/update", func(r chi.Router) {
+			r.Post("/{type}/{name}/{val}", updateHandler)
+		})
+	})
 
 	err := http.ListenAndServe(cfg.RootAddress, router)
 	if err != nil {
