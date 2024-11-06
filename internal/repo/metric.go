@@ -30,17 +30,28 @@ func (t MetricType) String() string {
 }
 
 type Metric struct {
-	Type  MetricType
-	Name  string
-	Value any
+	Type  MetricType `json:"type"`
+	Name  string     `json:"id"`
+	Delta *int64     `json:"delta,omitempty"`
+	Value *float64   `json:"value,omitempty"`
 }
 
 func NewMetric(name MetricName, mType MetricType, value any) Metric {
-	return Metric{
+	m := Metric{
 		Type:  mType,
 		Name:  name.String(),
-		Value: value,
+		Delta: nil,
+		Value: nil,
 	}
+	if iVal, ok := value.(int64); ok {
+		m.Delta = &iVal
+		return m
+	}
+	if fVal, ok := value.(float64); ok {
+		m.Value = &fVal
+		return m
+	}
+	return m
 }
 
 func (m *Metric) String() string {
@@ -49,7 +60,11 @@ func (m *Metric) String() string {
 }
 
 func (m *Metric) ToURL() string {
-	return fmt.Sprintf("%s/%s/%v", m.Type.String(), m.Name, m.Value)
+	if fVal, ok := m.ActualValue().(float64); ok {
+		fValStr := strconv.FormatFloat(fVal, 'f', 2, 64)
+		return fmt.Sprintf("%s/%s/%v", m.Type.String(), m.Name, fValStr)
+	}
+	return fmt.Sprintf("%s/%s/%v", m.Type.String(), m.Name, m.ActualValue())
 }
 
 func (m *Metric) Update(other Metric) {

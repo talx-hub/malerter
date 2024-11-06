@@ -37,8 +37,8 @@ lint:
 SERVER_PORT := 37797
 ADDRESS := "localhost:37797"
 TEMP_FILE := "./temp"
-run-autotests: iter1 iter2 iter3 iter4 iter5 iter6
 .PHONY : run-autotests
+run-autotests: iter1 iter2 iter3 iter4 iter5 iter6
 
 iter1:
 	./bin/metricstest $(v) -test.run=^TestIteration1$$ -binary-path=./bin/server

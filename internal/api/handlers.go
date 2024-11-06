@@ -1,6 +1,7 @@
 package api
 
 import (
+	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
@@ -27,6 +28,36 @@ func getStatusFromError(err error) int {
 	default:
 		return http.StatusInternalServerError
 	}
+}
+
+func (h *HTTPHandler) DumpMetricJSON(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		e := "only POST requests are allowed"
+		http.Error(w, e, http.StatusBadRequest)
+		return
+	}
+
+	var metric repo.Metric
+	if err := json.NewDecoder(r.Body).Decode(&metric); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	if err := h.service.Store(metric); err != nil {
+		http.Error(w, err.Error(), http.StatusNotFound)
+	}
+
+	metric, err := h.service.Get(metric)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+
+	if err = json.NewEncoder(w).Encode(&metric); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("content-type", "application/json")
+	w.WriteHeader(http.StatusOK)
 }
 
 func (h *HTTPHandler) DumpMetric(w http.ResponseWriter, r *http.Request) {
@@ -79,7 +110,7 @@ func (h *HTTPHandler) GetMetric(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	valueStr := fmt.Sprintf("%v", m.Value)
+	valueStr := fmt.Sprintf("%v", m.ActualValue())
 	_, err = w.Write([]byte(valueStr))
 	if err != nil {
 		log.Fatal(err)
