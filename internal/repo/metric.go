@@ -61,6 +61,16 @@ func (m *Metric) Update(other Metric) {
 	}
 }
 
+func (m *Metric) ActualValue() any {
+	if m.Type == MetricTypeGauge && m.Value != nil {
+		return *m.Value
+	} else if m.Type == MetricTypeCounter && m.Delta != nil {
+		return *m.Delta
+	} else {
+		return nil
+	}
+}
+
 func FromURL(url string) (Metric, error) {
 	parts := strings.Split(url, "/")
 	if len(parts) < 4 {

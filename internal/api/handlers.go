@@ -18,6 +18,17 @@ func NewHTTPHandler(service service.Service) *HTTPHandler {
 	return &HTTPHandler{service: service}
 }
 
+func getStatusFromError(err error) int {
+	switch err.(type) {
+	case *customerror.NotFoundError:
+		return http.StatusNotFound
+	case *customerror.InvalidArgumentError:
+		return http.StatusBadRequest
+	default:
+		return http.StatusInternalServerError
+	}
+}
+
 func (h *HTTPHandler) DumpMetric(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		e := "only POST requests are allowed"
@@ -26,15 +37,16 @@ func (h *HTTPHandler) DumpMetric(w http.ResponseWriter, r *http.Request) {
 	}
 
 	rawMetric := r.URL.Path
-	if err := h.service.Store(rawMetric); err != nil {
-		switch err.(type) {
-		case *customerror.NotFoundError:
-			http.Error(w, err.Error(), http.StatusNotFound)
-		case *customerror.InvalidArgumentError:
-			http.Error(w, err.Error(), http.StatusBadRequest)
-		default:
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-		}
+	metric, err := repo.FromURL(rawMetric)
+	if err != nil {
+		st := getStatusFromError(err)
+		http.Error(w, err.Error(), st)
+		return
+	}
+
+	err = h.service.Store(metric)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusNotFound)
 		return
 	}
 
@@ -49,7 +61,14 @@ func (h *HTTPHandler) GetMetric(w http.ResponseWriter, r *http.Request) {
 	}
 
 	rawMetric := r.URL.Path
-	m, err := h.service.Get(rawMetric)
+	metric, err := repo.FromURL(rawMetric)
+	if err != nil {
+		st := getStatusFromError(err)
+		http.Error(w, err.Error(), st)
+		return
+	}
+
+	m, err := h.service.Get(metric)
 	if err != nil {
 		switch err.(type) {
 		case *customerror.NotFoundError:
