@@ -35,7 +35,7 @@ func (r *MemRepository) Get(metric Metric) (Metric, error) {
 		return m, nil
 	}
 	return Metric{},
-		&customerror.NotFoundError{RawMetric: metric.String()}
+		&customerror.NotFoundError{MetricURL: metric.String()}
 }
 
 func (r *MemRepository) GetAll() []Metric {

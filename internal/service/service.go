@@ -3,7 +3,7 @@ package service
 import "github.com/talx-hub/malerter/internal/repo"
 
 type Service interface {
-	Store(string) error
-	Get(string) (repo.Metric, error)
+	Store(metric repo.Metric) error
+	Get(metric repo.Metric) (repo.Metric, error)
 	GetAll() []repo.Metric
 }

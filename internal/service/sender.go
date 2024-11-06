@@ -38,7 +38,7 @@ func send(urls []string) {
 		if err != nil {
 			continue
 		}
-		if err := response.Body.Close(); err != nil {
+		if err = response.Body.Close(); err != nil {
 			log.Fatal(err)
 		}
 	}

@@ -2,6 +2,10 @@ package repo
 
 import (
 	"fmt"
+	"strconv"
+	"strings"
+
+	"github.com/talx-hub/malerter/internal/customerror"
 )
 
 type MetricName string
@@ -52,7 +56,61 @@ func (m *Metric) Update(other Metric) {
 	if m.Type == MetricTypeGauge {
 		m.Value = other.Value
 	} else {
-		updated := m.Value.(int64) + other.Value.(int64)
-		m.Value = updated
+		updated := *m.Delta + *other.Delta
+		m.Delta = &updated
 	}
+}
+
+func FromURL(url string) (Metric, error) {
+	parts := strings.Split(url, "/")
+	if len(parts) < 4 {
+		return Metric{},
+			&customerror.NotFoundError{
+				MetricURL: url,
+				Info:      "incorrect URL",
+			}
+	}
+
+	// только два типа метрик позволены
+	mType := MetricType(parts[2])
+	if !mType.IsValid() {
+		return Metric{},
+			&customerror.InvalidArgumentError{
+				MetricURL: url,
+				Info:      "only counter and gauge types are allowed",
+			}
+	}
+
+	// имя не должно быть числом
+	mName := &parts[3]
+	_, errF := strconv.ParseFloat(*mName, 64)
+	_, errI := strconv.Atoi(*mName)
+	if errF == nil || errI == nil {
+		return Metric{},
+			&customerror.NotFoundError{
+				MetricURL: url,
+				Info:      "metric name must be a string",
+			}
+	}
+	if len(parts) == 4 {
+		return Metric{Type: mType, Name: *mName, Value: nil}, nil
+	}
+
+	// значение должно быть числом и соответствовать типу
+	mValue := &parts[4]
+	iVal, iErr := strconv.ParseInt(*mValue, 10, 64)
+	if mType == MetricTypeCounter && iErr == nil {
+		return Metric{Type: mType, Name: *mName, Delta: &iVal}, nil
+	}
+
+	fVal, fErr := strconv.ParseFloat(*mValue, 64)
+	if mType == MetricTypeGauge && fErr == nil {
+		return Metric{Type: mType, Name: *mName, Value: &fVal}, nil
+	}
+
+	return Metric{},
+		&customerror.InvalidArgumentError{
+			MetricURL: url,
+			Info:      "wrong value type for metric type",
+		}
 }
