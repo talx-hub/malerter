@@ -60,12 +60,12 @@ func TestHTTPHandler_DumpMetric(t *testing.T) {
 		{"/update/counter/someMetric/123", "", 200},
 		{"/update/gauge/someMetric/123.1", "", 200},
 		{"/update/gauge/someMetric/1", "", 200},
-		{"/update/gauge/1", "metric /update/gauge/1 not found\n", 404},
-		{"/update/WRONG/someMetric/1", "metric /update/WRONG/someMetric/1 is incorrect\n", 400},
-		{"/update/counter/someMetric/1.0", "metric /update/counter/someMetric/1.0 is incorrect\n", 400},
-		{"/update/counter/someMetric", "metric /update/counter/someMetric not found\n", 404},
-		{"/update/counter/someMetric/9223372036854775808", "metric /update/counter/someMetric/9223372036854775808 is incorrect\n", 400},
-		{"/update/counter/someMetric/string", "metric /update/counter/someMetric/string is incorrect\n", 400},
+		{"/update/gauge/1", "metric /update/gauge/1 not found: metric name must be a string\n", 404},
+		{"/update/WRONG/someMetric/1", "metric /update/WRONG/someMetric/1 is incorrect: only counter and gauge types are allowed\n", 400},
+		{"/update/counter/someMetric/1.0", "metric /update/counter/someMetric/1.0 is incorrect: wrong value type for metric type\n", 400},
+		{"/update/counter/someMetric", "metric counter/someMetric/<nil> not found: \n", 404},
+		{"/update/counter/someMetric/9223372036854775808", "metric /update/counter/someMetric/9223372036854775808 is incorrect: wrong value type for metric type\n", 400},
+		{"/update/counter/someMetric/string", "metric /update/counter/someMetric/string is incorrect: wrong value type for metric type\n", 400},
 	}
 	rep := repo.NewMemRepository()
 	serv := service.NewMetricsDumper(rep)
@@ -110,7 +110,7 @@ func (r *mockRepo) Get(m repo.Metric) (repo.Metric, error) {
 		return mm, nil
 	}
 	return repo.Metric{},
-		&customerror.NotFoundError{RawMetric: m.String()}
+		&customerror.NotFoundError{MetricURL: m.String()}
 }
 func (r *mockRepo) GetAll() []repo.Metric {
 	var metrics []repo.Metric
@@ -124,15 +124,15 @@ func TestHTTPHandler_GetMetric(t *testing.T) {
 	tests := []test{
 		{"/value/counter/mainQuestion", "42", 200},
 		{"/value/gauge/pi", "3.14", 200},
-		{"/value/wrong/pi", "metric /value/wrong/pi is incorrect\n", 400},
-		{"/value/gauge/wrong", "metric wrong(gauge): <nil> not found\n", 404},
-		{"/value/counter/wrong", "metric wrong(counter): <nil> not found\n", 404},
-		{"/value/counter", "metric /value/counter not found\n", 404},
-		{"/value/gauge", "metric /value/gauge not found\n", 404},
+		{"/value/wrong/pi", "metric /value/wrong/pi is incorrect: only counter and gauge types are allowed\n", 400},
+		{"/value/gauge/wrong", "metric wrong(gauge): <nil> not found: \n", 404},
+		{"/value/counter/wrong", "metric wrong(counter): <nil> not found: \n", 404},
+		{"/value/counter", "metric /value/counter not found: incorrect URL\n", 404},
+		{"/value/gauge", "metric /value/gauge not found: incorrect URL\n", 404},
 	}
 	m := map[string]repo.Metric{
-		"countermainQuestion": {Type: repo.MetricTypeCounter, Name: "mainQuestion", Value: int64(42)},
-		"gaugepi":             {Type: repo.MetricTypeGauge, Name: "pi", Value: 3.14},
+		"countermainQuestion": repo.NewMetric("mainQuestion", repo.MetricTypeCounter, int64(42)),
+		"gaugepi":             repo.NewMetric("pi", repo.MetricTypeGauge, 3.14),
 	}
 	mock := mockRepo{d: m}
 	serv := service.NewMetricsDumper(&mock)
