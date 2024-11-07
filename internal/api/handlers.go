@@ -110,14 +110,14 @@ func (h *HTTPHandler) GetMetric(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	w.Header().Set("content-type", "text/plain")
+	w.WriteHeader(http.StatusOK)
 	valueStr := fmt.Sprintf("%v", m.ActualValue())
 	_, err = w.Write([]byte(valueStr))
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	w.Header().Set("content-type", "text/plain")
-	w.WriteHeader(http.StatusOK)
 }
 
 func (h *HTTPHandler) GetAll(w http.ResponseWriter, r *http.Request) {
@@ -127,14 +127,14 @@ func (h *HTTPHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	w.Header().Set("content-type", "text/html")
+	w.WriteHeader(http.StatusOK)
 	metrics := h.service.GetAll()
 	page := createMetricsPage(metrics)
 	_, err := w.Write([]byte(page))
 	if err != nil {
 		log.Fatal(err)
 	}
-	w.Header().Set("content-type", "text/html")
-	w.WriteHeader(http.StatusOK)
 }
 
 func createMetricsPage(metrics []repo.Metric) string {
