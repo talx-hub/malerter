@@ -46,7 +46,10 @@ func (m *Metric) setValue(val any) error {
 
 	sVal, ok := val.(string)
 	if !ok {
-		return fmt.Errorf("invalid value \"%v\" for %s", val, m.String())
+		return &customerror.InvalidArgumentError{
+			MetricURL: m.ToURL(),
+			Info:      fmt.Sprintf("invalid value <%v>", val),
+		}
 	}
 	fVal, fErr := strconv.ParseFloat(sVal, 64)
 	iVal, iErr := strconv.ParseInt(sVal, 10, 64)
@@ -61,7 +64,7 @@ func (m *Metric) setValue(val any) error {
 	}
 	return &customerror.InvalidArgumentError{
 		MetricURL: m.ToURL(),
-		Info:      "invalid value",
+		Info:      fmt.Sprintf("invalid value <%v>", val),
 	}
 }
 

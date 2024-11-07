@@ -65,7 +65,7 @@ func TestHTTPHandler_DumpMetric(t *testing.T) {
 		{"/update/counter/someMetric/1.0", "metric counter/someMetric/<nil> is incorrect: metric has invalid value\n", 400},
 		{"/update/counter/someMetric", "metric counter/someMetric/<nil> not found: \n", 404},
 		{"/update/counter/someMetric/9223372036854775808", "metric counter/someMetric/<nil> is incorrect: metric has invalid value\n", 400},
-		{"/update/counter/someMetric/string", "metric counter/someMetric/<nil> is incorrect: invalid value\n", 400},
+		{"/update/counter/someMetric/string", "metric counter/someMetric/<nil> is incorrect: invalid value <string>\n", 400},
 	}
 	rep := repo.NewMemRepository()
 	serv := service.NewMetricsDumper(rep)
