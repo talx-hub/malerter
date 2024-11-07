@@ -144,6 +144,37 @@ func (h *HTTPHandler) GetMetric(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func (h *HTTPHandler) GetMetricJSON(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "only POST requests are allowed", http.StatusBadRequest)
+		return
+	}
+
+	metric, err := repo.NewMetric().FromJSON(r.Body)
+	if err != nil {
+		st := getStatusFromError(err)
+		http.Error(w, err.Error(), st)
+		return
+	}
+	if metric == nil {
+		http.Error(w, "metric is nil", http.StatusInternalServerError)
+		return
+	}
+
+	*metric, err = h.service.Get(*metric)
+	if err != nil {
+		st := getStatusFromError(err)
+		http.Error(w, err.Error(), st)
+		return
+	}
+
+	w.Header().Set("content-type", "application/json")
+	if err = json.NewEncoder(w).Encode(&metric); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+}
+
 func (h *HTTPHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		e := "only GET requests are allowed"
