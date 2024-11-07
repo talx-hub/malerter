@@ -2,6 +2,7 @@ package api
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
@@ -20,10 +21,12 @@ func NewHTTPHandler(service service.Service) *HTTPHandler {
 }
 
 func getStatusFromError(err error) int {
-	switch err.(type) {
-	case *customerror.NotFoundError:
+	var notFoundError *customerror.NotFoundError
+	var invalidArgumentError *customerror.InvalidArgumentError
+	switch {
+	case errors.As(err, &notFoundError):
 		return http.StatusNotFound
-	case *customerror.InvalidArgumentError:
+	case errors.As(err, &invalidArgumentError):
 		return http.StatusBadRequest
 	default:
 		return http.StatusInternalServerError
@@ -37,27 +40,40 @@ func (h *HTTPHandler) DumpMetricJSON(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var metric repo.Metric
-	if err := json.NewDecoder(r.Body).Decode(&metric); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+	metric, err := repo.NewMetric().FromJSON(r.Body)
+	if err != nil {
+		st := getStatusFromError(err)
+		http.Error(w, err.Error(), st)
+		return
+	}
+	if metric == nil {
+		http.Error(w, "metric is nil", http.StatusInternalServerError)
+		return
+	}
+	if metric.IsEmpty() {
+		e := customerror.NotFoundError{
+			MetricURL: metric.ToURL(),
+			Info:      "metric value is empty",
+		}
+		http.Error(w, e.Error(), http.StatusNotFound)
+		return
+	}
+	if err = h.service.Store(*metric); err != nil {
+		http.Error(w, err.Error(), http.StatusNotFound)
 		return
 	}
 
-	if err := h.service.Store(metric); err != nil {
-		http.Error(w, err.Error(), http.StatusNotFound)
-	}
-
-	metric, err := h.service.Get(metric)
+	*metric, err = h.service.Get(*metric)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
 	}
 
+	w.Header().Set("content-type", "application/json")
 	if err = json.NewEncoder(w).Encode(&metric); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	w.Header().Set("content-type", "application/json")
-	w.WriteHeader(http.StatusOK)
 }
 
 func (h *HTTPHandler) DumpMetric(w http.ResponseWriter, r *http.Request) {
@@ -75,6 +91,14 @@ func (h *HTTPHandler) DumpMetric(w http.ResponseWriter, r *http.Request) {
 	}
 	if metric == nil {
 		http.Error(w, "metric is nil", http.StatusInternalServerError)
+		return
+	}
+	if metric.IsEmpty() {
+		e := customerror.NotFoundError{
+			MetricURL: metric.ToURL(),
+			Info:      "metric value is empty",
+		}
+		http.Error(w, e.Error(), http.StatusNotFound)
 		return
 	}
 
@@ -107,23 +131,17 @@ func (h *HTTPHandler) GetMetric(w http.ResponseWriter, r *http.Request) {
 
 	m, err := h.service.Get(*metric)
 	if err != nil {
-		switch err.(type) {
-		case *customerror.NotFoundError:
-			http.Error(w, err.Error(), http.StatusNotFound)
-		case *customerror.InvalidArgumentError:
-			http.Error(w, err.Error(), http.StatusBadRequest)
-		}
+		st := getStatusFromError(err)
+		http.Error(w, err.Error(), st)
 		return
 	}
 
 	w.Header().Set("content-type", "text/plain")
-	w.WriteHeader(http.StatusOK)
 	valueStr := fmt.Sprintf("%v", m.ActualValue())
 	_, err = w.Write([]byte(valueStr))
 	if err != nil {
 		log.Fatal(err)
 	}
-
 }
 
 func (h *HTTPHandler) GetAll(w http.ResponseWriter, r *http.Request) {
@@ -134,7 +152,6 @@ func (h *HTTPHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("content-type", "text/html")
-	w.WriteHeader(http.StatusOK)
 	metrics := h.service.GetAll()
 	page := createMetricsPage(metrics)
 	_, err := w.Write([]byte(page))

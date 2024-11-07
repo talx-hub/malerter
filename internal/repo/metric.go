@@ -1,7 +1,9 @@
 package repo
 
 import (
+	"encoding/json"
 	"fmt"
+	"io"
 	"strconv"
 	"strings"
 
@@ -68,7 +70,7 @@ func (m *Metric) setValue(val any) error {
 	}
 }
 
-// if Metric.setValue() recieves string that could be converted to int,
+// if Metric.setValue() receives string that could be converted to int,
 // the Metric.setValue() method will set both m.Value and m.Delta,
 // so we need to clean extra field
 func (m *Metric) clean() {
@@ -80,7 +82,7 @@ func (m *Metric) clean() {
 	}
 }
 
-func (m *Metric) isEmpty() bool {
+func (m *Metric) IsEmpty() bool {
 	if m.Delta == nil && m.Value == nil {
 		return true
 	}
@@ -109,7 +111,7 @@ func (m *Metric) checkValid() error {
 	// значение должно соответствовать типу
 	wrongCounter := m.Type == MetricTypeCounter && m.Delta == nil
 	wrongGauge := m.Type == MetricTypeGauge && m.Delta != nil && m.Value == nil
-	if !m.isEmpty() && (wrongCounter || wrongGauge) {
+	if !m.IsEmpty() && (wrongCounter || wrongGauge) {
 		return &customerror.InvalidArgumentError{
 			MetricURL: m.ToURL(),
 			Info:      "metric has invalid value",
@@ -120,8 +122,11 @@ func (m *Metric) checkValid() error {
 }
 
 func (m *Metric) String() string {
-	return fmt.Sprintf("%s(%s): %v",
-		m.Name, m.Type.String(), m.Value)
+	if fVal, ok := m.ActualValue().(float64); ok {
+		fValStr := strconv.FormatFloat(fVal, 'f', 2, 64)
+		return fmt.Sprintf("%s(%s): %v", m.Name, m.Type.String(), fValStr)
+	}
+	return fmt.Sprintf("%s(%s): %v", m.Name, m.Type.String(), m.ActualValue())
 }
 
 func (m *Metric) ToURL() string {
@@ -144,11 +149,11 @@ func (m *Metric) Update(other Metric) {
 func (m *Metric) ActualValue() any {
 	if m.Type == MetricTypeGauge && m.Value != nil {
 		return *m.Value
-	} else if m.Type == MetricTypeCounter && m.Delta != nil {
-		return *m.Delta
-	} else {
-		return nil
 	}
+	if m.Type == MetricTypeCounter && m.Delta != nil {
+		return *m.Delta
+	}
+	return nil
 }
 
 func (m *Metric) FromValues(name string, t MetricType, value any) (*Metric, error) {
@@ -176,13 +181,26 @@ func (m *Metric) FromURL(url string) (*Metric, error) {
 
 	m.Name = parts[3]
 	m.Type = MetricType(parts[2])
-	if err := m.checkValid(); len(parts) == 4 && err == nil {
+	if len(parts) == 4 {
+		if err := m.checkValid(); err != nil {
+			return nil, err
+		}
 		return m, nil
-	} else if len(parts) == 4 && err != nil {
-		return nil, err
 	}
 
 	if err := m.setValue(parts[4]); err != nil {
+		return nil, err
+	}
+	m.clean()
+	if err := m.checkValid(); err != nil {
+		return nil, err
+	}
+
+	return m, nil
+}
+
+func (m *Metric) FromJSON(body io.ReadCloser) (*Metric, error) {
+	if err := json.NewDecoder(body).Decode(m); err != nil {
 		return nil, err
 	}
 	m.clean()

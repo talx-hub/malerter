@@ -1,7 +1,6 @@
 package service
 
 import (
-	"github.com/talx-hub/malerter/internal/customerror"
 	"github.com/talx-hub/malerter/internal/repo"
 )
 
@@ -14,9 +13,6 @@ func NewMetricsDumper(repo repo.Repository) *MetricsDumper {
 }
 
 func (d *MetricsDumper) Store(metric repo.Metric) error {
-	if metric.Value == nil && metric.Delta == nil {
-		return &customerror.NotFoundError{MetricURL: metric.ToURL()}
-	}
 	d.repo.Store(metric)
 	return nil
 }

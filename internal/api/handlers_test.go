@@ -63,7 +63,7 @@ func TestHTTPHandler_DumpMetric(t *testing.T) {
 		{"/update/gauge/1", "metric gauge/1/<nil> not found: metric name must be a string\n", 404},
 		{"/update/WRONG/someMetric/1", "metric WRONG/someMetric/<nil> is incorrect: only counter and gauge types are allowed\n", 400},
 		{"/update/counter/someMetric/1.0", "metric counter/someMetric/<nil> is incorrect: metric has invalid value\n", 400},
-		{"/update/counter/someMetric", "metric counter/someMetric/<nil> not found: \n", 404},
+		{"/update/counter/someMetric", "metric counter/someMetric/<nil> not found: metric value is empty\n", 404},
 		{"/update/counter/someMetric/9223372036854775808", "metric counter/someMetric/<nil> is incorrect: metric has invalid value\n", 400},
 		{"/update/counter/someMetric/string", "metric counter/someMetric/<nil> is incorrect: invalid value <string>\n", 400},
 	}
