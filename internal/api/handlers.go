@@ -67,15 +67,18 @@ func (h *HTTPHandler) DumpMetric(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	rawMetric := r.URL.Path
-	metric, err := repo.FromURL(rawMetric)
+	metric, err := repo.NewMetric().FromURL(r.URL.Path)
 	if err != nil {
 		st := getStatusFromError(err)
 		http.Error(w, err.Error(), st)
 		return
 	}
+	if metric == nil {
+		http.Error(w, "metric is nil", http.StatusInternalServerError)
+		return
+	}
 
-	err = h.service.Store(metric)
+	err = h.service.Store(*metric)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusNotFound)
 		return
@@ -91,15 +94,18 @@ func (h *HTTPHandler) GetMetric(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	rawMetric := r.URL.Path
-	metric, err := repo.FromURL(rawMetric)
+	metric, err := repo.NewMetric().FromURL(r.URL.Path)
 	if err != nil {
 		st := getStatusFromError(err)
 		http.Error(w, err.Error(), st)
 		return
 	}
+	if metric == nil {
+		http.Error(w, "metric is nil", http.StatusInternalServerError)
+		return
+	}
 
-	m, err := h.service.Get(metric)
+	m, err := h.service.Get(*metric)
 	if err != nil {
 		switch err.(type) {
 		case *customerror.NotFoundError:
