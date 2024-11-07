@@ -8,12 +8,6 @@ import (
 	"github.com/talx-hub/malerter/internal/customerror"
 )
 
-type MetricName string
-
-func (m MetricName) String() string {
-	return string(m)
-}
-
 type MetricType string
 
 const (
@@ -36,22 +30,90 @@ type Metric struct {
 	Value *float64   `json:"value,omitempty"`
 }
 
-func NewMetric(name MetricName, mType MetricType, value any) Metric {
-	m := Metric{
-		Type:  mType,
-		Name:  name.String(),
-		Delta: nil,
-		Value: nil,
-	}
-	if iVal, ok := value.(int64); ok {
+func NewMetric() *Metric {
+	return &Metric{}
+}
+
+func (m *Metric) setValue(val any) error {
+	if iVal, ok := val.(int64); ok {
 		m.Delta = &iVal
-		return m
+		return nil
 	}
-	if fVal, ok := value.(float64); ok {
+	if fVal, ok := val.(float64); ok {
 		m.Value = &fVal
-		return m
+		return nil
 	}
-	return m
+
+	sVal, ok := val.(string)
+	if !ok {
+		return fmt.Errorf("invalid value \"%v\" for %s", val, m.String())
+	}
+	fVal, fErr := strconv.ParseFloat(sVal, 64)
+	iVal, iErr := strconv.ParseInt(sVal, 10, 64)
+	if fErr == nil {
+		m.Value = &fVal
+	}
+	if iErr == nil {
+		m.Delta = &iVal
+	}
+	if fErr == nil || iErr == nil {
+		return nil
+	}
+	return &customerror.InvalidArgumentError{
+		MetricURL: m.ToURL(),
+		Info:      "invalid value",
+	}
+}
+
+// if Metric.setValue() recieves string that could be converted to int,
+// the Metric.setValue() method will set both m.Value and m.Delta,
+// so we need to clean extra field
+func (m *Metric) clean() {
+	if m.Type == MetricTypeGauge && m.Delta != nil && m.Value != nil {
+		m.Delta = nil
+	}
+	if m.Type == MetricTypeCounter && m.Value != nil && m.Delta != nil {
+		m.Value = nil
+	}
+}
+
+func (m *Metric) isEmpty() bool {
+	if m.Delta == nil && m.Value == nil {
+		return true
+	}
+	return false
+}
+
+func (m *Metric) checkValid() error {
+	// имя не должно быть числом
+	_, errF := strconv.ParseFloat(m.Name, 64)
+	_, errI := strconv.Atoi(m.Name)
+	if errF == nil || errI == nil {
+		return &customerror.NotFoundError{
+			MetricURL: m.ToURL(),
+			Info:      "metric name must be a string",
+		}
+	}
+
+	// только два типа метрик позволены
+	if !m.Type.IsValid() {
+		return &customerror.InvalidArgumentError{
+			MetricURL: m.ToURL(),
+			Info:      "only counter and gauge types are allowed",
+		}
+	}
+
+	// значение должно соответствовать типу
+	wrongCounter := m.Type == MetricTypeCounter && m.Delta == nil
+	wrongGauge := m.Type == MetricTypeGauge && m.Delta != nil && m.Value == nil
+	if !m.isEmpty() && (wrongCounter || wrongGauge) {
+		return &customerror.InvalidArgumentError{
+			MetricURL: m.ToURL(),
+			Info:      "metric has invalid value",
+		}
+	}
+
+	return nil
 }
 
 func (m *Metric) String() string {
@@ -86,56 +148,44 @@ func (m *Metric) ActualValue() any {
 	}
 }
 
-func FromURL(url string) (Metric, error) {
+func (m *Metric) FromValues(name string, t MetricType, value any) (*Metric, error) {
+	m.Name = name
+	m.Type = t
+
+	if err := m.setValue(value); err != nil {
+		return nil, err
+	}
+	m.clean()
+	if err := m.checkValid(); err != nil {
+		return nil, err
+	}
+	return m, nil
+}
+
+func (m *Metric) FromURL(url string) (*Metric, error) {
 	parts := strings.Split(url, "/")
 	if len(parts) < 4 {
-		return Metric{},
-			&customerror.NotFoundError{
-				MetricURL: url,
-				Info:      "incorrect URL",
-			}
-	}
-
-	// только два типа метрик позволены
-	mType := MetricType(parts[2])
-	if !mType.IsValid() {
-		return Metric{},
-			&customerror.InvalidArgumentError{
-				MetricURL: url,
-				Info:      "only counter and gauge types are allowed",
-			}
-	}
-
-	// имя не должно быть числом
-	mName := &parts[3]
-	_, errF := strconv.ParseFloat(*mName, 64)
-	_, errI := strconv.Atoi(*mName)
-	if errF == nil || errI == nil {
-		return Metric{},
-			&customerror.NotFoundError{
-				MetricURL: url,
-				Info:      "metric name must be a string",
-			}
-	}
-	if len(parts) == 4 {
-		return Metric{Type: mType, Name: *mName, Value: nil}, nil
-	}
-
-	// значение должно быть числом и соответствовать типу
-	mValue := &parts[4]
-	iVal, iErr := strconv.ParseInt(*mValue, 10, 64)
-	if mType == MetricTypeCounter && iErr == nil {
-		return Metric{Type: mType, Name: *mName, Delta: &iVal}, nil
-	}
-
-	fVal, fErr := strconv.ParseFloat(*mValue, 64)
-	if mType == MetricTypeGauge && fErr == nil {
-		return Metric{Type: mType, Name: *mName, Value: &fVal}, nil
-	}
-
-	return Metric{},
-		&customerror.InvalidArgumentError{
+		return nil, &customerror.NotFoundError{
 			MetricURL: url,
-			Info:      "wrong value type for metric type",
+			Info:      "incorrect URL",
 		}
+	}
+
+	m.Name = parts[3]
+	m.Type = MetricType(parts[2])
+	if err := m.checkValid(); len(parts) == 4 && err == nil {
+		return m, nil
+	} else if len(parts) == 4 && err != nil {
+		return nil, err
+	}
+
+	if err := m.setValue(parts[4]); err != nil {
+		return nil, err
+	}
+	m.clean()
+	if err := m.checkValid(); err != nil {
+		return nil, err
+	}
+
+	return m, nil
 }
