@@ -8,7 +8,7 @@ import (
 	"net/http"
 
 	"github.com/talx-hub/malerter/internal/customerror"
-	"github.com/talx-hub/malerter/internal/repo"
+	"github.com/talx-hub/malerter/internal/model"
 	"github.com/talx-hub/malerter/internal/service"
 )
 
@@ -40,7 +40,7 @@ func (h *HTTPHandler) DumpMetricJSON(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	metric, err := repo.NewMetric().FromJSON(r.Body)
+	metric, err := model.NewMetric().FromJSON(r.Body)
 	if err != nil {
 		st := getStatusFromError(err)
 		http.Error(w, err.Error(), st)
@@ -83,7 +83,7 @@ func (h *HTTPHandler) DumpMetric(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	metric, err := repo.NewMetric().FromURL(r.URL.Path)
+	metric, err := model.NewMetric().FromURL(r.URL.Path)
 	if err != nil {
 		st := getStatusFromError(err)
 		http.Error(w, err.Error(), st)
@@ -118,7 +118,7 @@ func (h *HTTPHandler) GetMetric(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	metric, err := repo.NewMetric().FromURL(r.URL.Path)
+	metric, err := model.NewMetric().FromURL(r.URL.Path)
 	if err != nil {
 		st := getStatusFromError(err)
 		http.Error(w, err.Error(), st)
@@ -150,7 +150,7 @@ func (h *HTTPHandler) GetMetricJSON(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	metric, err := repo.NewMetric().FromJSON(r.Body)
+	metric, err := model.NewMetric().FromJSON(r.Body)
 	if err != nil {
 		st := getStatusFromError(err)
 		http.Error(w, err.Error(), st)
@@ -191,7 +191,7 @@ func (h *HTTPHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func createMetricsPage(metrics []repo.Metric) string {
+func createMetricsPage(metrics []model.Metric) string {
 	var page = `<html>
 	<body>
 %s	</body>

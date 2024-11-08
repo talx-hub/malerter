@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/talx-hub/malerter/internal/customerror"
+	"github.com/talx-hub/malerter/internal/model"
 	"github.com/talx-hub/malerter/internal/repo"
 	"github.com/talx-hub/malerter/internal/service"
 )
@@ -100,20 +101,20 @@ func TestHTTPHandler_DumpMetric(t *testing.T) {
 }
 
 type mockRepo struct {
-	d map[string]repo.Metric
+	d map[string]model.Metric
 }
 
-func (r *mockRepo) Store(repo.Metric) {}
-func (r *mockRepo) Get(m repo.Metric) (repo.Metric, error) {
+func (r *mockRepo) Store(model.Metric) {}
+func (r *mockRepo) Get(m model.Metric) (model.Metric, error) {
 	dummyKey := m.Type.String() + m.Name
 	if mm, found := r.d[dummyKey]; found {
 		return mm, nil
 	}
-	return repo.Metric{},
+	return model.Metric{},
 		&customerror.NotFoundError{MetricURL: m.String()}
 }
-func (r *mockRepo) GetAll() []repo.Metric {
-	var metrics []repo.Metric
+func (r *mockRepo) GetAll() []model.Metric {
+	var metrics []model.Metric
 	for _, m := range r.d {
 		metrics = append(metrics, m)
 	}
@@ -130,9 +131,9 @@ func TestHTTPHandler_GetMetric(t *testing.T) {
 		{"/value/counter", "metric /value/counter not found: incorrect URL\n", 404},
 		{"/value/gauge", "metric /value/gauge not found: incorrect URL\n", 404},
 	}
-	m1, _ := repo.NewMetric().FromValues("mainQuestion", repo.MetricTypeCounter, int64(42))
-	m2, _ := repo.NewMetric().FromValues("pi", repo.MetricTypeGauge, 3.14)
-	m := map[string]repo.Metric{
+	m1, _ := model.NewMetric().FromValues("mainQuestion", model.MetricTypeCounter, int64(42))
+	m2, _ := model.NewMetric().FromValues("pi", model.MetricTypeGauge, 3.14)
+	m := map[string]model.Metric{
 		"countermainQuestion": *m1,
 		"gaugepi":             *m2,
 	}

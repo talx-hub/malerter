@@ -4,6 +4,7 @@ import (
 	"log"
 	"net/http"
 
+	"github.com/talx-hub/malerter/internal/model"
 	"github.com/talx-hub/malerter/internal/repo"
 )
 
@@ -19,11 +20,11 @@ func (s *Sender) send() error {
 	return nil
 }
 
-func (s *Sender) get() []repo.Metric {
+func (s *Sender) get() []model.Metric {
 	return s.repo.GetAll()
 }
 
-func convertToURLs(metrics []repo.Metric, host string) []string {
+func convertToURLs(metrics []model.Metric, host string) []string {
 	var urls []string
 	for _, m := range metrics {
 		url := "http://" + host + "/update/" + m.ToURL()

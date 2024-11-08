@@ -1,6 +1,7 @@
 package service
 
 import (
+	"github.com/talx-hub/malerter/internal/model"
 	"github.com/talx-hub/malerter/internal/repo"
 )
 
@@ -12,19 +13,19 @@ func NewMetricsDumper(repo repo.Repository) *MetricsDumper {
 	return &MetricsDumper{repo: repo}
 }
 
-func (d *MetricsDumper) Store(metric repo.Metric) error {
+func (d *MetricsDumper) Store(metric model.Metric) error {
 	d.repo.Store(metric)
 	return nil
 }
 
-func (d *MetricsDumper) Get(metric repo.Metric) (repo.Metric, error) {
+func (d *MetricsDumper) Get(metric model.Metric) (model.Metric, error) {
 	res, err := d.repo.Get(metric)
 	if err != nil {
-		return repo.Metric{}, err
+		return model.Metric{}, err
 	}
 	return res, nil
 }
 
-func (d *MetricsDumper) GetAll() []repo.Metric {
+func (d *MetricsDumper) GetAll() []model.Metric {
 	return d.repo.GetAll()
 }

@@ -1,9 +1,11 @@
 package service
 
-import "github.com/talx-hub/malerter/internal/repo"
+import (
+	"github.com/talx-hub/malerter/internal/model"
+)
 
 type Service interface {
-	Store(metric repo.Metric) error
-	Get(metric repo.Metric) (repo.Metric, error)
-	GetAll() []repo.Metric
+	Store(metric model.Metric) error
+	Get(metric model.Metric) (model.Metric, error)
+	GetAll() []model.Metric
 }
