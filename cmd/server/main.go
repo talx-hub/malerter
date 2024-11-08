@@ -4,24 +4,23 @@ import (
 	"log"
 	"net/http"
 
-	"github.com/talx-hub/malerter/internal/logger"
-
 	"github.com/go-chi/chi/v5"
 	"github.com/talx-hub/malerter/internal/api"
-	"github.com/talx-hub/malerter/internal/config"
+	serverCfg "github.com/talx-hub/malerter/internal/config/server"
+	"github.com/talx-hub/malerter/internal/logger"
 	"github.com/talx-hub/malerter/internal/repo"
-	"github.com/talx-hub/malerter/internal/service"
+	"github.com/talx-hub/malerter/internal/service/server"
 )
 
 func main() {
-	director := config.NewServerDirector()
-	cfg, ok := director.Build().(config.Server)
+	// TODO: тут какие-то кошмары с указателями(см. config/server/builder/.Build())... разобраться
+	cfg, ok := serverCfg.NewDirector().Build().(serverCfg.Builder)
 	if !ok {
-		log.Fatal("unable to load server config")
+		log.Fatal("unable to load server serverCfg")
 	}
 
 	rep := repo.NewMemRepository()
-	serv := service.NewMetricsDumper(rep)
+	serv := server.NewMetricsDumper(rep)
 	handler := api.NewHTTPHandler(serv)
 
 	router := chi.NewRouter()

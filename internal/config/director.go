@@ -1,31 +1,21 @@
 package config
 
-import "log"
+import (
+	"log"
+)
 
 type Director struct {
-	builder Builder
-}
-
-func NewAgentDirector() *Director {
-	return &Director{
-		builder: AgentBuilder{},
-	}
-}
-
-func NewServerDirector() *Director {
-	return &Director{
-		builder: ServerBuilder{},
-	}
+	Builder Builder
 }
 
 func (d *Director) Build() Config {
-	cfg, err := d.builder.
-		loadFromFlags().
-		loadFromEnv().
-		isValid()
+	cfg, err := d.Builder.
+		LoadFromFlags().
+		LoadFromEnv().
+		IsValid()
 
 	if err != nil {
 		log.Fatal(err)
 	}
-	return cfg.build()
+	return cfg.Build()
 }

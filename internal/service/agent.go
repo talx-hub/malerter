@@ -5,18 +5,18 @@ import (
 	"os"
 	"time"
 
-	"github.com/talx-hub/malerter/internal/config"
+	"github.com/talx-hub/malerter/internal/config/agent"
 	"github.com/talx-hub/malerter/internal/repo"
 )
 
 type Agent struct {
-	config *config.Agent
+	config *agent.Builder
 	repo   repo.Repository
 	poller Poller
 	sender Sender
 }
 
-func NewAgent(repo repo.Repository, cfg *config.Agent) *Agent {
+func NewAgent(repo repo.Repository, cfg *agent.Builder) *Agent {
 	return &Agent{
 		config: cfg,
 		repo:   repo,
