@@ -14,6 +14,7 @@ import (
 	"github.com/talx-hub/malerter/internal/model"
 	"github.com/talx-hub/malerter/internal/repo"
 	"github.com/talx-hub/malerter/internal/service"
+	"github.com/talx-hub/malerter/internal/service/server"
 )
 
 func TestNewHTTPHandler(t *testing.T) {
@@ -32,13 +33,13 @@ func TestNewHTTPHandler(t *testing.T) {
 		},
 		{
 			name: "simple constructor test #1",
-			args: args{service: service.NewMetricsDumper(nil)},
-			want: &HTTPHandler{service.NewMetricsDumper(nil)},
+			args: args{service: server.NewMetricsDumper(nil)},
+			want: &HTTPHandler{server.NewMetricsDumper(nil)},
 		},
 		{
 			name: "simple constructor test #2",
-			args: args{service: service.NewMetricsDumper(repo.NewMemRepository())},
-			want: &HTTPHandler{service.NewMetricsDumper(repo.NewMemRepository())},
+			args: args{service: server.NewMetricsDumper(repo.NewMemRepository())},
+			want: &HTTPHandler{server.NewMetricsDumper(repo.NewMemRepository())},
 		},
 	}
 	for _, tt := range tests {
@@ -69,7 +70,7 @@ func TestHTTPHandler_DumpMetric(t *testing.T) {
 		{"/update/counter/someMetric/string", "metric counter/someMetric/<nil> is incorrect: invalid value <string>\n", 400},
 	}
 	rep := repo.NewMemRepository()
-	serv := service.NewMetricsDumper(rep)
+	serv := server.NewMetricsDumper(rep)
 	handler := NewHTTPHandler(serv)
 	ts := httptest.NewServer(http.HandlerFunc(handler.DumpMetric))
 	defer ts.Close()
@@ -138,7 +139,7 @@ func TestHTTPHandler_GetMetric(t *testing.T) {
 		"gaugepi":             *m2,
 	}
 	mock := mockRepo{d: m}
-	serv := service.NewMetricsDumper(&mock)
+	serv := server.NewMetricsDumper(&mock)
 	handler := NewHTTPHandler(serv)
 	ts := httptest.NewServer(http.HandlerFunc(handler.GetMetric))
 	defer ts.Close()
