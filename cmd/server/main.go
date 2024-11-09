@@ -27,15 +27,19 @@ func main() {
 
 	lggr := logger.New()
 	var updateHandler = lggr.WrapHandler(handler.DumpMetric)
+	var updateJSONHandler = lggr.WrapHandler(handler.DumpMetricJSON)
 	var getHandler = lggr.WrapHandler(handler.GetMetric)
 	var getAllHandler = lggr.WrapHandler(handler.GetAll)
+	var getJSONHandler = lggr.WrapHandler(handler.GetMetricJSON)
 
 	router.Route("/", func(r chi.Router) {
 		r.Get("/", getAllHandler)
 		r.Route("/value", func(r chi.Router) {
+			r.Post("/", getJSONHandler)
 			r.Get("/{type}/{name}", getHandler)
 		})
 		r.Route("/update", func(r chi.Router) {
+			r.Post("/", updateJSONHandler)
 			r.Post("/{type}/{name}/{val}", updateHandler)
 		})
 	})
