@@ -1,6 +1,8 @@
 package agent
 
 import (
+	"bytes"
+	"encoding/json"
 	"log"
 	"net/http"
 
@@ -15,8 +17,8 @@ type Sender struct {
 
 func (s *Sender) send() error {
 	metrics := s.get()
-	urls := convertToURLs(metrics, s.host)
-	send(urls)
+	jsons := convertToJSONs(metrics)
+	send(s.host, jsons)
 	return nil
 }
 
@@ -24,19 +26,27 @@ func (s *Sender) get() []model.Metric {
 	return s.repo.GetAll()
 }
 
-func convertToURLs(metrics []model.Metric, host string) []string {
-	var urls []string
+func convertToJSONs(metrics []model.Metric) []string {
+	var jsons []string
 	for _, m := range metrics {
-		url := "http://" + host + "/update/" + m.ToURL()
-		urls = append(urls, url)
+		mJSON, err := json.Marshal(m)
+		if err != nil {
+			// TODO: хочу логировать всё в одном месте, в main. Формировать пачку ошибок и её возвращать?
+			log.Printf("unable to convert metric %s to JSON: %v", m.String(), err)
+			continue
+		}
+		jsons = append(jsons, string(mJSON))
 	}
-	return urls
+	return jsons
 }
 
-func send(urls []string) {
-	for _, url := range urls {
-		response, err := http.Post(url, "text/plain", nil)
+func send(host string, jsons []string) {
+	for _, j := range jsons {
+		body := bytes.NewBuffer([]byte(j))
+		response, err := http.Post("http://"+host, "application/json", body)
 		if err != nil {
+			// TODO: хочу логировать всё в одном месте, в main. Формировать пачку ошибок и её возвращать?
+			log.Printf("unable to send json %s to %s: %v", j, host, err)
 			continue
 		}
 		if err = response.Body.Close(); err != nil {
