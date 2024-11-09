@@ -90,6 +90,13 @@ func (m *Metric) IsEmpty() bool {
 }
 
 func (m *Metric) checkValid() error {
+	if m.Name == "" {
+		return &customerror.NotFoundError{
+			MetricURL: m.ToURL(),
+			Info:      "metric name must be not empty",
+		}
+	}
+
 	// имя не должно быть числом
 	_, errF := strconv.ParseFloat(m.Name, 64)
 	_, errI := strconv.Atoi(m.Name)
@@ -109,8 +116,8 @@ func (m *Metric) checkValid() error {
 	}
 
 	// значение должно соответствовать типу
-	wrongCounter := m.Type == MetricTypeCounter && m.Delta == nil
-	wrongGauge := m.Type == MetricTypeGauge && m.Delta != nil && m.Value == nil
+	wrongCounter := m.Type == MetricTypeCounter && (m.Value != nil || m.Delta == nil)
+	wrongGauge := m.Type == MetricTypeGauge && (m.Delta != nil || m.Value == nil)
 	if !m.IsEmpty() && (wrongCounter || wrongGauge) {
 		return &customerror.InvalidArgumentError{
 			MetricURL: m.ToURL(),
@@ -121,37 +128,60 @@ func (m *Metric) checkValid() error {
 	return nil
 }
 
-func (m *Metric) String() string {
-	if fVal, ok := m.ActualValue().(float64); ok {
-		fValStr := strconv.FormatFloat(fVal, 'f', 2, 64)
-		return fmt.Sprintf("%s(%s): %v", m.Name, m.Type.String(), fValStr)
-	}
-	return fmt.Sprintf("%s(%s): %v", m.Name, m.Type.String(), m.ActualValue())
-}
-
-func (m *Metric) ToURL() string {
-	if fVal, ok := m.ActualValue().(float64); ok {
-		fValStr := strconv.FormatFloat(fVal, 'f', 2, 64)
-		return fmt.Sprintf("%s/%s/%v", m.Type.String(), m.Name, fValStr)
-	}
-	return fmt.Sprintf("%s/%s/%v", m.Type.String(), m.Name, m.ActualValue())
-}
-
-func (m *Metric) Update(other Metric) {
-	if m.Type == MetricTypeGauge {
-		m.Value = other.Value
-	} else {
-		updated := *m.Delta + *other.Delta
-		m.Delta = &updated
-	}
-}
-
 func (m *Metric) ActualValue() any {
 	if m.Type == MetricTypeGauge && m.Value != nil {
 		return *m.Value
 	}
 	if m.Type == MetricTypeCounter && m.Delta != nil {
 		return *m.Delta
+	}
+	return nil
+}
+
+func (m *Metric) String() string {
+	if m.IsEmpty() {
+		return fmt.Sprintf("%s(%s): <nil>", m.Name, m.Type.String())
+	}
+	if m.Type == MetricTypeGauge {
+		return fmt.Sprintf("%s(%s): %.2f", m.Name, m.Type.String(), m.ActualValue())
+	}
+	return fmt.Sprintf("%s(%s): %v", m.Name, m.Type.String(), m.ActualValue())
+}
+
+func (m *Metric) ToURL() string {
+	if m.IsEmpty() {
+		return fmt.Sprintf("%s/%s/<nil>", m.Type.String(), m.Name)
+	}
+	if m.Type == MetricTypeGauge {
+		return fmt.Sprintf("%s/%s/%.2f", m.Type.String(), m.Name, m.ActualValue())
+	}
+	return fmt.Sprintf("%s/%s/%v", m.Type.String(), m.Name, m.ActualValue())
+}
+
+func (m *Metric) Update(other Metric) error {
+	// TODO: может убрать эти проверки??? невалидные метрики вообще не должны иметь возможность быть созданными клиентским кодом
+	if err := m.checkValid(); err != nil {
+		return fmt.Errorf("cannot update invalid metric: %v", err)
+	}
+	if err := other.checkValid(); err != nil {
+		return fmt.Errorf("rhs metric is invalid, cannot update: %v", err)
+	}
+	if m.IsEmpty() {
+		return fmt.Errorf("lhs metric is empty, cannot update")
+	}
+	if other.IsEmpty() {
+		return fmt.Errorf("rhs metric is empty, cannot update")
+	}
+	if m.Type != other.Type {
+		return fmt.Errorf("lhs and rhs metrics type are different, cannot update")
+	}
+
+	if m.Type == MetricTypeGauge {
+		m.Value = other.Value
+	} else {
+		// TODO: handle overflow
+		updated := *m.Delta + *other.Delta
+		m.Delta = &updated
 	}
 	return nil
 }
@@ -199,11 +229,10 @@ func (m *Metric) FromURL(url string) (*Metric, error) {
 	return m, nil
 }
 
-func (m *Metric) FromJSON(body io.ReadCloser) (*Metric, error) {
+func (m *Metric) FromJSON(body io.Reader) (*Metric, error) {
 	if err := json.NewDecoder(body).Decode(m); err != nil {
 		return nil, err
 	}
-	m.clean()
 	if err := m.checkValid(); err != nil {
 		return nil, err
 	}

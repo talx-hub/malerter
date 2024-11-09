@@ -22,7 +22,10 @@ func NewMemRepository() *MemRepository {
 func (r *MemRepository) Store(metric model.Metric) {
 	dummyKey := metric.Type.String() + metric.Name
 	if old, found := r.data[dummyKey]; found {
-		old.Update(metric)
+		err := old.Update(metric)
+		if err != nil {
+			return
+		}
 		n := old
 		r.data[dummyKey] = n
 	} else {
