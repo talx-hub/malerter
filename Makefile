@@ -39,7 +39,7 @@ SERVER_PORT := 37797
 ADDRESS := "localhost:37797"
 TEMP_FILE := "./temp"
 .PHONY : run-autotests
-run-autotests: iter1 iter2 iter3 iter4 iter5 iter6
+run-autotests: iter1 iter2 iter3 iter4 iter5 iter6 iter7
 
 .PHONY : iter1
 iter1:
@@ -65,3 +65,8 @@ iter5:
 .PHONY : iter6
 iter6:
 	./bin/metricstest -test.run=^TestIteration6$$ -agent-binary-path=./bin/agent -binary-path=./bin/server -server-port=$(SERVER_PORT) -source-path=.
+
+.PHONY : iter7
+iter7:
+	./bin/metricstest -test.run=^TestIteration7$$ -agent-binary-path=./bin/agent -binary-path=./bin/server -server-port=$(SERVER_PORT) -source-path=.
+
