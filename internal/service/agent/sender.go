@@ -43,7 +43,7 @@ func convertToJSONs(metrics []model.Metric) []string {
 func send(host string, jsons []string) {
 	for _, j := range jsons {
 		body := bytes.NewBuffer([]byte(j))
-		response, err := http.Post("http://"+host, "application/json", body)
+		response, err := http.Post("http://"+host+"/update/", "application/json", body)
 		if err != nil {
 			// TODO: хочу логировать всё в одном месте, в main. Формировать пачку ошибок и её возвращать?
 			log.Printf("unable to send json %s to %s: %v", j, host, err)
