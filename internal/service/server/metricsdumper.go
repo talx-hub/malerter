@@ -14,8 +14,7 @@ func NewMetricsDumper(repo repo.Repository) *MetricsDumper {
 }
 
 func (d *MetricsDumper) Store(metric model.Metric) error {
-	d.repo.Store(metric)
-	return nil
+	return d.repo.Store(metric)
 }
 
 func (d *MetricsDumper) Get(metric model.Metric) (model.Metric, error) {

@@ -6,7 +6,7 @@ import (
 )
 
 type Repository interface {
-	Store(metric model.Metric)
+	Store(metric model.Metric) error
 	Get(metric model.Metric) (model.Metric, error)
 	GetAll() []model.Metric
 }
@@ -19,18 +19,19 @@ func NewMemRepository() *MemRepository {
 	return &MemRepository{data: make(map[string]model.Metric)}
 }
 
-func (r *MemRepository) Store(metric model.Metric) {
+func (r *MemRepository) Store(metric model.Metric) error {
 	dummyKey := metric.Type.String() + metric.Name
 	if old, found := r.data[dummyKey]; found {
 		err := old.Update(metric)
 		if err != nil {
-			return
+			return err
 		}
 		n := old
 		r.data[dummyKey] = n
 	} else {
 		r.data[dummyKey] = metric
 	}
+	return nil
 }
 
 func (r *MemRepository) Get(metric model.Metric) (model.Metric, error) {

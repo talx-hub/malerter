@@ -39,6 +39,11 @@ func (h *HTTPHandler) DumpMetricJSON(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, e, http.StatusBadRequest)
 		return
 	}
+	if r.Header.Get("Content-Type") != "application/json" {
+		e := "content-type must be application/json"
+		http.Error(w, e, http.StatusBadRequest)
+		return
+	}
 
 	metric, err := model.NewMetric().FromJSON(r.Body)
 	if err != nil {
@@ -149,6 +154,11 @@ func (h *HTTPHandler) GetMetricJSON(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "only POST requests are allowed", http.StatusBadRequest)
 		return
 	}
+	if r.Header.Get("Content-Type") != "application/json" {
+		e := "content-type must be application/json"
+		http.Error(w, e, http.StatusBadRequest)
+		return
+	}
 
 	metric, err := model.NewMetric().FromJSON(r.Body)
 	if err != nil {
@@ -201,6 +211,5 @@ func createMetricsPage(metrics []model.Metric) string {
 	for _, m := range metrics {
 		data += fmt.Sprintf("\t\t<p>%s</p>\n", m.String())
 	}
-	fmt.Printf(page, data)
 	return fmt.Sprintf(page, data)
 }

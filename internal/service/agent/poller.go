@@ -98,6 +98,8 @@ func (p *Poller) store(metrics []*model.Metric) {
 			log.Println("can't store empty metric")
 			continue
 		}
-		p.repo.Store(*m)
+		if p.repo.Store(*m) != nil {
+			log.Println("error during storing of metric")
+		}
 	}
 }
