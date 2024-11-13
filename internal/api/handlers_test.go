@@ -247,6 +247,7 @@ func TestHTTPHandler_DumpMetricJSON(t *testing.T) {
 	dumper := server.NewMetricsDumper(repository)
 	handler := NewHTTPHandler(dumper)
 	testServer := httptest.NewServer(http.HandlerFunc(handler.DumpMetricJSON))
+	defer testServer.Close()
 
 	for _, test := range tests {
 		t.Run(test.url, func(t *testing.T) {
@@ -327,6 +328,7 @@ func TestHTTPHandler_GetMetricJSON(t *testing.T) {
 	dumper := server.NewMetricsDumper(repository)
 	handler := NewHTTPHandler(dumper)
 	testServer := httptest.NewServer(http.HandlerFunc(handler.GetMetricJSON))
+	defer testServer.Close()
 
 	for _, test := range tests {
 		t.Run(test.url, func(t *testing.T) {
