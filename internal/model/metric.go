@@ -89,7 +89,7 @@ func (m *Metric) IsEmpty() bool {
 	return false
 }
 
-func (m *Metric) checkValid() error {
+func (m *Metric) CheckValid() error {
 	if m.Name == "" {
 		return &customerror.NotFoundError{
 			MetricURL: m.ToURL(),
@@ -160,10 +160,10 @@ func (m *Metric) ToURL() string {
 
 func (m *Metric) Update(other Metric) error {
 	// TODO: может убрать эти проверки??? невалидные метрики вообще не должны иметь возможность быть созданными клиентским кодом
-	if err := m.checkValid(); err != nil {
+	if err := m.CheckValid(); err != nil {
 		return fmt.Errorf("cannot update invalid metric: %v", err)
 	}
-	if err := other.checkValid(); err != nil {
+	if err := other.CheckValid(); err != nil {
 		return fmt.Errorf("rhs metric is invalid, cannot update: %v", err)
 	}
 	if m.IsEmpty() {
@@ -194,7 +194,7 @@ func (m *Metric) FromValues(name string, t MetricType, value any) (*Metric, erro
 		return nil, err
 	}
 	m.clean()
-	if err := m.checkValid(); err != nil {
+	if err := m.CheckValid(); err != nil {
 		return nil, err
 	}
 	return m, nil
@@ -212,7 +212,7 @@ func (m *Metric) FromURL(url string) (*Metric, error) {
 	m.Name = parts[3]
 	m.Type = MetricType(parts[2])
 	if len(parts) == 4 {
-		if err := m.checkValid(); err != nil {
+		if err := m.CheckValid(); err != nil {
 			return nil, err
 		}
 		return m, nil
@@ -222,7 +222,7 @@ func (m *Metric) FromURL(url string) (*Metric, error) {
 		return nil, err
 	}
 	m.clean()
-	if err := m.checkValid(); err != nil {
+	if err := m.CheckValid(); err != nil {
 		return nil, err
 	}
 
@@ -233,7 +233,7 @@ func (m *Metric) FromJSON(body io.Reader) (*Metric, error) {
 	if err := json.NewDecoder(body).Decode(m); err != nil {
 		return nil, err
 	}
-	if err := m.checkValid(); err != nil {
+	if err := m.CheckValid(); err != nil {
 		return nil, err
 	}
 

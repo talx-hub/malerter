@@ -1,7 +1,6 @@
 package agent
 
 import (
-	"github.com/talx-hub/malerter/internal/repo"
 	"io"
 	"log"
 	"net/http"
@@ -11,6 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/talx-hub/malerter/internal/model"
+	"github.com/talx-hub/malerter/internal/repo"
 )
 
 func TestGet(t *testing.T) {
