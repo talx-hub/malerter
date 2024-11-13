@@ -21,7 +21,7 @@ func NewAgent(repo repo.Repository, cfg *agent.Builder) *Agent {
 		config: cfg,
 		repo:   repo,
 		poller: Poller{repo: repo},
-		sender: Sender{repo: repo, host: cfg.ServerAddress},
+		sender: Sender{repo: repo, host: "http://" + cfg.ServerAddress},
 	}
 }
 
