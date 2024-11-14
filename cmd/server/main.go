@@ -1,8 +1,12 @@
 package main
 
 import (
+	"context"
+	"errors"
 	"log"
 	"net/http"
+	"os"
+	"os/signal"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/talx-hub/malerter/internal/api"
@@ -64,9 +68,31 @@ func main() {
 		Bool(`"restore backup"`, cfg.Restore).
 		Str(`"backup path"`, cfg.FileStoragePath).
 		Msg("Starting server")
-	err = http.ListenAndServe(cfg.RootAddress, router)
-	if err != nil {
+	srv := http.Server{Addr: cfg.RootAddress, Handler: router}
+	idleConnsClosed := make(chan struct{})
+	go func() {
+		sigint := make(chan os.Signal, 1)
+		signal.Notify(sigint, os.Interrupt)
+		<-sigint
+
+		if err = srv.Shutdown(context.Background()); err != nil {
+			zeroLogger.Logger.Fatal().
+				Err(err).
+				Msg("HTTP server Shutdown")
+		}
+
+		bk.Backup()
+		if err = bk.Close(); err != nil {
+			zeroLogger.Logger.Fatal().
+				Err(err).
+				Msg("Backup Close")
+		}
+		close(idleConnsClosed)
+	}()
+
+	if err = srv.ListenAndServe(); !errors.Is(err, http.ErrServerClosed) {
 		zeroLogger.Logger.Fatal().
 			Err(err)
 	}
+	<-idleConnsClosed
 }
