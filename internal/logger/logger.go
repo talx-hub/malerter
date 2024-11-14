@@ -1,6 +1,7 @@
 package logger
 
 import (
+	"fmt"
 	"net/http"
 	"os"
 	"time"
@@ -9,22 +10,27 @@ import (
 )
 
 type Logger struct {
-	l zerolog.Logger
+	Logger zerolog.Logger
 }
 
-func New() *Logger {
+func New(logLevel string) (*Logger, error) {
+	level, err := zerolog.ParseLevel(logLevel)
+	if err != nil {
+		return nil, fmt.Errorf("unable to init logger: %v", err)
+	}
+	zerolog.DurationFieldUnit = time.Second
 	logger := Logger{
 		zerolog.New(zerolog.ConsoleWriter{
 			Out:        os.Stdout,
 			TimeFormat: time.Stamp,
 		}).
-			Level(zerolog.InfoLevel).
+			Level(level).
 			With().
 			Timestamp().
 			Int("pid", os.Getpid()).
 			Logger(),
 	}
-	return &logger
+	return &logger, nil
 }
 
 type (
@@ -67,7 +73,7 @@ func (logger Logger) WrapHandler(h http.HandlerFunc) http.HandlerFunc {
 
 		h.ServeHTTP(&lw, r)
 		duration := time.Since(start)
-		logger.l.Info().
+		logger.Logger.Info().
 			Str("URI", uri).
 			Str("method", method).
 			Int("status", responseData.status).

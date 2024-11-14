@@ -26,7 +26,11 @@ func main() {
 
 	router := chi.NewRouter()
 
-	zeroLogger := logger.New()
+	zeroLogger, err := logger.New(cfg.LogLevel)
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	var updateHandler = zeroLogger.WrapHandler(handler.DumpMetric)
 	var updateJSONHandler = zeroLogger.WrapHandler(compressor.GzipMiddleware(handler.DumpMetricJSON))
 	var getHandler = zeroLogger.WrapHandler(handler.GetMetric)
@@ -45,8 +49,15 @@ func main() {
 		})
 	})
 
-	err := http.ListenAndServe(cfg.RootAddress, router)
+	zeroLogger.Logger.Info().
+		Str(`"address"`, cfg.RootAddress).
+		Dur(`"backup interval"`, cfg.StoreInterval).
+		Bool(`"restore backup"`, cfg.Restore).
+		Str(`"backup path"`, cfg.FileStoragePath).
+		Msg("Starting server")
+	err = http.ListenAndServe(cfg.RootAddress, router)
 	if err != nil {
-		panic(err)
+		zeroLogger.Logger.Fatal().
+			Err(err)
 	}
 }

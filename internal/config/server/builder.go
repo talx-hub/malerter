@@ -13,7 +13,7 @@ import (
 
 const (
 	AddressDefault       = "localhost:8080"
-	LogLevelDefault      = "InfoLevel"
+	LogLevelDefault      = "Info"
 	StoreIntervalDefault = 300
 	RestoreDefault       = true
 )
@@ -27,7 +27,7 @@ const (
 )
 
 func FileStorageDefault() string {
-	return time.Now().UTC().String() + ".bk"
+	return time.Now().UTC().Format("2006-01-02_15:04:05_MST") + ".bk"
 }
 
 func NewDirector() *config.Director {
