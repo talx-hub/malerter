@@ -39,12 +39,13 @@ func main() {
 		log.Fatal(err)
 	}
 
-	var updateHandler = zeroLogger.WrapHandler(handler.DumpMetric)
-	var updateJSONHandler = zeroLogger.WrapHandler(compressor.GzipMiddleware(handler.DumpMetricJSON))
+	var updateHandler = zeroLogger.WrapHandler(bk.Middleware(handler.DumpMetric))
+	var updateJSONHandler = zeroLogger.WrapHandler(compressor.GzipMiddleware(bk.Middleware(handler.DumpMetricJSON)))
 	var getHandler = zeroLogger.WrapHandler(handler.GetMetric)
 	var getAllHandler = zeroLogger.WrapHandler(compressor.GzipMiddleware(handler.GetAll))
 	var getJSONHandler = zeroLogger.WrapHandler(compressor.GzipMiddleware(handler.GetMetricJSON))
 
+	router := chi.NewRouter()
 	router.Route("/", func(r chi.Router) {
 		r.Get("/", getAllHandler)
 		r.Route("/value", func(r chi.Router) {
