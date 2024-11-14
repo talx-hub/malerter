@@ -92,9 +92,10 @@ func TestSend(t *testing.T) {
 	}))
 	defer testServer.Close()
 
+	client := testServer.Client()
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			send(testServer.URL, test.jsons)
+			send(client, testServer.URL, test.jsons, false)
 			require.Equal(t, len(test.jsons), len(storage))
 			for i, json := range test.jsons {
 				assert.JSONEq(t, json, storage[i])

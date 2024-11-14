@@ -2,6 +2,7 @@ package agent
 
 import (
 	"log"
+	"net/http"
 	"os"
 	"time"
 
@@ -16,12 +17,17 @@ type Agent struct {
 	sender Sender
 }
 
-func NewAgent(repo repo.Repository, cfg *agent.Builder) *Agent {
+func NewAgent(repo repo.Repository, cfg *agent.Builder, client *http.Client) *Agent {
 	return &Agent{
 		config: cfg,
 		repo:   repo,
 		poller: Poller{repo: repo},
-		sender: Sender{repo: repo, host: "http://" + cfg.ServerAddress},
+		sender: Sender{
+			repo:     repo,
+			host:     "http://" + cfg.ServerAddress,
+			client:   client,
+			compress: true,
+		},
 	}
 }
 

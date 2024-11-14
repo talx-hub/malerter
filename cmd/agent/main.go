@@ -2,6 +2,7 @@ package main
 
 import (
 	"log"
+	"net/http"
 
 	agentCfg "github.com/talx-hub/malerter/internal/config/agent"
 	"github.com/talx-hub/malerter/internal/repo"
@@ -23,7 +24,7 @@ func main() {
 	}
 
 	rep := repo.NewMemRepository()
-	agt := agent.NewAgent(rep, &cfg)
+	agt := agent.NewAgent(rep, &cfg, &http.Client{})
 
 	agt.Run()
 }
