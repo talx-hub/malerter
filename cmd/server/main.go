@@ -6,6 +6,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/talx-hub/malerter/internal/api"
+	"github.com/talx-hub/malerter/internal/backup"
 	"github.com/talx-hub/malerter/internal/compressor"
 	serverCfg "github.com/talx-hub/malerter/internal/config/server"
 	"github.com/talx-hub/malerter/internal/logger"
@@ -21,6 +22,13 @@ func main() {
 	}
 
 	rep := repo.NewMemRepository()
+	bk, err := backup.New(cfg, rep)
+	if err != nil {
+		log.Fatalf("unable to load backup: %v", err)
+	}
+	if cfg.Restore {
+		bk.Restore()
+	}
 	dumper := server.NewMetricsDumper(rep)
 	handler := api.NewHTTPHandler(dumper)
 
