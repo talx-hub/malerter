@@ -6,6 +6,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/talx-hub/malerter/internal/api"
+	"github.com/talx-hub/malerter/internal/compressor"
 	serverCfg "github.com/talx-hub/malerter/internal/config/server"
 	"github.com/talx-hub/malerter/internal/logger"
 	"github.com/talx-hub/malerter/internal/repo"
@@ -27,10 +28,10 @@ func main() {
 
 	lggr := logger.New()
 	var updateHandler = lggr.WrapHandler(handler.DumpMetric)
-	var updateJSONHandler = lggr.WrapHandler(handler.DumpMetricJSON)
+	var updateJSONHandler = lggr.WrapHandler(compressor.GzipMiddleware(handler.DumpMetricJSON))
 	var getHandler = lggr.WrapHandler(handler.GetMetric)
-	var getAllHandler = lggr.WrapHandler(handler.GetAll)
-	var getJSONHandler = lggr.WrapHandler(handler.GetMetricJSON)
+	var getAllHandler = lggr.WrapHandler(compressor.GzipMiddleware(handler.GetAll))
+	var getJSONHandler = lggr.WrapHandler(compressor.GzipMiddleware(handler.GetMetricJSON))
 
 	router.Route("/", func(r chi.Router) {
 		r.Get("/", getAllHandler)
