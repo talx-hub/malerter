@@ -36,8 +36,6 @@ func main() {
 	dumper := server.NewMetricsDumper(rep)
 	handler := api.NewHTTPHandler(dumper)
 
-	router := chi.NewRouter()
-
 	zeroLogger, err := logger.New(cfg.LogLevel)
 	if err != nil {
 		log.Fatal(err)
