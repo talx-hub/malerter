@@ -21,17 +21,17 @@ func main() {
 	}
 
 	rep := repo.NewMemRepository()
-	serv := server.NewMetricsDumper(rep)
-	handler := api.NewHTTPHandler(serv)
+	dumper := server.NewMetricsDumper(rep)
+	handler := api.NewHTTPHandler(dumper)
 
 	router := chi.NewRouter()
 
-	lggr := logger.New()
-	var updateHandler = lggr.WrapHandler(handler.DumpMetric)
-	var updateJSONHandler = lggr.WrapHandler(compressor.GzipMiddleware(handler.DumpMetricJSON))
-	var getHandler = lggr.WrapHandler(handler.GetMetric)
-	var getAllHandler = lggr.WrapHandler(compressor.GzipMiddleware(handler.GetAll))
-	var getJSONHandler = lggr.WrapHandler(compressor.GzipMiddleware(handler.GetMetricJSON))
+	zeroLogger := logger.New()
+	var updateHandler = zeroLogger.WrapHandler(handler.DumpMetric)
+	var updateJSONHandler = zeroLogger.WrapHandler(compressor.GzipMiddleware(handler.DumpMetricJSON))
+	var getHandler = zeroLogger.WrapHandler(handler.GetMetric)
+	var getAllHandler = zeroLogger.WrapHandler(compressor.GzipMiddleware(handler.GetAll))
+	var getJSONHandler = zeroLogger.WrapHandler(compressor.GzipMiddleware(handler.GetMetricJSON))
 
 	router.Route("/", func(r chi.Router) {
 		r.Get("/", getAllHandler)
