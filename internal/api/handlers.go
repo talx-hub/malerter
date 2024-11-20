@@ -21,8 +21,8 @@ func NewHTTPHandler(service service.Service) *HTTPHandler {
 }
 
 func getStatusFromError(err error) int {
-	var notFoundError *customerror.NotFoundError
-	var invalidArgumentError *customerror.InvalidArgumentError
+	var notFoundError *customerror.ErrNotFound
+	var invalidArgumentError *customerror.ErrInvalidArgument
 	switch {
 	case errors.As(err, &notFoundError):
 		return http.StatusNotFound
@@ -48,16 +48,21 @@ func (h *HTTPHandler) DumpMetricJSON(w http.ResponseWriter, r *http.Request) {
 	metric, err := model.NewMetric().FromJSON(r.Body)
 	if err != nil {
 		st := getStatusFromError(err)
-		http.Error(w, err.Error(), st)
+		http.Error(
+			w,
+			fmt.Sprintf("%s fails: %s", r.URL.Path, err.Error()),
+			st)
 		return
 	}
 
 	if metric.IsEmpty() {
-		e := customerror.NotFoundError{
-			MetricURL: metric.ToURL(),
-			Info:      "metric value is empty",
+		e := customerror.ErrNotFound{
+			Message: "metric value is empty",
 		}
-		http.Error(w, e.Error(), http.StatusNotFound)
+		http.Error(
+			w,
+			fmt.Sprintf("%s fails: %s", r.URL.Path, e.Error()),
+			http.StatusNotFound)
 		return
 	}
 	if err = h.service.Store(metric); err != nil {
@@ -92,21 +97,29 @@ func (h *HTTPHandler) DumpMetric(w http.ResponseWriter, r *http.Request) {
 	metric, err := model.NewMetric().FromURL(r.URL.Path)
 	if err != nil {
 		st := getStatusFromError(err)
-		http.Error(w, err.Error(), st)
+		http.Error(
+			w,
+			fmt.Sprintf("%s fails: %s", r.URL.Path, err.Error()),
+			st)
 		return
 	}
 	if metric.IsEmpty() {
-		e := customerror.NotFoundError{
-			MetricURL: metric.ToURL(),
-			Info:      "metric value is empty",
+		e := customerror.ErrNotFound{
+			Message: "metric value is empty",
 		}
-		http.Error(w, e.Error(), http.StatusNotFound)
+		http.Error(
+			w,
+			fmt.Sprintf("%s fails: %s", r.URL.Path, e.Error()),
+			http.StatusNotFound)
 		return
 	}
 
 	err = h.service.Store(metric)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusNotFound)
+		http.Error(
+			w,
+			fmt.Sprintf("%s fails: %s", r.URL.Path, err.Error()),
+			http.StatusNotFound)
 		return
 	}
 
@@ -123,7 +136,10 @@ func (h *HTTPHandler) GetMetric(w http.ResponseWriter, r *http.Request) {
 	metric, err := model.NewMetric().FromURL(r.URL.Path)
 	if err != nil {
 		st := getStatusFromError(err)
-		http.Error(w, err.Error(), st)
+		http.Error(
+			w,
+			fmt.Sprintf("%s fails: %s", r.URL.Path, err.Error()),
+			st)
 		return
 	}
 
@@ -131,7 +147,10 @@ func (h *HTTPHandler) GetMetric(w http.ResponseWriter, r *http.Request) {
 	m, err := h.service.Get(dummyKey)
 	if err != nil {
 		st := getStatusFromError(err)
-		http.Error(w, err.Error(), st)
+		http.Error(
+			w,
+			fmt.Sprintf("%s fails: %s", r.URL.Path, err.Error()),
+			st)
 		return
 	}
 
@@ -157,7 +176,10 @@ func (h *HTTPHandler) GetMetricJSON(w http.ResponseWriter, r *http.Request) {
 	metric, err := model.NewMetric().FromJSON(r.Body)
 	if err != nil {
 		st := getStatusFromError(err)
-		http.Error(w, err.Error(), st)
+		http.Error(
+			w,
+			fmt.Sprintf("%s fails: %s", r.URL.Path, err.Error()),
+			st)
 		return
 	}
 
@@ -165,7 +187,10 @@ func (h *HTTPHandler) GetMetricJSON(w http.ResponseWriter, r *http.Request) {
 	metric, err = h.service.Get(dummyKey)
 	if err != nil {
 		st := getStatusFromError(err)
-		http.Error(w, err.Error(), st)
+		http.Error(
+			w,
+			fmt.Sprintf("%s fails: %s", r.URL.Path, err.Error()),
+			st)
 		return
 	}
 

@@ -48,9 +48,8 @@ func (m *Metric) setValue(val any) error {
 
 	sVal, ok := val.(string)
 	if !ok {
-		return &customerror.InvalidArgumentError{
-			MetricURL: m.ToURL(),
-			Info:      fmt.Sprintf("invalid value <%v>", val),
+		return &customerror.ErrInvalidArgument{
+			Info: fmt.Sprintf("invalid value <%v>", val),
 		}
 	}
 	fVal, fErr := strconv.ParseFloat(sVal, 64)
@@ -64,9 +63,8 @@ func (m *Metric) setValue(val any) error {
 	if fErr == nil || iErr == nil {
 		return nil
 	}
-	return &customerror.InvalidArgumentError{
-		MetricURL: m.ToURL(),
-		Info:      fmt.Sprintf("invalid value <%v>", val),
+	return &customerror.ErrInvalidArgument{
+		Info: fmt.Sprintf("invalid value <%v>", val),
 	}
 }
 
@@ -91,9 +89,8 @@ func (m *Metric) IsEmpty() bool {
 
 func (m *Metric) CheckValid() error {
 	if m.Name == "" {
-		return &customerror.NotFoundError{
-			MetricURL: m.ToURL(),
-			Info:      "metric name must be not empty",
+		return &customerror.ErrNotFound{
+			Message: "metric name must be not empty",
 		}
 	}
 
@@ -101,17 +98,15 @@ func (m *Metric) CheckValid() error {
 	_, errF := strconv.ParseFloat(m.Name, 64)
 	_, errI := strconv.Atoi(m.Name)
 	if errF == nil || errI == nil {
-		return &customerror.NotFoundError{
-			MetricURL: m.ToURL(),
-			Info:      "metric name must be a string",
+		return &customerror.ErrNotFound{
+			Message: "metric name must be a string",
 		}
 	}
 
 	// только два типа метрик позволены
 	if !m.Type.IsValid() {
-		return &customerror.InvalidArgumentError{
-			MetricURL: m.ToURL(),
-			Info:      "only counter and gauge types are allowed",
+		return &customerror.ErrInvalidArgument{
+			Info: "only counter and gauge types are allowed",
 		}
 	}
 
@@ -119,9 +114,8 @@ func (m *Metric) CheckValid() error {
 	wrongCounter := m.Type == MetricTypeCounter && (m.Value != nil || m.Delta == nil)
 	wrongGauge := m.Type == MetricTypeGauge && (m.Delta != nil || m.Value == nil)
 	if !m.IsEmpty() && (wrongCounter || wrongGauge) {
-		return &customerror.InvalidArgumentError{
-			MetricURL: m.ToURL(),
-			Info:      "metric has invalid value",
+		return &customerror.ErrInvalidArgument{
+			Info: "metric has invalid value",
 		}
 	}
 

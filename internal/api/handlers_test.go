@@ -62,12 +62,12 @@ func TestHTTPHandler_DumpMetric(t *testing.T) {
 		{"/update/counter/someMetric/123", "", 200},
 		{"/update/gauge/someMetric/123.1", "", 200},
 		{"/update/gauge/someMetric/1", "", 200},
-		{"/update/gauge/1", "metric gauge/1/<nil> not found: metric name must be a string\n", 404},
-		{"/update/WRONG/someMetric/1", "metric WRONG/someMetric/<nil> is incorrect: only counter and gauge types are allowed\n", 400},
-		{"/update/counter/someMetric/1.0", "metric counter/someMetric/<nil> is incorrect: metric has invalid value\n", 400},
-		{"/update/counter/someMetric", "metric counter/someMetric/<nil> not found: metric value is empty\n", 404},
-		{"/update/counter/someMetric/9223372036854775808", "metric counter/someMetric/<nil> is incorrect: metric has invalid value\n", 400},
-		{"/update/counter/someMetric/string", "metric counter/someMetric/<nil> is incorrect: invalid value <string>\n", 400},
+		{"/update/gauge/1", "/update/gauge/1 fails: not found: metric name must be a string\n", 404},
+		{"/update/WRONG/someMetric/1", "/update/WRONG/someMetric/1 fails: incorrect request: only counter and gauge types are allowed\n", 400},
+		{"/update/counter/someMetric/1.0", "/update/counter/someMetric/1.0 fails: incorrect request: metric has invalid value\n", 400},
+		{"/update/counter/someMetric", "/update/counter/someMetric fails: not found: metric value is empty\n", 404},
+		{"/update/counter/someMetric/9223372036854775808", "/update/counter/someMetric/9223372036854775808 fails: incorrect request: metric has invalid value\n", 400},
+		{"/update/counter/someMetric/string", "/update/counter/someMetric/string fails: incorrect request: invalid value <string>\n", 400},
 	}
 	rep := repo.NewMemRepository()
 	serv := server.NewMetricsDumper(rep)
@@ -111,17 +111,17 @@ func TestHTTPHandler_GetMetric(t *testing.T) {
 	tests := []test{
 		{"/value/counter/mainQuestion", "42", 200},
 		{"/value/gauge/pi", "3.14", 200},
-		{"/value/wrong/pi", "metric wrong/pi/<nil> is incorrect: only counter and gauge types are allowed\n", 400},
-		{"/value/gauge/wrong", "metric wrong(gauge): <nil> not found: \n", 404},
-		{"/value/counter/wrong", "metric wrong(counter): <nil> not found: \n", 404},
-		{"/value/counter", "metric /value/counter not found: incorrect URL\n", 404},
-		{"/value/gauge", "metric /value/gauge not found: incorrect URL\n", 404},
+		{"/value/wrong/pi", "/value/wrong/pi fails: incorrect request: only counter and gauge types are allowed\n", 400},
+		{"/value/gauge/wrong", "/value/gauge/wrong fails: not found: \n", 404},
+		{"/value/counter/wrong", "/value/counter/wrong fails: not found: \n", 404},
+		{"/value/counter", "/value/counter fails: not found: incorrect URL\n", 404},
+		{"/value/gauge", "/value/gauge fails: not found: incorrect URL\n", 404},
 	}
 	m1, _ := model.NewMetric().FromValues("mainQuestion", model.MetricTypeCounter, int64(42))
 	m2, _ := model.NewMetric().FromValues("pi", model.MetricTypeGauge, 3.14)
 	repository := repo.NewMemRepository()
-	_ = repository.Store(*m1)
-	_ = repository.Store(*m2)
+	_ = repository.Store(m1)
+	_ = repository.Store(m2)
 
 	dumper := server.NewMetricsDumper(repository)
 	handler := NewHTTPHandler(dumper)
@@ -322,8 +322,8 @@ func TestHTTPHandler_GetMetricJSON(t *testing.T) {
 	repository := repo.NewMemRepository()
 	m1, _ := model.NewMetric().FromValues("m42", model.MetricTypeCounter, int64(42))
 	m2, _ := model.NewMetric().FromValues("pi", model.MetricTypeGauge, 3.14)
-	_ = repository.Store(*m1)
-	_ = repository.Store(*m2)
+	_ = repository.Store(m1)
+	_ = repository.Store(m2)
 
 	dumper := server.NewMetricsDumper(repository)
 	handler := NewHTTPHandler(dumper)
@@ -387,7 +387,7 @@ func TestHTTPHandler_GetAll(t *testing.T) {
 
 	repository := repo.NewMemRepository()
 	m1, _ := model.NewMetric().FromValues("m42", model.MetricTypeCounter, int64(42))
-	_ = repository.Store(*m1)
+	_ = repository.Store(m1)
 
 	dumper := server.NewMetricsDumper(repository)
 	handler := NewHTTPHandler(dumper)
