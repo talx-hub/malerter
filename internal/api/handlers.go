@@ -1,12 +1,15 @@
 package api
 
 import (
+	"encoding/json"
+	"errors"
 	"fmt"
-	"github.com/talx-hub/malerter/internal/customerror"
-	"github.com/talx-hub/malerter/internal/repo"
-	"github.com/talx-hub/malerter/internal/service"
 	"log"
 	"net/http"
+
+	"github.com/talx-hub/malerter/internal/customerror"
+	"github.com/talx-hub/malerter/internal/model"
+	"github.com/talx-hub/malerter/internal/service"
 )
 
 type HTTPHandler struct {
@@ -17,6 +20,68 @@ func NewHTTPHandler(service service.Service) *HTTPHandler {
 	return &HTTPHandler{service: service}
 }
 
+func getStatusFromError(err error) int {
+	var notFoundError *customerror.NotFoundError
+	var invalidArgumentError *customerror.InvalidArgumentError
+	switch {
+	case errors.As(err, &notFoundError):
+		return http.StatusNotFound
+	case errors.As(err, &invalidArgumentError):
+		return http.StatusBadRequest
+	default:
+		return http.StatusInternalServerError
+	}
+}
+
+func (h *HTTPHandler) DumpMetricJSON(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		e := "only POST requests are allowed"
+		http.Error(w, e, http.StatusBadRequest)
+		return
+	}
+	if r.Header.Get("Content-Type") != "application/json" {
+		e := "content-type must be application/json"
+		http.Error(w, e, http.StatusBadRequest)
+		return
+	}
+
+	metric, err := model.NewMetric().FromJSON(r.Body)
+	if err != nil {
+		st := getStatusFromError(err)
+		http.Error(w, err.Error(), st)
+		return
+	}
+	if metric == nil {
+		http.Error(w, "metric is nil", http.StatusInternalServerError)
+		return
+	}
+	if metric.IsEmpty() {
+		e := customerror.NotFoundError{
+			MetricURL: metric.ToURL(),
+			Info:      "metric value is empty",
+		}
+		http.Error(w, e.Error(), http.StatusNotFound)
+		return
+	}
+	if err = h.service.Store(*metric); err != nil {
+		http.Error(w, err.Error(), http.StatusNotFound)
+		return
+	}
+
+	*metric, err = h.service.Get(*metric)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	if err = json.NewEncoder(w).Encode(&metric); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+}
+
 func (h *HTTPHandler) DumpMetric(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		e := "only POST requests are allowed"
@@ -24,16 +89,28 @@ func (h *HTTPHandler) DumpMetric(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	rawMetric := r.URL.Path
-	if err := h.service.Store(rawMetric); err != nil {
-		switch err.(type) {
-		case *customerror.NotFoundError:
-			http.Error(w, err.Error(), http.StatusNotFound)
-		case *customerror.InvalidArgumentError:
-			http.Error(w, err.Error(), http.StatusBadRequest)
-		default:
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+	metric, err := model.NewMetric().FromURL(r.URL.Path)
+	if err != nil {
+		st := getStatusFromError(err)
+		http.Error(w, err.Error(), st)
+		return
+	}
+	if metric == nil {
+		http.Error(w, "metric is nil", http.StatusInternalServerError)
+		return
+	}
+	if metric.IsEmpty() {
+		e := customerror.NotFoundError{
+			MetricURL: metric.ToURL(),
+			Info:      "metric value is empty",
 		}
+		http.Error(w, e.Error(), http.StatusNotFound)
+		return
+	}
+
+	err = h.service.Store(*metric)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusNotFound)
 		return
 	}
 
@@ -47,26 +124,68 @@ func (h *HTTPHandler) GetMetric(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	rawMetric := r.URL.Path
-	m, err := h.service.Get(rawMetric)
+	metric, err := model.NewMetric().FromURL(r.URL.Path)
 	if err != nil {
-		switch err.(type) {
-		case *customerror.NotFoundError:
-			http.Error(w, err.Error(), http.StatusNotFound)
-		case *customerror.InvalidArgumentError:
-			http.Error(w, err.Error(), http.StatusBadRequest)
-		}
+		st := getStatusFromError(err)
+		http.Error(w, err.Error(), st)
+		return
+	}
+	if metric == nil {
+		http.Error(w, "metric is nil", http.StatusInternalServerError)
 		return
 	}
 
-	valueStr := fmt.Sprintf("%v", m.Value)
+	m, err := h.service.Get(*metric)
+	if err != nil {
+		st := getStatusFromError(err)
+		http.Error(w, err.Error(), st)
+		return
+	}
+
+	w.Header().Set("Content-Type", "text/plain")
+	w.WriteHeader(http.StatusOK)
+	valueStr := fmt.Sprintf("%v", m.ActualValue())
 	_, err = w.Write([]byte(valueStr))
 	if err != nil {
 		log.Fatal(err)
 	}
+}
 
-	w.Header().Set("content-type", "text/plain")
+func (h *HTTPHandler) GetMetricJSON(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "only POST requests are allowed", http.StatusBadRequest)
+		return
+	}
+	if r.Header.Get("Content-Type") != "application/json" {
+		e := "content-type must be application/json"
+		http.Error(w, e, http.StatusBadRequest)
+		return
+	}
+
+	metric, err := model.NewMetric().FromJSON(r.Body)
+	if err != nil {
+		st := getStatusFromError(err)
+		http.Error(w, err.Error(), st)
+		return
+	}
+	if metric == nil {
+		http.Error(w, "metric is nil", http.StatusInternalServerError)
+		return
+	}
+
+	*metric, err = h.service.Get(*metric)
+	if err != nil {
+		st := getStatusFromError(err)
+		http.Error(w, err.Error(), st)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
+	if err = json.NewEncoder(w).Encode(&metric); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
 }
 
 func (h *HTTPHandler) GetAll(w http.ResponseWriter, r *http.Request) {
@@ -76,17 +195,17 @@ func (h *HTTPHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	w.Header().Set("Content-Type", "text/html")
+	w.WriteHeader(http.StatusOK)
 	metrics := h.service.GetAll()
 	page := createMetricsPage(metrics)
 	_, err := w.Write([]byte(page))
 	if err != nil {
 		log.Fatal(err)
 	}
-	w.Header().Set("content-type", "text/html")
-	w.WriteHeader(http.StatusOK)
 }
 
-func createMetricsPage(metrics []repo.Metric) string {
+func createMetricsPage(metrics []model.Metric) string {
 	var page = `<html>
 	<body>
 %s	</body>
@@ -96,6 +215,5 @@ func createMetricsPage(metrics []repo.Metric) string {
 	for _, m := range metrics {
 		data += fmt.Sprintf("\t\t<p>%s</p>\n", m.String())
 	}
-	fmt.Printf(page, data)
 	return fmt.Sprintf(page, data)
 }
