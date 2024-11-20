@@ -53,11 +53,11 @@ func (p *Poller) update() error {
 	return nil
 }
 
-func collect() []*model.Metric {
+func collect() []model.Metric {
 	var memStats runtime.MemStats
 	runtime.ReadMemStats(&memStats)
 	var randomValue = rand.Float64()
-	var metrics = make([]*model.Metric, MetricCount)
+	var metrics = make([]model.Metric, MetricCount)
 
 	metrics[0], _ = model.NewMetric().FromValues(MetricAlloc, model.MetricTypeGauge, float64(memStats.Alloc))
 	metrics[1], _ = model.NewMetric().FromValues(MetricBuckHashSys, model.MetricTypeGauge, float64(memStats.BuckHashSys))
@@ -92,13 +92,9 @@ func collect() []*model.Metric {
 	return metrics
 }
 
-func (p *Poller) store(metrics []*model.Metric) {
+func (p *Poller) store(metrics []model.Metric) {
 	for _, m := range metrics {
-		if m == nil {
-			log.Println("can't store empty metric")
-			continue
-		}
-		if p.repo.Store(*m) != nil {
+		if p.repo.Store(m) != nil {
 			log.Println("error during storing of metric")
 		}
 	}

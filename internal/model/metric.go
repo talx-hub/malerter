@@ -186,26 +186,25 @@ func (m *Metric) Update(other Metric) error {
 	return nil
 }
 
-func (m *Metric) FromValues(name string, t MetricType, value any) (*Metric, error) {
+func (m *Metric) FromValues(name string, t MetricType, value any) (Metric, error) {
 	m.Name = name
 	m.Type = t
 
 	if err := m.setValue(value); err != nil {
-		return nil, err
+		return Metric{}, err
 	}
 	m.clean()
 	if err := m.CheckValid(); err != nil {
-		return nil, err
+		return Metric{}, err
 	}
-	return m, nil
+	return *m, nil
 }
 
-func (m *Metric) FromURL(url string) (*Metric, error) {
+func (m *Metric) FromURL(url string) (Metric, error) {
 	parts := strings.Split(url, "/")
 	if len(parts) < 4 {
-		return nil, &customerror.NotFoundError{
-			MetricURL: url,
-			Info:      "incorrect URL",
+		return Metric{}, &customerror.ErrNotFound{
+			Message: "incorrect URL",
 		}
 	}
 
@@ -213,29 +212,29 @@ func (m *Metric) FromURL(url string) (*Metric, error) {
 	m.Type = MetricType(parts[2])
 	if len(parts) == 4 {
 		if err := m.CheckValid(); err != nil {
-			return nil, err
+			return Metric{}, err
 		}
-		return m, nil
+		return *m, nil
 	}
 
 	if err := m.setValue(parts[4]); err != nil {
-		return nil, err
+		return Metric{}, err
 	}
 	m.clean()
 	if err := m.CheckValid(); err != nil {
-		return nil, err
+		return Metric{}, err
 	}
 
-	return m, nil
+	return *m, nil
 }
 
-func (m *Metric) FromJSON(body io.Reader) (*Metric, error) {
+func (m *Metric) FromJSON(body io.Reader) (Metric, error) {
 	if err := json.NewDecoder(body).Decode(m); err != nil {
-		return nil, err
+		return Metric{}, err
 	}
 	if err := m.CheckValid(); err != nil {
-		return nil, err
+		return Metric{}, err
 	}
 
-	return m, nil
+	return *m, nil
 }

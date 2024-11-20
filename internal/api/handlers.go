@@ -51,10 +51,7 @@ func (h *HTTPHandler) DumpMetricJSON(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), st)
 		return
 	}
-	if metric == nil {
-		http.Error(w, "metric is nil", http.StatusInternalServerError)
-		return
-	}
+
 	if metric.IsEmpty() {
 		e := customerror.NotFoundError{
 			MetricURL: metric.ToURL(),
@@ -63,13 +60,16 @@ func (h *HTTPHandler) DumpMetricJSON(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, e.Error(), http.StatusNotFound)
 		return
 	}
-	if err = h.service.Store(*metric); err != nil {
-		http.Error(w, err.Error(), http.StatusNotFound)
+	if err = h.service.Store(metric); err != nil {
+		http.Error(
+			w,
+			fmt.Sprintf("%s fails: %s", r.URL.Path, err.Error()),
+			http.StatusNotFound)
 		return
 	}
 
 	dummyKey := metric.Type.String() + metric.Name
-	*metric, err = h.service.Get(dummyKey)
+	metric, err = h.service.Get(dummyKey)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -95,10 +95,6 @@ func (h *HTTPHandler) DumpMetric(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), st)
 		return
 	}
-	if metric == nil {
-		http.Error(w, "metric is nil", http.StatusInternalServerError)
-		return
-	}
 	if metric.IsEmpty() {
 		e := customerror.NotFoundError{
 			MetricURL: metric.ToURL(),
@@ -108,7 +104,7 @@ func (h *HTTPHandler) DumpMetric(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = h.service.Store(*metric)
+	err = h.service.Store(metric)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusNotFound)
 		return
@@ -128,10 +124,6 @@ func (h *HTTPHandler) GetMetric(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		st := getStatusFromError(err)
 		http.Error(w, err.Error(), st)
-		return
-	}
-	if metric == nil {
-		http.Error(w, "metric is nil", http.StatusInternalServerError)
 		return
 	}
 
@@ -168,13 +160,9 @@ func (h *HTTPHandler) GetMetricJSON(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), st)
 		return
 	}
-	if metric == nil {
-		http.Error(w, "metric is nil", http.StatusInternalServerError)
-		return
-	}
 
 	dummyKey := metric.Type.String() + metric.Name
-	*metric, err = h.service.Get(dummyKey)
+	metric, err = h.service.Get(dummyKey)
 	if err != nil {
 		st := getStatusFromError(err)
 		http.Error(w, err.Error(), st)

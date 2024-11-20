@@ -17,13 +17,13 @@ func TestGet(t *testing.T) {
 	storage := repo.NewMemRepository()
 	m1, _ := model.NewMetric().FromValues("m42", model.MetricTypeCounter, int64(42))
 	m2, _ := model.NewMetric().FromValues("pi", model.MetricTypeGauge, 3.14)
-	_ = storage.Store(*m1)
-	_ = storage.Store(*m2)
+	_ = storage.Store(m1)
+	_ = storage.Store(m2)
 	sender := Sender{repo: storage, host: ""}
 	got := sender.get()
 	require.Len(t, got, 2)
-	assert.Contains(t, got, *m1)
-	assert.Contains(t, got, *m2)
+	assert.Contains(t, got, m1)
+	assert.Contains(t, got, m2)
 }
 
 func TestConvertToJSONs(t *testing.T) {

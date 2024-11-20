@@ -39,7 +39,7 @@ func (r *MemRepository) Get(key string) (model.Metric, error) {
 		return m, nil
 	}
 	return model.Metric{},
-		&customerror.NotFoundError{MetricURL: key}
+		&customerror.ErrNotFound{}
 }
 
 func (r *MemRepository) GetAll() []model.Metric {
