@@ -7,7 +7,7 @@ import (
 
 type Repository interface {
 	Store(metric model.Metric) error
-	Get(metric model.Metric) (model.Metric, error)
+	Get(key string) (model.Metric, error)
 	GetAll() []model.Metric
 }
 
@@ -34,17 +34,16 @@ func (r *MemRepository) Store(metric model.Metric) error {
 	return nil
 }
 
-func (r *MemRepository) Get(metric model.Metric) (model.Metric, error) {
-	dummyKey := metric.Type.String() + metric.Name
-	if m, found := r.data[dummyKey]; found {
+func (r *MemRepository) Get(key string) (model.Metric, error) {
+	if m, found := r.data[key]; found {
 		return m, nil
 	}
 	return model.Metric{},
-		&customerror.NotFoundError{MetricURL: metric.String()}
+		&customerror.NotFoundError{MetricURL: key}
 }
 
 func (r *MemRepository) GetAll() []model.Metric {
-	var metrics []model.Metric
+	var metrics = make([]model.Metric, 0)
 	for _, m := range r.data {
 		metrics = append(metrics, m)
 	}

@@ -68,7 +68,8 @@ func (h *HTTPHandler) DumpMetricJSON(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	*metric, err = h.service.Get(*metric)
+	dummyKey := metric.Type.String() + metric.Name
+	*metric, err = h.service.Get(dummyKey)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -135,7 +136,8 @@ func (h *HTTPHandler) GetMetric(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	m, err := h.service.Get(*metric)
+	dummyKey := metric.Type.String() + metric.Name
+	m, err := h.service.Get(dummyKey)
 	if err != nil {
 		st := getStatusFromError(err)
 		http.Error(w, err.Error(), st)
@@ -173,7 +175,8 @@ func (h *HTTPHandler) GetMetricJSON(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	*metric, err = h.service.Get(*metric)
+	dummyKey := metric.Type.String() + metric.Name
+	*metric, err = h.service.Get(dummyKey)
 	if err != nil {
 		st := getStatusFromError(err)
 		http.Error(w, err.Error(), st)

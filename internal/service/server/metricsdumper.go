@@ -17,8 +17,8 @@ func (d *MetricsDumper) Store(metric model.Metric) error {
 	return d.repo.Store(metric)
 }
 
-func (d *MetricsDumper) Get(metric model.Metric) (model.Metric, error) {
-	res, err := d.repo.Get(metric)
+func (d *MetricsDumper) Get(key string) (model.Metric, error) {
+	res, err := d.repo.Get(key)
 	if err != nil {
 		return model.Metric{}, err
 	}
