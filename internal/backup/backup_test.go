@@ -20,11 +20,19 @@ func TestBackupRestore(t *testing.T) {
 
 	bk1, err := New(cfg, rep1)
 	require.NoError(t, err)
+	defer func() {
+		err1 := bk1.Close()
+		require.NoError(t, err1)
+	}()
 	bk1.Backup()
 
 	rep2 := repo.NewMemRepository()
 	bk2, err := New(cfg, rep2)
 	require.NoError(t, err)
+	defer func() {
+		err1 := bk1.Close()
+		require.NoError(t, err1)
+	}()
 	bk2.Restore()
 
 	assert.ElementsMatch(t, rep1.GetAll(), rep2.GetAll())

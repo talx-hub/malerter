@@ -25,21 +25,31 @@ func main() {
 		log.Fatal("unable to load server serverCfg")
 	}
 
+	zeroLogger, err := logger.New(cfg.LogLevel)
+	if err != nil {
+		log.Fatalf("unable to configure custom logger: %s", err.Error())
+	}
+
 	rep := repo.NewMemRepository()
 	bk, err := backup.New(cfg, rep)
 	if err != nil {
-		log.Fatalf("unable to load backup: %v", err)
+		zeroLogger.Logger.Fatal().
+			Err(err).
+			Msg("unable to load Backup service")
 	}
+	defer func() {
+		if err = bk.Close(); err != nil {
+			zeroLogger.Logger.Fatal().
+				Err(err).
+				Msg("unable to close Backup service")
+		}
+	}()
 	if cfg.Restore {
 		bk.Restore()
 	}
+
 	dumper := server.NewMetricsDumper(rep)
 	handler := api.NewHTTPHandler(dumper)
-
-	zeroLogger, err := logger.New(cfg.LogLevel)
-	if err != nil {
-		log.Fatal(err)
-	}
 
 	var updateHandler = zeroLogger.WrapHandler(bk.Middleware(handler.DumpMetric))
 	var updateJSONHandler = zeroLogger.WrapHandler(compressor.GzipMiddleware(bk.Middleware(handler.DumpMetricJSON)))
@@ -76,21 +86,18 @@ func main() {
 		if err = srv.Shutdown(context.Background()); err != nil {
 			zeroLogger.Logger.Fatal().
 				Err(err).
-				Msg("HTTP server Shutdown")
+				Msg("error during HTTP server Shutdown")
 		}
 
 		bk.Backup()
-		if err = bk.Close(); err != nil {
-			zeroLogger.Logger.Fatal().
-				Err(err).
-				Msg("Backup Close")
-		}
+
 		close(idleConnsClosed)
 	}()
 
 	if err = srv.ListenAndServe(); !errors.Is(err, http.ErrServerClosed) {
 		zeroLogger.Logger.Fatal().
-			Err(err)
+			Err(err).
+			Msg("error during HTTP server ListenAndServe")
 	}
 	<-idleConnsClosed
 }
