@@ -62,10 +62,7 @@ func (logger Logger) WrapHandler(h http.HandlerFunc) http.HandlerFunc {
 
 		uri := r.RequestURI
 		method := r.Method
-		responseData := &responseData{
-			status: 0,
-			size:   0,
-		}
+		responseData := &responseData{}
 		lw := loggingResponseWriter{
 			ResponseWriter: w,
 			responseData:   responseData,
