@@ -14,11 +14,17 @@ import (
 	"github.com/talx-hub/malerter/internal/backup"
 	"github.com/talx-hub/malerter/internal/compressor"
 	serverCfg "github.com/talx-hub/malerter/internal/config/server"
-	"github.com/talx-hub/malerter/internal/logger"
+	"github.com/talx-hub/malerter/internal/logger/zerologger"
 	"github.com/talx-hub/malerter/internal/model"
 	"github.com/talx-hub/malerter/internal/repository/memory"
 	"github.com/talx-hub/malerter/internal/service/server"
 )
+
+type Repository interface {
+	Add(metric model.Metric) error
+	Find(key string) (model.Metric, error)
+	Get() []model.Metric
+}
 
 func main() {
 	// TODO: тут какие-то кошмары с указателями(см. config/server/builder/.Build())... разобраться
@@ -27,7 +33,7 @@ func main() {
 		log.Fatal("unable to load server serverCfg")
 	}
 
-	zeroLogger, err := logger.New(cfg.LogLevel)
+	zeroLogger, err := zerologger.New(cfg.LogLevel)
 	if err != nil {
 		log.Fatalf("unable to configure custom logger: %s", err.Error())
 	}
@@ -35,13 +41,13 @@ func main() {
 	storage := memory.New()
 	bk, err := backup.New(cfg, storage)
 	if err != nil {
-		zeroLogger.Logger.Fatal().
+		zeroLogger.Fatal().
 			Err(err).
 			Msg("unable to load Backup service")
 	}
 	defer func() {
 		if err = bk.Close(); err != nil {
-			zeroLogger.Logger.Fatal().
+			zeroLogger.Fatal().
 				Err(err).
 				Msg("unable to close Backup service")
 		}
@@ -50,7 +56,7 @@ func main() {
 		bk.Restore()
 	}
 
-	zeroLogger.Logger.Info().
+	zeroLogger.Info().
 		Str(`"address"`, cfg.RootAddress).
 		Dur(`"backup interval"`, cfg.StoreInterval).
 		Bool(`"restore backup"`, cfg.Restore).
@@ -64,28 +70,22 @@ func main() {
 	go idleShutdown(&srv, idleConnectionsClosed, zeroLogger, bk)
 
 	if err = srv.ListenAndServe(); !errors.Is(err, http.ErrServerClosed) {
-		zeroLogger.Logger.Fatal().
+		zeroLogger.Fatal().
 			Err(err).
 			Msg("error during HTTP server ListenAndServe")
 	}
 	<-idleConnectionsClosed
 }
 
-type Repository interface {
-	Add(metric model.Metric) error
-	Find(key string) (model.Metric, error)
-	Get() []model.Metric
-}
-
-func metricRouter(repo Repository, log *logger.Logger, bk *backup.File) chi.Router {
+func metricRouter(repo Repository, log *zerologger.ZeroLogger, bk *backup.File) chi.Router {
 	dumper := server.NewMetricsDumper(repo)
 	handler := api.NewHTTPHandler(dumper)
 
-	var updateHandler = log.WrapHandler(bk.Middleware(handler.DumpMetric))
-	var updateJSONHandler = log.WrapHandler(compressor.GzipMiddleware(bk.Middleware(handler.DumpMetricJSON)))
-	var getHandler = log.WrapHandler(handler.GetMetric)
-	var getAllHandler = log.WrapHandler(compressor.GzipMiddleware(handler.GetAll))
-	var getJSONHandler = log.WrapHandler(compressor.GzipMiddleware(handler.GetMetricJSON))
+	var updateHandler = log.Middleware(bk.Middleware(handler.DumpMetric))
+	var updateJSONHandler = log.Middleware(compressor.GzipMiddleware(bk.Middleware(handler.DumpMetricJSON)))
+	var getHandler = log.Middleware(handler.GetMetric)
+	var getAllHandler = log.Middleware(compressor.GzipMiddleware(handler.GetAll))
+	var getJSONHandler = log.Middleware(compressor.GzipMiddleware(handler.GetMetricJSON))
 
 	router := chi.NewRouter()
 	router.Route("/", func(r chi.Router) {
@@ -104,16 +104,16 @@ func metricRouter(repo Repository, log *logger.Logger, bk *backup.File) chi.Rout
 }
 
 func idleShutdown(server *http.Server, channel chan struct{},
-	log *logger.Logger, backupService *backup.File) {
+	log *zerologger.ZeroLogger, backupService *backup.File) {
 
 	sigint := make(chan os.Signal, 1)
 	signal.Notify(sigint, os.Interrupt)
 	<-sigint
 
-	log.Logger.Info().
+	log.Info().
 		Msg("shutdown signal received. Exiting...")
 	if err := server.Shutdown(context.Background()); err != nil {
-		log.Logger.Fatal().
+		log.Fatal().
 			Err(err).
 			Msg("error during HTTP server Shutdown")
 	}

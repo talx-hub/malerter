@@ -1,4 +1,4 @@
-package logger
+package zerologger
 
 import (
 	"fmt"
@@ -9,18 +9,18 @@ import (
 	"github.com/rs/zerolog"
 )
 
-type Logger struct {
-	Logger zerolog.Logger
+type ZeroLogger struct {
+	zerolog.Logger
 }
 
-func New(logLevel string) (*Logger, error) {
+func New(logLevel string) (*ZeroLogger, error) {
 	level, err := zerolog.ParseLevel(logLevel)
 	if err != nil {
 		return nil, fmt.Errorf("unable to init logger: %v", err)
 	}
 	zerolog.DurationFieldUnit = time.Second
-	logger := Logger{
-		zerolog.New(zerolog.ConsoleWriter{
+	logger := ZeroLogger{
+		Logger: zerolog.New(zerolog.ConsoleWriter{
 			Out:        os.Stdout,
 			TimeFormat: time.Stamp,
 		}).
@@ -56,7 +56,7 @@ func (w *loggingResponseWriter) WriteHeader(statusCode int) {
 	w.responseData.status = statusCode
 }
 
-func (logger Logger) WrapHandler(h http.HandlerFunc) http.HandlerFunc {
+func (logger ZeroLogger) Middleware(h http.HandlerFunc) http.HandlerFunc {
 	logFn := func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
 

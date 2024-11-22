@@ -11,7 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/talx-hub/malerter/internal/backup"
 	serverCfg "github.com/talx-hub/malerter/internal/config/server"
-	"github.com/talx-hub/malerter/internal/logger"
+	"github.com/talx-hub/malerter/internal/logger/zerologger"
 	"github.com/talx-hub/malerter/internal/repository/memory"
 )
 
@@ -19,7 +19,7 @@ func services(t *testing.T) (*httptest.Server, *backup.File) {
 	cfg, ok := serverCfg.NewDirector().Build().(serverCfg.Builder)
 	require.True(t, ok)
 
-	zeroLogger, err := logger.New(cfg.LogLevel)
+	zeroLogger, err := zerologger.New(cfg.LogLevel)
 	require.NoError(t, err)
 
 	rep := memory.New()
