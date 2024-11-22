@@ -6,7 +6,7 @@ import (
 	"log"
 	"net/http"
 
-	"github.com/talx-hub/malerter/internal/compressor"
+	"github.com/talx-hub/malerter/internal/gzip"
 	"github.com/talx-hub/malerter/internal/model"
 )
 
@@ -46,7 +46,7 @@ func send(client *http.Client, host string, jsons []string, compress bool) {
 		var body *bytes.Buffer
 		var err error
 		if compress {
-			body, err = compressor.Compress([]byte(j))
+			body, err = gzip.Compress([]byte(j))
 			if err != nil {
 				log.Printf("unable to compress json %s: %v", j, err)
 			}

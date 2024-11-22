@@ -40,20 +40,24 @@ type (
 	}
 
 	loggingResponseWriter struct {
-		http.ResponseWriter
+		w            http.ResponseWriter
 		responseData *responseData
 	}
 )
 
 func (w *loggingResponseWriter) Write(b []byte) (int, error) {
-	size, err := w.ResponseWriter.Write(b)
+	size, err := w.w.Write(b)
 	w.responseData.size += size
 	return size, err
 }
 
 func (w *loggingResponseWriter) WriteHeader(statusCode int) {
-	w.ResponseWriter.WriteHeader(statusCode)
+	w.w.WriteHeader(statusCode)
 	w.responseData.status = statusCode
+}
+
+func (w *loggingResponseWriter) Header() http.Header {
+	return w.w.Header()
 }
 
 func (logger ZeroLogger) Middleware(h http.Handler) http.Handler {
@@ -64,8 +68,8 @@ func (logger ZeroLogger) Middleware(h http.Handler) http.Handler {
 		method := r.Method
 		responseData := &responseData{}
 		lw := loggingResponseWriter{
-			ResponseWriter: w,
-			responseData:   responseData,
+			w:            w,
+			responseData: responseData,
 		}
 
 		h.ServeHTTP(&lw, r)

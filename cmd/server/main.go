@@ -13,8 +13,8 @@ import (
 
 	"github.com/talx-hub/malerter/internal/api"
 	"github.com/talx-hub/malerter/internal/backup"
-	"github.com/talx-hub/malerter/internal/compressor"
 	serverCfg "github.com/talx-hub/malerter/internal/config/server"
+	"github.com/talx-hub/malerter/internal/gzip"
 	"github.com/talx-hub/malerter/internal/logger/zerologger"
 	"github.com/talx-hub/malerter/internal/model"
 	"github.com/talx-hub/malerter/internal/repository/memory"
@@ -89,8 +89,10 @@ func metricRouter(repo Repository, log *zerologger.ZeroLogger, bk *backup.File) 
 	var getJSONHandler = handler.GetMetricJSON
 
 	router := chi.NewRouter()
-	router.Use(log.Middleware)
-	router.Use(compressor.GzipMiddleware)
+	router.Use(
+		log.Middleware,
+		gzip.Middleware,
+	)
 
 	router.Route("/", func(r chi.Router) {
 		r.Get("/", getAllHandler)
