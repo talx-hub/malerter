@@ -6,7 +6,7 @@ import (
 	"log"
 	"net/http"
 
-	"github.com/talx-hub/malerter/internal/gzip"
+	"github.com/talx-hub/malerter/internal/compressor/gzip"
 	"github.com/talx-hub/malerter/internal/model"
 )
 

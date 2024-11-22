@@ -13,8 +13,8 @@ import (
 
 	"github.com/talx-hub/malerter/internal/api"
 	"github.com/talx-hub/malerter/internal/backup"
+	"github.com/talx-hub/malerter/internal/compressor/gzip"
 	serverCfg "github.com/talx-hub/malerter/internal/config/server"
-	"github.com/talx-hub/malerter/internal/gzip"
 	"github.com/talx-hub/malerter/internal/logger/zerologger"
 	"github.com/talx-hub/malerter/internal/model"
 	"github.com/talx-hub/malerter/internal/repository/memory"
