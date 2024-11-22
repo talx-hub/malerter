@@ -81,13 +81,16 @@ func metricRouter(repo Repository, log *zerologger.ZeroLogger, bk *backup.File) 
 	dumper := server.NewMetricsDumper(repo)
 	handler := api.NewHTTPHandler(dumper)
 
-	var updateHandler = log.Middleware(bk.Middleware(handler.DumpMetric))
-	var updateJSONHandler = log.Middleware(compressor.GzipMiddleware(bk.Middleware(handler.DumpMetricJSON)))
-	var getHandler = log.Middleware(handler.GetMetric)
-	var getAllHandler = log.Middleware(compressor.GzipMiddleware(handler.GetAll))
-	var getJSONHandler = log.Middleware(compressor.GzipMiddleware(handler.GetMetricJSON))
+	var updateHandler = bk.Middleware(handler.DumpMetric)
+	var updateJSONHandler = bk.Middleware(handler.DumpMetricJSON)
+	var getHandler = handler.GetMetric
+	var getAllHandler = handler.GetAll
+	var getJSONHandler = handler.GetMetricJSON
 
 	router := chi.NewRouter()
+	router.Use(log.Middleware)
+	router.Use(compressor.GzipMiddleware)
+
 	router.Route("/", func(r chi.Router) {
 		r.Get("/", getAllHandler)
 		r.Route("/value", func(r chi.Router) {

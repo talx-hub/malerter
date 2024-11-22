@@ -56,7 +56,7 @@ func (w *loggingResponseWriter) WriteHeader(statusCode int) {
 	w.responseData.status = statusCode
 }
 
-func (logger ZeroLogger) Middleware(h http.HandlerFunc) http.HandlerFunc {
+func (logger ZeroLogger) Middleware(h http.Handler) http.Handler {
 	logFn := func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
 
@@ -70,7 +70,7 @@ func (logger ZeroLogger) Middleware(h http.HandlerFunc) http.HandlerFunc {
 
 		h.ServeHTTP(&lw, r)
 		duration := time.Since(start)
-		logger.Logger.Info().
+		logger.Info().
 			Str("URI", uri).
 			Str("method", method).
 			Int("status", responseData.status).
@@ -79,5 +79,5 @@ func (logger ZeroLogger) Middleware(h http.HandlerFunc) http.HandlerFunc {
 			Send()
 	}
 
-	return logFn
+	return http.HandlerFunc(logFn)
 }
