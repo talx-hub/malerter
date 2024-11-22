@@ -7,6 +7,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"slices"
 	"strings"
 )
 
@@ -23,7 +24,13 @@ func NewWriter(w http.ResponseWriter) *Writer {
 }
 
 func (w *Writer) Write(rawData []byte) (int, error) {
-	return w.compressor.Write(rawData)
+	contentType := w.ResponseWriter.Header().Values("Content-Type")
+	isText := slices.Contains(contentType, "text/html")
+	isJSON := slices.Contains(contentType, "application/json")
+	if isText || isJSON {
+		return w.compressor.Write(rawData)
+	}
+	return w.ResponseWriter.Write(rawData)
 }
 
 func (w *Writer) WriteHeader(statusCode int) {
