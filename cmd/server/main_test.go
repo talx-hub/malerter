@@ -120,6 +120,11 @@ func TestMetricRouter(t *testing.T) {
 		t.Run(fmt.Sprintf("%s %s", test.method, test.url), func(t *testing.T) {
 			resp := testRequest(t, ts, test.method, test.url,
 				test.body, test.contentType, test.encoding)
+			defer func() {
+				err := resp.Body.Close()
+				require.NoError(t, err)
+			}()
+
 			assert.Equal(t, test.statusWant, resp.StatusCode)
 			if test.statusWant != http.StatusOK {
 				return
@@ -147,10 +152,6 @@ func testRequest(t *testing.T, ts *httptest.Server,
 
 	resp, err := ts.Client().Do(req)
 	require.NoError(t, err)
-	defer func() {
-		err = resp.Body.Close()
-		require.NoError(t, err)
-	}()
 
 	return resp
 }
