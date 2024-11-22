@@ -9,6 +9,7 @@ import (
 	"os/signal"
 
 	"github.com/go-chi/chi/v5"
+
 	"github.com/talx-hub/malerter/internal/api"
 	"github.com/talx-hub/malerter/internal/backup"
 	"github.com/talx-hub/malerter/internal/compressor"
@@ -48,14 +49,36 @@ func main() {
 		bk.Restore()
 	}
 
-	dumper := server.NewMetricsDumper(rep)
+	zeroLogger.Logger.Info().
+		Str(`"address"`, cfg.RootAddress).
+		Dur(`"backup interval"`, cfg.StoreInterval).
+		Bool(`"restore backup"`, cfg.Restore).
+		Str(`"backup path"`, cfg.FileStoragePath).
+		Msg("Starting server")
+	srv := http.Server{
+		Addr:    cfg.RootAddress,
+		Handler: metricRouter(rep, zeroLogger, bk),
+	}
+	idleConnectionsClosed := make(chan struct{})
+	go idleShutdown(&srv, idleConnectionsClosed, zeroLogger, bk)
+
+	if err = srv.ListenAndServe(); !errors.Is(err, http.ErrServerClosed) {
+		zeroLogger.Logger.Fatal().
+			Err(err).
+			Msg("error during HTTP server ListenAndServe")
+	}
+	<-idleConnectionsClosed
+}
+
+func metricRouter(repo repo.Repository, log *logger.Logger, bk *backup.Backup) chi.Router {
+	dumper := server.NewMetricsDumper(repo)
 	handler := api.NewHTTPHandler(dumper)
 
-	var updateHandler = zeroLogger.WrapHandler(bk.Middleware(handler.DumpMetric))
-	var updateJSONHandler = zeroLogger.WrapHandler(compressor.GzipMiddleware(bk.Middleware(handler.DumpMetricJSON)))
-	var getHandler = zeroLogger.WrapHandler(handler.GetMetric)
-	var getAllHandler = zeroLogger.WrapHandler(compressor.GzipMiddleware(handler.GetAll))
-	var getJSONHandler = zeroLogger.WrapHandler(compressor.GzipMiddleware(handler.GetMetricJSON))
+	var updateHandler = log.WrapHandler(bk.Middleware(handler.DumpMetric))
+	var updateJSONHandler = log.WrapHandler(compressor.GzipMiddleware(bk.Middleware(handler.DumpMetricJSON)))
+	var getHandler = log.WrapHandler(handler.GetMetric)
+	var getAllHandler = log.WrapHandler(compressor.GzipMiddleware(handler.GetAll))
+	var getJSONHandler = log.WrapHandler(compressor.GzipMiddleware(handler.GetMetricJSON))
 
 	router := chi.NewRouter()
 	router.Route("/", func(r chi.Router) {
@@ -70,34 +93,25 @@ func main() {
 		})
 	})
 
-	zeroLogger.Logger.Info().
-		Str(`"address"`, cfg.RootAddress).
-		Dur(`"backup interval"`, cfg.StoreInterval).
-		Bool(`"restore backup"`, cfg.Restore).
-		Str(`"backup path"`, cfg.FileStoragePath).
-		Msg("Starting server")
-	srv := http.Server{Addr: cfg.RootAddress, Handler: router}
-	idleConnsClosed := make(chan struct{})
-	go func() {
-		sigint := make(chan os.Signal, 1)
-		signal.Notify(sigint, os.Interrupt)
-		<-sigint
+	return router
+}
 
-		if err = srv.Shutdown(context.Background()); err != nil {
-			zeroLogger.Logger.Fatal().
-				Err(err).
-				Msg("error during HTTP server Shutdown")
-		}
+func idleShutdown(server *http.Server, channel chan struct{},
+	log *logger.Logger, backupService *backup.Backup) {
 
-		bk.Backup()
+	sigint := make(chan os.Signal, 1)
+	signal.Notify(sigint, os.Interrupt)
+	<-sigint
 
-		close(idleConnsClosed)
-	}()
-
-	if err = srv.ListenAndServe(); !errors.Is(err, http.ErrServerClosed) {
-		zeroLogger.Logger.Fatal().
+	log.Logger.Info().
+		Msg("shutdown signal received. Exiting...")
+	if err := server.Shutdown(context.Background()); err != nil {
+		log.Logger.Fatal().
 			Err(err).
-			Msg("error during HTTP server ListenAndServe")
+			Msg("error during HTTP server Shutdown")
 	}
-	<-idleConnsClosed
+
+	backupService.Backup()
+
+	close(channel)
 }
