@@ -60,7 +60,7 @@ func (h *HTTPHandler) DumpMetricJSON(w http.ResponseWriter, r *http.Request) {
 			http.StatusNotFound)
 		return
 	}
-	if err = h.service.Store(metric); err != nil {
+	if err = h.service.Add(metric); err != nil {
 		http.Error(
 			w,
 			fmt.Sprintf("%s fails: %s", r.URL.Path, err.Error()),
@@ -69,7 +69,7 @@ func (h *HTTPHandler) DumpMetricJSON(w http.ResponseWriter, r *http.Request) {
 	}
 
 	dummyKey := metric.Type.String() + metric.Name
-	metric, err = h.service.Get(dummyKey)
+	metric, err = h.service.Find(dummyKey)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -104,7 +104,7 @@ func (h *HTTPHandler) DumpMetric(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = h.service.Store(metric)
+	err = h.service.Add(metric)
 	if err != nil {
 		http.Error(
 			w,
@@ -128,7 +128,7 @@ func (h *HTTPHandler) GetMetric(w http.ResponseWriter, r *http.Request) {
 	}
 
 	dummyKey := metric.Type.String() + metric.Name
-	m, err := h.service.Get(dummyKey)
+	m, err := h.service.Find(dummyKey)
 	if err != nil {
 		st := getStatusFromError(err)
 		http.Error(
@@ -165,7 +165,7 @@ func (h *HTTPHandler) GetMetricJSON(w http.ResponseWriter, r *http.Request) {
 	}
 
 	dummyKey := metric.Type.String() + metric.Name
-	metric, err = h.service.Get(dummyKey)
+	metric, err = h.service.Find(dummyKey)
 	if err != nil {
 		st := getStatusFromError(err)
 		http.Error(
@@ -185,7 +185,7 @@ func (h *HTTPHandler) GetMetricJSON(w http.ResponseWriter, r *http.Request) {
 
 func (h *HTTPHandler) GetAll(w http.ResponseWriter, _ *http.Request) {
 	w.Header().Set("Content-Type", "text/html")
-	metrics := h.service.GetAll()
+	metrics := h.service.Get()
 	page := createMetricsPage(metrics)
 	w.WriteHeader(http.StatusOK)
 	_, err := w.Write([]byte(page))

@@ -8,11 +8,10 @@ import (
 
 	"github.com/talx-hub/malerter/internal/compressor"
 	"github.com/talx-hub/malerter/internal/model"
-	"github.com/talx-hub/malerter/internal/repo"
 )
 
 type Sender struct {
-	repo     repo.Repository
+	storage  Storage
 	host     string
 	client   *http.Client
 	compress bool
@@ -26,7 +25,7 @@ func (s *Sender) send() error {
 }
 
 func (s *Sender) get() []model.Metric {
-	return s.repo.GetAll()
+	return s.storage.Get()
 }
 
 func convertToJSONs(metrics []model.Metric) []string {

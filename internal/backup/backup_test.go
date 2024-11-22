@@ -7,15 +7,15 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/talx-hub/malerter/internal/config/server"
 	"github.com/talx-hub/malerter/internal/model"
-	"github.com/talx-hub/malerter/internal/repo"
+	"github.com/talx-hub/malerter/internal/repository/memory"
 )
 
 func TestBackupRestore(t *testing.T) {
 	m1, _ := model.NewMetric().FromValues("mainQuestion", model.MetricTypeCounter, int64(42))
 	m2, _ := model.NewMetric().FromValues("pi", model.MetricTypeGauge, 3.14)
-	rep1 := repo.NewMemRepository()
-	_ = rep1.Store(m1)
-	_ = rep1.Store(m2)
+	rep1 := memory.New()
+	_ = rep1.Add(m1)
+	_ = rep1.Add(m2)
 	cfg := server.Builder{FileStoragePath: "temp.bk"}
 
 	bk1, err := New(cfg, rep1)
@@ -26,7 +26,7 @@ func TestBackupRestore(t *testing.T) {
 	}()
 	bk1.Backup()
 
-	rep2 := repo.NewMemRepository()
+	rep2 := memory.New()
 	bk2, err := New(cfg, rep2)
 	require.NoError(t, err)
 	defer func() {
@@ -35,5 +35,5 @@ func TestBackupRestore(t *testing.T) {
 	}()
 	bk2.Restore()
 
-	assert.ElementsMatch(t, rep1.GetAll(), rep2.GetAll())
+	assert.ElementsMatch(t, rep1.Get(), rep2.Get())
 }

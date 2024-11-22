@@ -11,8 +11,9 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
 	"github.com/talx-hub/malerter/internal/model"
-	"github.com/talx-hub/malerter/internal/repo"
+	"github.com/talx-hub/malerter/internal/repository/memory"
 	"github.com/talx-hub/malerter/internal/service"
 	"github.com/talx-hub/malerter/internal/service/server"
 )
@@ -38,8 +39,8 @@ func TestNewHTTPHandler(t *testing.T) {
 		},
 		{
 			name: "simple constructor test #2",
-			args: args{service: server.NewMetricsDumper(repo.NewMemRepository())},
-			want: &HTTPHandler{server.NewMetricsDumper(repo.NewMemRepository())},
+			args: args{service: server.NewMetricsDumper(memory.New())},
+			want: &HTTPHandler{server.NewMetricsDumper(memory.New())},
 		},
 	}
 	for _, tt := range tests {
@@ -69,7 +70,7 @@ func TestHTTPHandler_DumpMetric(t *testing.T) {
 		{"/update/counter/someMetric/9223372036854775808", "/update/counter/someMetric/9223372036854775808 fails: incorrect request: metric has invalid value\n", 400},
 		{"/update/counter/someMetric/string", "/update/counter/someMetric/string fails: incorrect request: invalid value <string>\n", 400},
 	}
-	rep := repo.NewMemRepository()
+	rep := memory.New()
 	serv := server.NewMetricsDumper(rep)
 	handler := NewHTTPHandler(serv)
 	ts := httptest.NewServer(http.HandlerFunc(handler.DumpMetric))
@@ -105,9 +106,9 @@ func TestHTTPHandler_GetMetric(t *testing.T) {
 	}
 	m1, _ := model.NewMetric().FromValues("mainQuestion", model.MetricTypeCounter, int64(42))
 	m2, _ := model.NewMetric().FromValues("pi", model.MetricTypeGauge, 3.14)
-	repository := repo.NewMemRepository()
-	_ = repository.Store(m1)
-	_ = repository.Store(m2)
+	repository := memory.New()
+	_ = repository.Add(m1)
+	_ = repository.Add(m2)
 
 	dumper := server.NewMetricsDumper(repository)
 	handler := NewHTTPHandler(dumper)
@@ -229,7 +230,7 @@ func TestHTTPHandler_DumpMetricJSON(t *testing.T) {
 		},
 	}
 
-	repository := repo.NewMemRepository()
+	repository := memory.New()
 	dumper := server.NewMetricsDumper(repository)
 	handler := NewHTTPHandler(dumper)
 	testServer := httptest.NewServer(http.HandlerFunc(handler.DumpMetricJSON))
@@ -305,11 +306,11 @@ func TestHTTPHandler_GetMetricJSON(t *testing.T) {
 		},
 	}
 
-	repository := repo.NewMemRepository()
+	repository := memory.New()
 	m1, _ := model.NewMetric().FromValues("m42", model.MetricTypeCounter, int64(42))
 	m2, _ := model.NewMetric().FromValues("pi", model.MetricTypeGauge, 3.14)
-	_ = repository.Store(m1)
-	_ = repository.Store(m2)
+	_ = repository.Add(m1)
+	_ = repository.Add(m2)
 
 	dumper := server.NewMetricsDumper(repository)
 	handler := NewHTTPHandler(dumper)
@@ -367,9 +368,9 @@ func TestHTTPHandler_GetAll(t *testing.T) {
 		},
 	}
 
-	repository := repo.NewMemRepository()
+	repository := memory.New()
 	m1, _ := model.NewMetric().FromValues("m42", model.MetricTypeCounter, int64(42))
-	_ = repository.Store(m1)
+	_ = repository.Add(m1)
 
 	dumper := server.NewMetricsDumper(repository)
 	handler := NewHTTPHandler(dumper)

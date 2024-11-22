@@ -10,16 +10,16 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/talx-hub/malerter/internal/model"
-	"github.com/talx-hub/malerter/internal/repo"
+	"github.com/talx-hub/malerter/internal/repository/memory"
 )
 
 func TestGet(t *testing.T) {
-	storage := repo.NewMemRepository()
+	storage := memory.New()
 	m1, _ := model.NewMetric().FromValues("m42", model.MetricTypeCounter, int64(42))
 	m2, _ := model.NewMetric().FromValues("pi", model.MetricTypeGauge, 3.14)
-	_ = storage.Store(m1)
-	_ = storage.Store(m2)
-	sender := Sender{repo: storage, host: ""}
+	_ = storage.Add(m1)
+	_ = storage.Add(m2)
+	sender := Sender{storage: storage, host: ""}
 	got := sender.get()
 	require.Len(t, got, 2)
 	assert.Contains(t, got, m1)

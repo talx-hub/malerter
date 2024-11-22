@@ -7,18 +7,23 @@ import (
 	"time"
 
 	"github.com/talx-hub/malerter/internal/config/server"
-	"github.com/talx-hub/malerter/internal/repo"
+	"github.com/talx-hub/malerter/internal/model"
 )
+
+type Storage interface {
+	Add(model.Metric) error
+	Get() []model.Metric
+}
 
 type Backup struct {
 	producer       Producer
 	restorer       Restorer
 	backupInterval time.Duration
 	lastBackup     time.Time
-	storage        repo.Repository
+	storage        Storage
 }
 
-func New(config server.Builder, storage repo.Repository) (*Backup, error) {
+func New(config server.Builder, storage Storage) (*Backup, error) {
 	p, err := NewProducer(config.FileStoragePath)
 	if err != nil {
 		return nil, err
@@ -46,7 +51,7 @@ func (b *Backup) Restore() {
 			}
 			log.Printf("unable to restore metric: %v", err)
 		}
-		err = b.storage.Store(*metric)
+		err = b.storage.Add(*metric)
 		if err != nil {
 			log.Printf("unable to store metric, during backup restore: %v", err)
 		}
@@ -54,7 +59,7 @@ func (b *Backup) Restore() {
 }
 
 func (b *Backup) Backup() {
-	metrics := b.storage.GetAll()
+	metrics := b.storage.Get()
 	for _, m := range metrics {
 		if err := b.producer.WriteMetric(m); err != nil {
 			log.Printf("unable to backup metric: %v\n", err)

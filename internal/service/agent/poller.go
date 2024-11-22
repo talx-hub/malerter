@@ -6,7 +6,6 @@ import (
 	"runtime"
 
 	"github.com/talx-hub/malerter/internal/model"
-	"github.com/talx-hub/malerter/internal/repo"
 )
 
 const MetricCount = 29
@@ -44,7 +43,7 @@ const (
 )
 
 type Poller struct {
-	repo repo.Repository
+	storage Storage
 }
 
 func (p *Poller) update() error {
@@ -94,7 +93,7 @@ func collect() []model.Metric {
 
 func (p *Poller) store(metrics []model.Metric) {
 	for _, m := range metrics {
-		if p.repo.Store(m) != nil {
+		if p.storage.Add(m) != nil {
 			log.Println("error during storing of metric")
 		}
 	}

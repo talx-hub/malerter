@@ -15,7 +15,8 @@ import (
 	"github.com/talx-hub/malerter/internal/compressor"
 	serverCfg "github.com/talx-hub/malerter/internal/config/server"
 	"github.com/talx-hub/malerter/internal/logger"
-	"github.com/talx-hub/malerter/internal/repo"
+	"github.com/talx-hub/malerter/internal/model"
+	"github.com/talx-hub/malerter/internal/repository/memory"
 	"github.com/talx-hub/malerter/internal/service/server"
 )
 
@@ -31,7 +32,7 @@ func main() {
 		log.Fatalf("unable to configure custom logger: %s", err.Error())
 	}
 
-	rep := repo.NewMemRepository()
+	rep := memory.New()
 	bk, err := backup.New(cfg, rep)
 	if err != nil {
 		zeroLogger.Logger.Fatal().
@@ -70,7 +71,13 @@ func main() {
 	<-idleConnectionsClosed
 }
 
-func metricRouter(repo repo.Repository, log *logger.Logger, bk *backup.Backup) chi.Router {
+type Repository interface {
+	Add(metric model.Metric) error
+	Find(key string) (model.Metric, error)
+	Get() []model.Metric
+}
+
+func metricRouter(repo Repository, log *logger.Logger, bk *backup.Backup) chi.Router {
 	dumper := server.NewMetricsDumper(repo)
 	handler := api.NewHTTPHandler(dumper)
 

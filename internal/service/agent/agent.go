@@ -7,23 +7,29 @@ import (
 	"time"
 
 	"github.com/talx-hub/malerter/internal/config/agent"
-	"github.com/talx-hub/malerter/internal/repo"
+	"github.com/talx-hub/malerter/internal/model"
 )
 
-type Agent struct {
-	config *agent.Builder
-	repo   repo.Repository
-	poller Poller
-	sender Sender
+type Storage interface {
+	Add(metric model.Metric) error
+	Find(key string) (model.Metric, error)
+	Get() []model.Metric
 }
 
-func NewAgent(repo repo.Repository, cfg *agent.Builder, client *http.Client) *Agent {
+type Agent struct {
+	config  *agent.Builder
+	storage Storage
+	poller  Poller
+	sender  Sender
+}
+
+func NewAgent(storage Storage, cfg *agent.Builder, client *http.Client) *Agent {
 	return &Agent{
-		config: cfg,
-		repo:   repo,
-		poller: Poller{repo: repo},
+		config:  cfg,
+		storage: storage,
+		poller:  Poller{storage: storage},
 		sender: Sender{
-			repo:     repo,
+			storage:  storage,
 			host:     "http://" + cfg.ServerAddress,
 			client:   client,
 			compress: true,

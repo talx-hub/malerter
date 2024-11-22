@@ -3,15 +3,16 @@ package main
 import (
 	"bytes"
 	"fmt"
+	"net/http"
+	"net/http/httptest"
+	"testing"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/talx-hub/malerter/internal/backup"
 	serverCfg "github.com/talx-hub/malerter/internal/config/server"
 	"github.com/talx-hub/malerter/internal/logger"
-	"github.com/talx-hub/malerter/internal/repo"
-	"net/http"
-	"net/http/httptest"
-	"testing"
+	"github.com/talx-hub/malerter/internal/repository/memory"
 )
 
 func services(t *testing.T) (*httptest.Server, *backup.Backup) {
@@ -21,7 +22,7 @@ func services(t *testing.T) (*httptest.Server, *backup.Backup) {
 	zeroLogger, err := logger.New(cfg.LogLevel)
 	require.NoError(t, err)
 
-	rep := repo.NewMemRepository()
+	rep := memory.New()
 
 	bk, err := backup.New(cfg, rep)
 	require.NoError(t, err)

@@ -5,7 +5,7 @@ import (
 	"net/http"
 
 	agentCfg "github.com/talx-hub/malerter/internal/config/agent"
-	"github.com/talx-hub/malerter/internal/repo"
+	"github.com/talx-hub/malerter/internal/repository/memory"
 	"github.com/talx-hub/malerter/internal/service/agent"
 )
 
@@ -23,7 +23,7 @@ func main() {
 		log.Fatal("unable to load agent config")
 	}
 
-	rep := repo.NewMemRepository()
+	rep := memory.New()
 	agt := agent.NewAgent(rep, &cfg, &http.Client{})
 
 	agt.Run()
