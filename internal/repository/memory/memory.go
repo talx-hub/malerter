@@ -13,7 +13,10 @@ type Metrics struct {
 }
 
 func New() *Metrics {
-	return &Metrics{data: make(map[string]model.Metric)}
+	return &Metrics{
+		data: make(map[string]model.Metric),
+		m:    &sync.RWMutex{},
+	}
 }
 
 func (r *Metrics) Add(metric model.Metric) error {
