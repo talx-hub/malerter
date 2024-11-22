@@ -34,11 +34,6 @@ func getStatusFromError(err error) int {
 }
 
 func (h *HTTPHandler) DumpMetricJSON(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		e := "only POST requests are allowed"
-		http.Error(w, e, http.StatusBadRequest)
-		return
-	}
 	if r.Header.Get("Content-Type") != "application/json" {
 		e := "content-type must be application/json"
 		http.Error(w, e, http.StatusBadRequest)
@@ -88,12 +83,6 @@ func (h *HTTPHandler) DumpMetricJSON(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *HTTPHandler) DumpMetric(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		e := "only POST requests are allowed"
-		http.Error(w, e, http.StatusBadRequest)
-		return
-	}
-
 	metric, err := model.NewMetric().FromURL(r.URL.Path)
 	if err != nil {
 		st := getStatusFromError(err)
@@ -127,12 +116,6 @@ func (h *HTTPHandler) DumpMetric(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *HTTPHandler) GetMetric(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
-		e := "only GET requests are allowed"
-		http.Error(w, e, http.StatusBadRequest)
-		return
-	}
-
 	metric, err := model.NewMetric().FromURL(r.URL.Path)
 	if err != nil {
 		st := getStatusFromError(err)
@@ -163,10 +146,6 @@ func (h *HTTPHandler) GetMetric(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *HTTPHandler) GetMetricJSON(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		http.Error(w, "only POST requests are allowed", http.StatusBadRequest)
-		return
-	}
 	if r.Header.Get("Content-Type") != "application/json" {
 		e := "content-type must be application/json"
 		http.Error(w, e, http.StatusBadRequest)
@@ -201,13 +180,7 @@ func (h *HTTPHandler) GetMetricJSON(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (h *HTTPHandler) GetAll(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
-		e := "only GET requests are allowed"
-		http.Error(w, e, http.StatusBadRequest)
-		return
-	}
-
+func (h *HTTPHandler) GetAll(w http.ResponseWriter, _ *http.Request) {
 	w.Header().Set("Content-Type", "text/html")
 	metrics := h.service.GetAll()
 	page := createMetricsPage(metrics)

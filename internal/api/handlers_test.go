@@ -75,20 +75,6 @@ func TestHTTPHandler_DumpMetric(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(handler.DumpMetric))
 	defer ts.Close()
 
-	wrongMethodTest := test{
-		url:    "/update/gauge/someMetric/1",
-		want:   "only POST requests are allowed\n",
-		status: 400,
-	}
-	t.Run("wrong method test", func(t *testing.T) {
-		resp, got := testRequest(t, ts, http.MethodGet, wrongMethodTest.url, "", nil)
-		assert.Equal(t, wrongMethodTest.status, resp.StatusCode)
-		assert.Equal(t, wrongMethodTest.want, got)
-		if err := resp.Body.Close(); err != nil {
-			log.Fatal(err)
-		}
-	})
-
 	for _, tt := range tests {
 		t.Run(tt.url, func(t *testing.T) {
 			resp, got := testRequest(t, ts, http.MethodPost, tt.url, "", nil)
@@ -373,10 +359,6 @@ func TestHTTPHandler_GetAll(t *testing.T) {
 		expectedStatus int
 		expectedBody   string
 	}{
-		{
-			method: http.MethodPost, url: "/",
-			expectedStatus: http.StatusBadRequest,
-		},
 		{
 			method: http.MethodGet, url: "/",
 			expectedStatus: http.StatusOK,
