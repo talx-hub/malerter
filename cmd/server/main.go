@@ -9,6 +9,7 @@ import (
 	"os/signal"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/go-chi/chi/v5/middleware"
 
 	"github.com/talx-hub/malerter/internal/api"
 	"github.com/talx-hub/malerter/internal/backup"
@@ -94,10 +95,17 @@ func metricRouter(repo Repository, log *zerologger.ZeroLogger, bk *backup.File) 
 	router.Route("/", func(r chi.Router) {
 		r.Get("/", getAllHandler)
 		r.Route("/value", func(r chi.Router) {
-			r.Post("/", getJSONHandler)
+			r.Group(func(r chi.Router) {
+				r.Use(middleware.AllowContentType("application/json"))
+				r.Post("/", getJSONHandler)
+			})
 			r.Get("/{type}/{name}", getHandler)
 		})
 		r.Route("/update", func(r chi.Router) {
+			r.Group(func(r chi.Router) {
+				r.Use(middleware.AllowContentType("application/json"))
+				r.Post("/", updateJSONHandler)
+			})
 			r.Post("/", updateJSONHandler)
 			r.Post("/{type}/{name}/{val}", updateHandler)
 		})

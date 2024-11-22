@@ -137,14 +137,6 @@ func TestHTTPHandler_DumpMetricJSON(t *testing.T) {
 		expectedBody string
 	}{
 		{
-			method: http.MethodGet, url: "/update/",
-			expectedCode: http.StatusBadRequest,
-		},
-		{
-			method: http.MethodPost, url: "/update", contentType: "text/plain",
-			expectedCode: http.StatusBadRequest,
-		},
-		{
 			method: http.MethodPost, url: "/update", contentType: "application/json",
 			body:         `{"id":"mainQuestion", "type":"counter", "delta":42}`,
 			expectedCode: http.StatusOK,
@@ -259,14 +251,6 @@ func TestHTTPHandler_GetMetricJSON(t *testing.T) {
 		expectedCode int
 		expectedBody string
 	}{
-		{
-			method: http.MethodGet, url: "/value",
-			expectedCode: http.StatusBadRequest,
-		},
-		{
-			method: http.MethodPost, url: "/value", contentType: "text/plain",
-			expectedCode: http.StatusBadRequest,
-		},
 		{
 			method: http.MethodPost, url: "/value", contentType: "application/json",
 			body:         `{"id":"m42", "type":"counter"}`,

@@ -101,6 +101,7 @@ func GzipMiddleware(h http.Handler) http.Handler {
 				return
 			}
 			r.Body = decompressor
+			r.Header.Set("Content-Length", "0")
 			defer func() {
 				if err = decompressor.Close(); err != nil {
 					log.Fatal(err)

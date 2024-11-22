@@ -34,12 +34,6 @@ func getStatusFromError(err error) int {
 }
 
 func (h *HTTPHandler) DumpMetricJSON(w http.ResponseWriter, r *http.Request) {
-	if r.Header.Get("Content-Type") != "application/json" {
-		e := "content-type must be application/json"
-		http.Error(w, e, http.StatusBadRequest)
-		return
-	}
-
 	metric, err := model.NewMetric().FromJSON(r.Body)
 	if err != nil {
 		st := getStatusFromError(err)
@@ -148,12 +142,6 @@ func (h *HTTPHandler) GetMetric(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *HTTPHandler) GetMetricJSON(w http.ResponseWriter, r *http.Request) {
-	if r.Header.Get("Content-Type") != "application/json" {
-		e := "content-type must be application/json"
-		http.Error(w, e, http.StatusBadRequest)
-		return
-	}
-
 	metric, err := model.NewMetric().FromJSON(r.Body)
 	if err != nil {
 		st := getStatusFromError(err)
