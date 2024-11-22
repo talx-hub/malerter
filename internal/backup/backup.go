@@ -15,7 +15,7 @@ type Storage interface {
 	Get() []model.Metric
 }
 
-type Backup struct {
+type File struct {
 	producer       Producer
 	restorer       Restorer
 	backupInterval time.Duration
@@ -23,7 +23,7 @@ type Backup struct {
 	storage        Storage
 }
 
-func New(config server.Builder, storage Storage) (*Backup, error) {
+func New(config server.Builder, storage Storage) (*File, error) {
 	p, err := NewProducer(config.FileStoragePath)
 	if err != nil {
 		return nil, err
@@ -33,7 +33,7 @@ func New(config server.Builder, storage Storage) (*Backup, error) {
 		return nil, err
 	}
 
-	return &Backup{
+	return &File{
 		producer:       *p,
 		restorer:       *r,
 		backupInterval: config.StoreInterval,
@@ -42,7 +42,7 @@ func New(config server.Builder, storage Storage) (*Backup, error) {
 	}, nil
 }
 
-func (b *Backup) Restore() {
+func (b *File) Restore() {
 	for {
 		metric, err := b.restorer.ReadMetric()
 		if err != nil {
@@ -58,7 +58,7 @@ func (b *Backup) Restore() {
 	}
 }
 
-func (b *Backup) Backup() {
+func (b *File) Backup() {
 	metrics := b.storage.Get()
 	for _, m := range metrics {
 		if err := b.producer.WriteMetric(m); err != nil {
@@ -67,7 +67,7 @@ func (b *Backup) Backup() {
 	}
 }
 
-func (b *Backup) Middleware(h http.HandlerFunc) http.HandlerFunc {
+func (b *File) Middleware(h http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		now := time.Now().UTC()
 		if now.Sub(b.lastBackup) >= b.backupInterval {
@@ -77,7 +77,7 @@ func (b *Backup) Middleware(h http.HandlerFunc) http.HandlerFunc {
 	}
 }
 
-func (b *Backup) Close() error {
+func (b *File) Close() error {
 	if err := b.producer.Close(); err != nil {
 		return err
 	}

@@ -32,8 +32,8 @@ func main() {
 		log.Fatalf("unable to configure custom logger: %s", err.Error())
 	}
 
-	rep := memory.New()
-	bk, err := backup.New(cfg, rep)
+	storage := memory.New()
+	bk, err := backup.New(cfg, storage)
 	if err != nil {
 		zeroLogger.Logger.Fatal().
 			Err(err).
@@ -58,7 +58,7 @@ func main() {
 		Msg("Starting server")
 	srv := http.Server{
 		Addr:    cfg.RootAddress,
-		Handler: metricRouter(rep, zeroLogger, bk),
+		Handler: metricRouter(storage, zeroLogger, bk),
 	}
 	idleConnectionsClosed := make(chan struct{})
 	go idleShutdown(&srv, idleConnectionsClosed, zeroLogger, bk)
@@ -77,7 +77,7 @@ type Repository interface {
 	Get() []model.Metric
 }
 
-func metricRouter(repo Repository, log *logger.Logger, bk *backup.Backup) chi.Router {
+func metricRouter(repo Repository, log *logger.Logger, bk *backup.File) chi.Router {
 	dumper := server.NewMetricsDumper(repo)
 	handler := api.NewHTTPHandler(dumper)
 
@@ -104,7 +104,7 @@ func metricRouter(repo Repository, log *logger.Logger, bk *backup.Backup) chi.Ro
 }
 
 func idleShutdown(server *http.Server, channel chan struct{},
-	log *logger.Logger, backupService *backup.Backup) {
+	log *logger.Logger, backupService *backup.File) {
 
 	sigint := make(chan os.Signal, 1)
 	signal.Notify(sigint, os.Interrupt)

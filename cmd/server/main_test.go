@@ -15,7 +15,7 @@ import (
 	"github.com/talx-hub/malerter/internal/repository/memory"
 )
 
-func services(t *testing.T) (*httptest.Server, *backup.Backup) {
+func services(t *testing.T) (*httptest.Server, *backup.File) {
 	cfg, ok := serverCfg.NewDirector().Build().(serverCfg.Builder)
 	require.True(t, ok)
 
