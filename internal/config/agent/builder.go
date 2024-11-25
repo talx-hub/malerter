@@ -1,8 +1,8 @@
 package agent
 
 import (
+	"errors"
 	"flag"
-	"fmt"
 	"log"
 	"os"
 	"strconv"
@@ -73,10 +73,10 @@ func (b *Builder) LoadFromEnv() config.Builder {
 
 func (b *Builder) IsValid() (config.Builder, error) {
 	if b.ReportInterval < 0 {
-		return nil, fmt.Errorf("report interval must be positive")
+		return nil, errors.New("report interval must be positive")
 	}
 	if b.PollInterval < 0 {
-		return nil, fmt.Errorf("poll interval must be positive")
+		return nil, errors.New("poll interval must be positive")
 	}
 	return b, nil
 }

@@ -2,6 +2,7 @@ package model
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"strconv"
@@ -26,10 +27,10 @@ func (t MetricType) String() string {
 }
 
 type Metric struct {
-	Type  MetricType `json:"type"`
-	Name  string     `json:"id"`
 	Delta *int64     `json:"delta,omitempty"`
 	Value *float64   `json:"value,omitempty"`
+	Type  MetricType `json:"type"`
+	Name  string     `json:"id"`
 }
 
 func NewMetric() *Metric {
@@ -48,7 +49,7 @@ func (m *Metric) setValue(val any) error {
 
 	sVal, ok := val.(string)
 	if !ok {
-		return &customerror.ErrInvalidArgument{
+		return &customerror.InvalidArgumentError{
 			Info: fmt.Sprintf("invalid value <%v>", val),
 		}
 	}
@@ -63,14 +64,14 @@ func (m *Metric) setValue(val any) error {
 	if fErr == nil || iErr == nil {
 		return nil
 	}
-	return &customerror.ErrInvalidArgument{
+	return &customerror.InvalidArgumentError{
 		Info: fmt.Sprintf("invalid value <%v>", val),
 	}
 }
 
 // if Metric.setValue() receives string that could be converted to int,
 // the Metric.setValue() method will set both m.Value and m.Delta,
-// so we need to clean extra field
+// so we need to clean extra field.
 func (m *Metric) clean() {
 	if m.Type == MetricTypeGauge && m.Delta != nil && m.Value != nil {
 		m.Delta = nil
@@ -89,7 +90,7 @@ func (m *Metric) IsEmpty() bool {
 
 func (m *Metric) CheckValid() error {
 	if m.Name == "" {
-		return &customerror.ErrNotFound{
+		return &customerror.NotFoundError{
 			Message: "metric name must be not empty",
 		}
 	}
@@ -98,14 +99,14 @@ func (m *Metric) CheckValid() error {
 	_, errF := strconv.ParseFloat(m.Name, 64)
 	_, errI := strconv.Atoi(m.Name)
 	if errF == nil || errI == nil {
-		return &customerror.ErrNotFound{
+		return &customerror.NotFoundError{
 			Message: "metric name must be a string",
 		}
 	}
 
 	// только два типа метрик позволены
 	if !m.Type.IsValid() {
-		return &customerror.ErrInvalidArgument{
+		return &customerror.InvalidArgumentError{
 			Info: "only counter and gauge types are allowed",
 		}
 	}
@@ -114,7 +115,7 @@ func (m *Metric) CheckValid() error {
 	wrongCounter := m.Type == MetricTypeCounter && (m.Value != nil || m.Delta == nil)
 	wrongGauge := m.Type == MetricTypeGauge && (m.Delta != nil || m.Value == nil)
 	if !m.IsEmpty() && (wrongCounter || wrongGauge) {
-		return &customerror.ErrInvalidArgument{
+		return &customerror.InvalidArgumentError{
 			Info: "metric has invalid value",
 		}
 	}
@@ -153,21 +154,22 @@ func (m *Metric) ToURL() string {
 }
 
 func (m *Metric) Update(other Metric) error {
-	// TODO: может убрать эти проверки??? невалидные метрики вообще не должны иметь возможность быть созданными клиентским кодом
+	// TODO: может убрать эти проверки???
+	// невалидные метрики вообще не должны иметь возможность быть созданными клиентским кодом
 	if err := m.CheckValid(); err != nil {
-		return fmt.Errorf("cannot update invalid metric: %v", err)
+		return fmt.Errorf("cannot update invalid metric: %w", err)
 	}
 	if err := other.CheckValid(); err != nil {
-		return fmt.Errorf("rhs metric is invalid, cannot update: %v", err)
+		return fmt.Errorf("rhs metric is invalid, cannot update: %w", err)
 	}
 	if m.IsEmpty() {
-		return fmt.Errorf("lhs metric is empty, cannot update")
+		return errors.New("lhs metric is empty, cannot update")
 	}
 	if other.IsEmpty() {
-		return fmt.Errorf("rhs metric is empty, cannot update")
+		return errors.New("rhs metric is empty, cannot update")
 	}
 	if m.Type != other.Type {
-		return fmt.Errorf("lhs and rhs metrics type are different, cannot update")
+		return errors.New("lhs and rhs metrics type are different, cannot update")
 	}
 
 	if m.Type == MetricTypeGauge {
@@ -185,38 +187,46 @@ func (m *Metric) FromValues(name string, t MetricType, value any) (Metric, error
 	m.Type = t
 
 	if err := m.setValue(value); err != nil {
-		return Metric{}, err
+		return Metric{}, fmt.Errorf("unable to set value: %w", err)
 	}
 	m.clean()
 	if err := m.CheckValid(); err != nil {
-		return Metric{}, err
+		return Metric{},
+			fmt.Errorf("metric, constructed from values is incorrect: %w", err)
 	}
 	return *m, nil
 }
 
 func (m *Metric) FromURL(url string) (Metric, error) {
+	const minCorrectURLParts = 4
 	parts := strings.Split(url, "/")
-	if len(parts) < 4 {
-		return Metric{}, &customerror.ErrNotFound{
+	if len(parts) < minCorrectURLParts {
+		return Metric{}, &customerror.NotFoundError{
 			Message: "incorrect URL",
 		}
 	}
 
-	m.Name = parts[3]
-	m.Type = MetricType(parts[2])
-	if len(parts) == 4 {
+	const idxName = 3
+	const idxType = 2
+	const idxValue = 4
+	m.Name = parts[idxName]
+	m.Type = MetricType(parts[idxType])
+	if len(parts) == minCorrectURLParts {
 		if err := m.CheckValid(); err != nil {
-			return Metric{}, err
+			return Metric{},
+				fmt.Errorf("metric, parsed from URL is invalid: %w", err)
 		}
 		return *m, nil
 	}
 
-	if err := m.setValue(parts[4]); err != nil {
-		return Metric{}, err
+	if err := m.setValue(parts[idxValue]); err != nil {
+		return Metric{},
+			fmt.Errorf("unable to set value for metric: %w", err)
 	}
 	m.clean()
 	if err := m.CheckValid(); err != nil {
-		return Metric{}, err
+		return Metric{},
+			fmt.Errorf("parsed metric from URL is invalid: %w", err)
 	}
 
 	return *m, nil
@@ -224,10 +234,10 @@ func (m *Metric) FromURL(url string) (Metric, error) {
 
 func (m *Metric) FromJSON(body io.Reader) (Metric, error) {
 	if err := json.NewDecoder(body).Decode(m); err != nil {
-		return Metric{}, err
+		return Metric{}, fmt.Errorf("unable to decode metric: %w", err)
 	}
 	if err := m.CheckValid(); err != nil {
-		return Metric{}, err
+		return Metric{}, fmt.Errorf("decoded metric is invalid: %w", err)
 	}
 
 	return *m, nil

@@ -17,7 +17,7 @@ import (
 //		? но как сделать нотификацию???
 
 func main() {
-	// TODO: тут какие-то кошмары с указателями(см. config/agent/builder/.Build())... разобраться
+	// TODO: тут какие-то кошмары с указателями(см. config/agent/builder/.Build())
 	cfg, ok := agentCfg.NewDirector().Build().(agentCfg.Builder)
 	if !ok {
 		log.Fatal("unable to load agent config")

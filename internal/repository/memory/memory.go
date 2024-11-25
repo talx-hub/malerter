@@ -1,6 +1,7 @@
 package memory
 
 import (
+	"fmt"
 	"sync"
 
 	"github.com/talx-hub/malerter/internal/customerror"
@@ -9,13 +10,12 @@ import (
 
 type Metrics struct {
 	data map[string]model.Metric
-	m    *sync.RWMutex
+	m    sync.RWMutex
 }
 
 func New() *Metrics {
 	return &Metrics{
 		data: make(map[string]model.Metric),
-		m:    &sync.RWMutex{},
 	}
 }
 
@@ -28,7 +28,7 @@ func (r *Metrics) Add(metric model.Metric) error {
 	if old, found := r.data[dummyKey]; found {
 		err := old.Update(metric)
 		if err != nil {
-			return err
+			return fmt.Errorf("unable to update metric in storage: %w", err)
 		}
 		n := old
 		r.data[dummyKey] = n
@@ -46,7 +46,7 @@ func (r *Metrics) Find(key string) (model.Metric, error) {
 		return m, nil
 	}
 	return model.Metric{},
-		&customerror.ErrNotFound{}
+		&customerror.NotFoundError{}
 }
 
 func (r *Metrics) Get() []model.Metric {

@@ -1,8 +1,8 @@
 package server
 
 import (
+	"errors"
 	"flag"
-	"fmt"
 	"log"
 	"os"
 	"strconv"
@@ -50,7 +50,7 @@ func (b *Builder) LoadFromFlags() config.Builder {
 	flag.StringVar(&b.FileStoragePath, "f", FileStorageDefault(), "backup file path")
 	var backupInterval int64
 	flag.Int64Var(&backupInterval, "i", StoreIntervalDefault, "interval in seconds of repository backup")
-	b.Restore = *flag.Bool("r", RestoreDefault, "restore backup while start")
+	flag.BoolVar(&b.Restore, "r", RestoreDefault, "restore backup while start")
 	flag.Parse()
 
 	b.StoreInterval = time.Duration(backupInterval) * time.Second
@@ -86,7 +86,7 @@ func (b *Builder) LoadFromEnv() config.Builder {
 
 func (b *Builder) IsValid() (config.Builder, error) {
 	if b.StoreInterval < 0 {
-		return nil, fmt.Errorf("store interval must be positive")
+		return nil, errors.New("store interval must be positive")
 	}
 	return b, nil
 }

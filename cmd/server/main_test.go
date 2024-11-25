@@ -7,6 +7,8 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/talx-hub/malerter/internal/constants"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/talx-hub/malerter/internal/backup"
@@ -15,7 +17,9 @@ import (
 	"github.com/talx-hub/malerter/internal/repository/memory"
 )
 
-func services(t *testing.T) (*httptest.Server, *backup.File) {
+func setupServices(t *testing.T) (*httptest.Server, *backup.File) {
+	t.Helper()
+
 	cfg, ok := serverCfg.NewDirector().Build().(serverCfg.Builder)
 	require.True(t, ok)
 
@@ -36,7 +40,7 @@ func services(t *testing.T) (*httptest.Server, *backup.File) {
 }
 
 func TestMetricRouter(t *testing.T) {
-	ts, bk := services(t)
+	ts, bk := setupServices(t)
 	defer func() {
 		err := bk.Close()
 		require.NoError(t, err)
@@ -56,7 +60,7 @@ func TestMetricRouter(t *testing.T) {
 			method: http.MethodGet, url: "/",
 			statusWant:      http.StatusOK,
 			encoding:        "gzip",
-			contentTypeWant: "text/html",
+			contentTypeWant: constants.ContentTypeHTML,
 		},
 		{
 			method: http.MethodPost, url: "/",
@@ -66,7 +70,7 @@ func TestMetricRouter(t *testing.T) {
 		},
 		{
 			method: http.MethodPost, url: "/value/",
-			contentType:     "application/json",
+			contentType:     constants.ContentTypeJSON,
 			body:            `{"id":"m1","type":"gauge","value":3.14}`,
 			statusWant:      http.StatusNotFound,
 			encoding:        "",
@@ -74,7 +78,7 @@ func TestMetricRouter(t *testing.T) {
 		},
 		{
 			method: http.MethodPost, url: "/value",
-			contentType:     "application/json",
+			contentType:     constants.ContentTypeJSON,
 			body:            `{"id":"m1","type":"gauge","value":3.14}`,
 			statusWant:      http.StatusNotFound,
 			encoding:        "",
@@ -82,7 +86,7 @@ func TestMetricRouter(t *testing.T) {
 		},
 		{
 			method: http.MethodDelete, url: "/value",
-			contentType:     "application/json",
+			contentType:     constants.ContentTypeJSON,
 			body:            `{"id":"m1","type":"gauge","value":3.14}`,
 			statusWant:      http.StatusMethodNotAllowed,
 			encoding:        "",
@@ -108,7 +112,7 @@ func TestMetricRouter(t *testing.T) {
 		},
 		{
 			method: http.MethodPost, url: "/value/m1/gauge",
-			contentType:     "application/json",
+			contentType:     constants.ContentTypeJSON,
 			body:            `{"id":"m1","type":"gauge","value":3.14}`,
 			statusWant:      http.StatusMethodNotAllowed,
 			encoding:        "",
@@ -130,10 +134,10 @@ func TestMetricRouter(t *testing.T) {
 				return
 			}
 			assert.Contains(
-				t, resp.Header.Values("Content-Type"), test.contentTypeWant)
+				t, resp.Header.Values(constants.KeyContentType), test.contentTypeWant)
 			if test.encoding != "" {
 				assert.Contains(
-					t, resp.Header.Values("Content-Encoding"), test.encoding)
+					t, resp.Header.Values(constants.KeyContentEncoding), test.encoding)
 			}
 		})
 	}
@@ -141,13 +145,15 @@ func TestMetricRouter(t *testing.T) {
 
 func testRequest(t *testing.T, ts *httptest.Server,
 	method, url, body, contentType, encoding string) *http.Response {
+	t.Helper()
+
 	req, err := http.NewRequest(method, ts.URL+url, bytes.NewBufferString(body))
 	require.NoError(t, err)
 	if contentType != "" {
-		req.Header.Set("Content-Type", contentType)
+		req.Header.Set(constants.KeyContentType, contentType)
 	}
 	if encoding != "" {
-		req.Header.Set("Accept-Encoding", encoding)
+		req.Header.Set(constants.KeyAcceptEncoding, encoding)
 	}
 
 	resp, err := ts.Client().Do(req)

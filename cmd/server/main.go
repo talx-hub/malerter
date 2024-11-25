@@ -15,6 +15,7 @@ import (
 	"github.com/talx-hub/malerter/internal/backup"
 	"github.com/talx-hub/malerter/internal/compressor/gzip"
 	serverCfg "github.com/talx-hub/malerter/internal/config/server"
+	"github.com/talx-hub/malerter/internal/constants"
 	"github.com/talx-hub/malerter/internal/logger/zerologger"
 	"github.com/talx-hub/malerter/internal/model"
 	"github.com/talx-hub/malerter/internal/repository/memory"
@@ -78,19 +79,19 @@ func main() {
 	<-idleConnectionsClosed
 }
 
-func metricRouter(repo Repository, log *zerologger.ZeroLogger, bk *backup.File) chi.Router {
+func metricRouter(repo Repository, logger *zerologger.ZeroLogger, backer *backup.File) chi.Router {
 	dumper := server.NewMetricsDumper(repo)
 	handler := api.NewHTTPHandler(dumper)
 
-	var updateHandler = bk.Middleware(handler.DumpMetric)
-	var updateJSONHandler = bk.Middleware(handler.DumpMetricJSON)
+	var updateHandler = backer.Middleware(handler.DumpMetric)
+	var updateJSONHandler = backer.Middleware(handler.DumpMetricJSON)
 	var getHandler = handler.GetMetric
 	var getAllHandler = handler.GetAll
 	var getJSONHandler = handler.GetMetricJSON
 
 	router := chi.NewRouter()
 	router.Use(
-		log.Middleware,
+		logger.Middleware,
 		gzip.Middleware,
 	)
 
@@ -98,14 +99,14 @@ func metricRouter(repo Repository, log *zerologger.ZeroLogger, bk *backup.File) 
 		r.Get("/", getAllHandler)
 		r.Route("/value", func(r chi.Router) {
 			r.Group(func(r chi.Router) {
-				r.Use(middleware.AllowContentType("application/json"))
+				r.Use(middleware.AllowContentType(constants.ContentTypeJSON))
 				r.Post("/", getJSONHandler)
 			})
 			r.Get("/{type}/{name}", getHandler)
 		})
 		r.Route("/update", func(r chi.Router) {
 			r.Group(func(r chi.Router) {
-				r.Use(middleware.AllowContentType("application/json"))
+				r.Use(middleware.AllowContentType(constants.ContentTypeJSON))
 				r.Post("/", updateJSONHandler)
 			})
 			r.Post("/", updateJSONHandler)
@@ -116,22 +117,21 @@ func metricRouter(repo Repository, log *zerologger.ZeroLogger, bk *backup.File) 
 	return router
 }
 
-func idleShutdown(server *http.Server, channel chan struct{},
-	log *zerologger.ZeroLogger, backupService *backup.File) {
-
+func idleShutdown(s *http.Server, channel chan struct{},
+	logger *zerologger.ZeroLogger, backer *backup.File) {
 	sigint := make(chan os.Signal, 1)
 	signal.Notify(sigint, os.Interrupt)
 	<-sigint
 
-	log.Info().
+	logger.Info().
 		Msg("shutdown signal received. Exiting...")
-	if err := server.Shutdown(context.Background()); err != nil {
-		log.Fatal().
+	if err := s.Shutdown(context.Background()); err != nil {
+		logger.Fatal().
 			Err(err).
 			Msg("error during HTTP server Shutdown")
 	}
 
-	backupService.Backup()
+	backer.Backup()
 
 	close(channel)
 }

@@ -7,21 +7,21 @@ import (
 	"net/http"
 
 	"github.com/talx-hub/malerter/internal/compressor/gzip"
+	"github.com/talx-hub/malerter/internal/constants"
 	"github.com/talx-hub/malerter/internal/model"
 )
 
 type Sender struct {
+	client   *http.Client
 	storage  Storage
 	host     string
-	client   *http.Client
 	compress bool
 }
 
-func (s *Sender) send() error {
+func (s *Sender) send() {
 	metrics := s.get()
 	jsons := convertToJSONs(metrics)
 	send(s.client, s.host, jsons, s.compress)
-	return nil
 }
 
 func (s *Sender) get() []model.Metric {
@@ -29,14 +29,14 @@ func (s *Sender) get() []model.Metric {
 }
 
 func convertToJSONs(metrics []model.Metric) []string {
-	var jsons []string
-	for _, m := range metrics {
+	jsons := make([]string, len(metrics))
+	for i, m := range metrics {
 		mJSON, err := json.Marshal(m)
 		if err != nil {
 			log.Printf("unable to convert metric %s to JSON: %v", m.String(), err)
 			continue
 		}
-		jsons = append(jsons, string(mJSON))
+		jsons[i] = string(mJSON)
 	}
 	return jsons
 }
@@ -51,15 +51,15 @@ func send(client *http.Client, host string, jsons []string, compress bool) {
 				log.Printf("unable to compress json %s: %v", j, err)
 			}
 		} else {
-			body = bytes.NewBuffer([]byte(j))
+			body = bytes.NewBufferString(j)
 		}
 		request, err := http.NewRequest(http.MethodPost, host+"/update/", body)
 		if err != nil {
 			log.Printf("unable to send json %s to %s: %v", j, host, err)
 			continue
 		}
-		request.Header.Set("Content-Type", "application/json")
-		request.Header.Set("Content-Encoding", "gzip")
+		request.Header.Set(constants.KeyContentType, constants.ContentTypeJSON)
+		request.Header.Set(constants.KeyContentEncoding, "gzip")
 		response, err := client.Do(request)
 		if err != nil {
 			log.Printf("unable to send json %s to %s: %v", j, host, err)

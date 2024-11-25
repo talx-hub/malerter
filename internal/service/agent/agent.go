@@ -1,9 +1,7 @@
 package agent
 
 import (
-	"log"
 	"net/http"
-	"os"
 	"time"
 
 	"github.com/talx-hub/malerter/internal/config/agent"
@@ -41,18 +39,10 @@ func (a *Agent) Run() {
 	var i = 1
 	var updateToSendRatio = int(a.config.ReportInterval / a.config.PollInterval)
 	for {
-		if err := a.poller.update(); err != nil {
-			if _, e := os.Stderr.WriteString(err.Error()); e != nil {
-				log.Fatal(e)
-			}
-		}
+		a.poller.update()
 
 		if i%updateToSendRatio == 0 {
-			if err := a.sender.send(); err != nil {
-				if _, e := os.Stderr.WriteString(err.Error()); e != nil {
-					log.Fatal(e)
-				}
-			}
+			a.sender.send()
 			i = 0
 		}
 		i++

@@ -1,19 +1,17 @@
 package customerror
 
-import "fmt"
-
-type ErrNotFound struct {
+type NotFoundError struct {
 	Message string
 }
 
-func (e *ErrNotFound) Error() string {
-	return fmt.Sprintf("not found: %s", e.Message)
+func (e *NotFoundError) Error() string {
+	return "not found: " + e.Message
 }
 
-type ErrInvalidArgument struct {
+type InvalidArgumentError struct {
 	Info string
 }
 
-func (e *ErrInvalidArgument) Error() string {
-	return fmt.Sprintf("incorrect request: %s", e.Info)
+func (e *InvalidArgumentError) Error() string {
+	return "incorrect request: " + e.Info
 }

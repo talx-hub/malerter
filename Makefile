@@ -1,11 +1,11 @@
-all: preproc build-all
 .PHONY : all
+all: preproc build-all
 
 .PHONY : preproc
-preproc: fmt lint test
+preproc: clean fmt lint test
 
 .PHONY : build-all
-build-all: clean server agent
+build-all: server agent
 
 server:
 	go build -o ./bin/server ./cmd/server/main.go
@@ -13,6 +13,7 @@ server:
 agent:
 	go build -o ./bin/agent ./cmd/agent/main.go
 
+.PHONY : test
 test:
 	go test ./... -race -coverprofile=cover.out -covermode=atomic
 
@@ -21,6 +22,7 @@ clean:
 	-rm ./bin/agent 2>/dev/null
 	-rm ./bin/server 2>/dev/null
 	-rm ./cover.out 2>/dev/null
+	-rm ./golangci-lint/report-unformatted.json 2>/dev/null
 
 .PHONY : check-coverage
 check-coverage:

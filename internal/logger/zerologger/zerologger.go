@@ -16,13 +16,12 @@ type ZeroLogger struct {
 func New(logLevel string) (*ZeroLogger, error) {
 	level, err := zerolog.ParseLevel(logLevel)
 	if err != nil {
-		return nil, fmt.Errorf("unable to init logger: %v", err)
+		return nil, fmt.Errorf("unable to init logger: %w", err)
 	}
-	zerolog.DurationFieldUnit = time.Second
 	logger := ZeroLogger{
 		Logger: zerolog.New(zerolog.ConsoleWriter{
 			Out:        os.Stdout,
-			TimeFormat: time.Stamp,
+			TimeFormat: time.RFC3339,
 		}).
 			Level(level).
 			With().
@@ -47,8 +46,12 @@ type (
 
 func (w *loggingResponseWriter) Write(b []byte) (int, error) {
 	size, err := w.w.Write(b)
+	if err != nil {
+		return size,
+			fmt.Errorf("failed to write with logging middleware %w", err)
+	}
 	w.responseData.size += size
-	return size, err
+	return size, nil
 }
 
 func (w *loggingResponseWriter) WriteHeader(statusCode int) {
@@ -60,7 +63,7 @@ func (w *loggingResponseWriter) Header() http.Header {
 	return w.w.Header()
 }
 
-func (logger ZeroLogger) Middleware(h http.Handler) http.Handler {
+func (logger *ZeroLogger) Middleware(h http.Handler) http.Handler {
 	logFn := func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
 
@@ -79,7 +82,7 @@ func (logger ZeroLogger) Middleware(h http.Handler) http.Handler {
 			Str("method", method).
 			Int("status", responseData.status).
 			Int("size", responseData.size).
-			Dur("duration", duration).
+			Str("duration", duration.String()).
 			Send()
 	}
 

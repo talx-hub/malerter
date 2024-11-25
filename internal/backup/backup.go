@@ -1,6 +1,7 @@
 package backup
 
 import (
+	"errors"
 	"io"
 	"log"
 	"net/http"
@@ -16,11 +17,11 @@ type Storage interface {
 }
 
 type File struct {
+	lastBackup     time.Time
+	storage        Storage
 	producer       Producer
 	restorer       Restorer
 	backupInterval time.Duration
-	lastBackup     time.Time
-	storage        Storage
 }
 
 func New(config server.Builder, storage Storage) (*File, error) {
@@ -46,7 +47,7 @@ func (b *File) Restore() {
 	for {
 		metric, err := b.restorer.ReadMetric()
 		if err != nil {
-			if err == io.EOF {
+			if errors.Is(err, io.EOF) {
 				break
 			}
 			log.Printf("unable to restore metric: %v", err)
