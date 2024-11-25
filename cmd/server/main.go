@@ -17,16 +17,9 @@ import (
 	serverCfg "github.com/talx-hub/malerter/internal/config/server"
 	"github.com/talx-hub/malerter/internal/constants"
 	"github.com/talx-hub/malerter/internal/logger/zerologger"
-	"github.com/talx-hub/malerter/internal/model"
 	"github.com/talx-hub/malerter/internal/repository/memory"
 	"github.com/talx-hub/malerter/internal/service/server"
 )
-
-type Repository interface {
-	Add(metric model.Metric) error
-	Find(key string) (model.Metric, error)
-	Get() []model.Metric
-}
 
 func main() {
 	// TODO: тут какие-то кошмары с указателями(см. config/server/builder/.Build())... разобраться
@@ -79,7 +72,7 @@ func main() {
 	<-idleConnectionsClosed
 }
 
-func metricRouter(repo Repository, logger *zerologger.ZeroLogger, backer *backup.File) chi.Router {
+func metricRouter(repo *memory.Metrics, logger *zerologger.ZeroLogger, backer *backup.File) chi.Router {
 	dumper := server.NewMetricsDumper(repo)
 	handler := api.NewHTTPHandler(dumper)
 
