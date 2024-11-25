@@ -33,7 +33,12 @@ fmt:
 
 .PHONY : lint
 lint:
-	golangci-lint run ./...
+	golangci-lint run -c .golangci.yml > ./golangci-lint/report-unformatted.json
+
+.PHONY : _golangci-lint-format-report
+_golangci-lint-format-report:
+	cat ./golangci-lint/report-unformatted.json | jq > ./golangci-lint/report.json
+	rm ./golangci-lint/report-unformatted.json
 
 SERVER_PORT := 37797
 ADDRESS := "localhost:37797"
