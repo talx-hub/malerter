@@ -84,3 +84,18 @@ iter8:
 .PHONY : iter9
 iter9:
 	./bin/metricstest -test.run=^TestIteration9$$ -agent-binary-path=./bin/agent -binary-path=./bin/server -server-port=$(SERVER_PORT) -source-path=. -file-storage-path=$(TEMP_FILE)
+
+.PHONY : iter10
+iter10:
+	./bin/metricstest -test.run=^TestIteration10A$$ \
+	  -agent-binary-path=./bin/agent \
+	  -binary-path=./bin/server \
+	  -server-port=$(SERVER_PORT) \
+	  -source-path=. \
+      -database-dsn='postgres://godevops:godevops@localhost:5432/godevops_alerts?sslmode=disable'
+	./bin/metricstest -test.run=^TestIteration10B$$ \
+	  -agent-binary-path=./bin/agent \
+	  -binary-path=./bin/server \
+	  -server-port=$(SERVER_PORT) \
+	  -source-path=. \
+      -database-dsn='postgres://godevops:godevops@localhost:5432/godevops_alerts?sslmode=disable'
