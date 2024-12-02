@@ -1,21 +1,17 @@
 package customerror
 
-import "fmt"
-
 type NotFoundError struct {
-	MetricURL string
-	Info      string
+	Message string
 }
 
 func (e *NotFoundError) Error() string {
-	return fmt.Sprintf("metric %v not found: %s", e.MetricURL, e.Info)
+	return "not found: " + e.Message
 }
 
 type InvalidArgumentError struct {
-	MetricURL string
-	Info      string
+	Info string
 }
 
 func (e *InvalidArgumentError) Error() string {
-	return fmt.Sprintf("metric %v is incorrect: %s", e.MetricURL, e.Info)
+	return "incorrect request: " + e.Info
 }

@@ -1,24 +1,30 @@
 package backup
 
 import (
+	"errors"
 	"io"
 	"log"
 	"net/http"
 	"time"
 
 	"github.com/talx-hub/malerter/internal/config/server"
-	"github.com/talx-hub/malerter/internal/repo"
+	"github.com/talx-hub/malerter/internal/model"
 )
 
-type Backup struct {
+type Storage interface {
+	Add(model.Metric) error
+	Get() []model.Metric
+}
+
+type File struct {
+	lastBackup     time.Time
+	storage        Storage
 	producer       Producer
 	restorer       Restorer
 	backupInterval time.Duration
-	lastBackup     time.Time
-	storage        repo.Repository
 }
 
-func New(config server.Builder, storage repo.Repository) (*Backup, error) {
+func New(config server.Builder, storage Storage) (*File, error) {
 	p, err := NewProducer(config.FileStoragePath)
 	if err != nil {
 		return nil, err
@@ -28,7 +34,7 @@ func New(config server.Builder, storage repo.Repository) (*Backup, error) {
 		return nil, err
 	}
 
-	return &Backup{
+	return &File{
 		producer:       *p,
 		restorer:       *r,
 		backupInterval: config.StoreInterval,
@@ -37,24 +43,24 @@ func New(config server.Builder, storage repo.Repository) (*Backup, error) {
 	}, nil
 }
 
-func (b *Backup) Restore() {
+func (b *File) Restore() {
 	for {
 		metric, err := b.restorer.ReadMetric()
 		if err != nil {
-			if err == io.EOF {
+			if errors.Is(err, io.EOF) {
 				break
 			}
 			log.Printf("unable to restore metric: %v", err)
 		}
-		err = b.storage.Store(*metric)
+		err = b.storage.Add(*metric)
 		if err != nil {
 			log.Printf("unable to store metric, during backup restore: %v", err)
 		}
 	}
 }
 
-func (b *Backup) Backup() {
-	metrics := b.storage.GetAll()
+func (b *File) Backup() {
+	metrics := b.storage.Get()
 	for _, m := range metrics {
 		if err := b.producer.WriteMetric(m); err != nil {
 			log.Printf("unable to backup metric: %v\n", err)
@@ -62,7 +68,7 @@ func (b *Backup) Backup() {
 	}
 }
 
-func (b *Backup) Middleware(h http.HandlerFunc) http.HandlerFunc {
+func (b *File) Middleware(h http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		now := time.Now().UTC()
 		if now.Sub(b.lastBackup) >= b.backupInterval {
@@ -72,7 +78,7 @@ func (b *Backup) Middleware(h http.HandlerFunc) http.HandlerFunc {
 	}
 }
 
-func (b *Backup) Close() error {
+func (b *File) Close() error {
 	if err := b.producer.Close(); err != nil {
 		return err
 	}

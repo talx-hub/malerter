@@ -7,17 +7,23 @@ import (
 	"log"
 	"net/http"
 
+	"github.com/talx-hub/malerter/internal/constants"
+
 	"github.com/talx-hub/malerter/internal/customerror"
 	"github.com/talx-hub/malerter/internal/model"
 	"github.com/talx-hub/malerter/internal/service"
+)
+
+const (
+	errMsgPattern = `%s fails: %s`
 )
 
 type HTTPHandler struct {
 	service service.Service
 }
 
-func NewHTTPHandler(service service.Service) *HTTPHandler {
-	return &HTTPHandler{service: service}
+func NewHTTPHandler(s service.Service) *HTTPHandler {
+	return &HTTPHandler{service: s}
 }
 
 func getStatusFromError(err error) int {
@@ -34,47 +40,39 @@ func getStatusFromError(err error) int {
 }
 
 func (h *HTTPHandler) DumpMetricJSON(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		e := "only POST requests are allowed"
-		http.Error(w, e, http.StatusBadRequest)
-		return
-	}
-	if r.Header.Get("Content-Type") != "application/json" {
-		e := "content-type must be application/json"
-		http.Error(w, e, http.StatusBadRequest)
-		return
-	}
-
 	metric, err := model.NewMetric().FromJSON(r.Body)
 	if err != nil {
 		st := getStatusFromError(err)
-		http.Error(w, err.Error(), st)
-		return
-	}
-	if metric == nil {
-		http.Error(w, "metric is nil", http.StatusInternalServerError)
-		return
-	}
-	if metric.IsEmpty() {
-		e := customerror.NotFoundError{
-			MetricURL: metric.ToURL(),
-			Info:      "metric value is empty",
-		}
-		http.Error(w, e.Error(), http.StatusNotFound)
-		return
-	}
-	if err = h.service.Store(*metric); err != nil {
-		http.Error(w, err.Error(), http.StatusNotFound)
+		http.Error(
+			w,
+			fmt.Sprintf(errMsgPattern, r.URL.Path, err.Error()),
+			st)
 		return
 	}
 
-	*metric, err = h.service.Get(*metric)
+	if metric.IsEmpty() {
+		http.Error(
+			w,
+			fmt.Sprintf(errMsgPattern, r.URL.Path, "metric value is empty"),
+			http.StatusNotFound)
+		return
+	}
+	if err = h.service.Add(metric); err != nil {
+		http.Error(
+			w,
+			fmt.Sprintf(errMsgPattern, r.URL.Path, err.Error()),
+			http.StatusNotFound)
+		return
+	}
+
+	dummyKey := metric.Type.String() + metric.Name
+	metric, err = h.service.Find(dummyKey)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set(constants.KeyContentType, constants.ContentTypeJSON)
 	w.WriteHeader(http.StatusOK)
 	if err = json.NewEncoder(w).Encode(&metric); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -83,34 +81,29 @@ func (h *HTTPHandler) DumpMetricJSON(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *HTTPHandler) DumpMetric(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		e := "only POST requests are allowed"
-		http.Error(w, e, http.StatusBadRequest)
-		return
-	}
-
 	metric, err := model.NewMetric().FromURL(r.URL.Path)
 	if err != nil {
 		st := getStatusFromError(err)
-		http.Error(w, err.Error(), st)
-		return
-	}
-	if metric == nil {
-		http.Error(w, "metric is nil", http.StatusInternalServerError)
+		http.Error(
+			w,
+			fmt.Sprintf(errMsgPattern, r.URL.Path, err.Error()),
+			st)
 		return
 	}
 	if metric.IsEmpty() {
-		e := customerror.NotFoundError{
-			MetricURL: metric.ToURL(),
-			Info:      "metric value is empty",
-		}
-		http.Error(w, e.Error(), http.StatusNotFound)
+		http.Error(
+			w,
+			fmt.Sprintf(errMsgPattern, r.URL.Path, "metric value is empty"),
+			http.StatusNotFound)
 		return
 	}
 
-	err = h.service.Store(*metric)
+	err = h.service.Add(metric)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusNotFound)
+		http.Error(
+			w,
+			fmt.Sprintf(errMsgPattern, r.URL.Path, err.Error()),
+			http.StatusNotFound)
 		return
 	}
 
@@ -118,31 +111,28 @@ func (h *HTTPHandler) DumpMetric(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *HTTPHandler) GetMetric(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
-		e := "only GET requests are allowed"
-		http.Error(w, e, http.StatusBadRequest)
-		return
-	}
-
 	metric, err := model.NewMetric().FromURL(r.URL.Path)
 	if err != nil {
 		st := getStatusFromError(err)
-		http.Error(w, err.Error(), st)
-		return
-	}
-	if metric == nil {
-		http.Error(w, "metric is nil", http.StatusInternalServerError)
+		http.Error(
+			w,
+			fmt.Sprintf(errMsgPattern, r.URL.Path, err.Error()),
+			st)
 		return
 	}
 
-	m, err := h.service.Get(*metric)
+	dummyKey := metric.Type.String() + metric.Name
+	m, err := h.service.Find(dummyKey)
 	if err != nil {
 		st := getStatusFromError(err)
-		http.Error(w, err.Error(), st)
+		http.Error(
+			w,
+			fmt.Sprintf(errMsgPattern, r.URL.Path, err.Error()),
+			st)
 		return
 	}
 
-	w.Header().Set("Content-Type", "text/plain")
+	w.Header().Set(constants.KeyContentType, constants.ContentTypeText)
 	w.WriteHeader(http.StatusOK)
 	valueStr := fmt.Sprintf("%v", m.ActualValue())
 	_, err = w.Write([]byte(valueStr))
@@ -152,35 +142,28 @@ func (h *HTTPHandler) GetMetric(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *HTTPHandler) GetMetricJSON(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		http.Error(w, "only POST requests are allowed", http.StatusBadRequest)
-		return
-	}
-	if r.Header.Get("Content-Type") != "application/json" {
-		e := "content-type must be application/json"
-		http.Error(w, e, http.StatusBadRequest)
-		return
-	}
-
 	metric, err := model.NewMetric().FromJSON(r.Body)
 	if err != nil {
 		st := getStatusFromError(err)
-		http.Error(w, err.Error(), st)
-		return
-	}
-	if metric == nil {
-		http.Error(w, "metric is nil", http.StatusInternalServerError)
+		http.Error(
+			w,
+			fmt.Sprintf(errMsgPattern, r.URL.Path, err.Error()),
+			st)
 		return
 	}
 
-	*metric, err = h.service.Get(*metric)
+	dummyKey := metric.Type.String() + metric.Name
+	metric, err = h.service.Find(dummyKey)
 	if err != nil {
 		st := getStatusFromError(err)
-		http.Error(w, err.Error(), st)
+		http.Error(
+			w,
+			fmt.Sprintf(errMsgPattern, r.URL.Path, err.Error()),
+			st)
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set(constants.KeyContentType, constants.ContentTypeJSON)
 	w.WriteHeader(http.StatusOK)
 	if err = json.NewEncoder(w).Encode(&metric); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -188,17 +171,11 @@ func (h *HTTPHandler) GetMetricJSON(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (h *HTTPHandler) GetAll(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
-		e := "only GET requests are allowed"
-		http.Error(w, e, http.StatusBadRequest)
-		return
-	}
-
-	w.Header().Set("Content-Type", "text/html")
-	w.WriteHeader(http.StatusOK)
-	metrics := h.service.GetAll()
+func (h *HTTPHandler) GetAll(w http.ResponseWriter, _ *http.Request) {
+	w.Header().Set(constants.KeyContentType, constants.ContentTypeHTML)
+	metrics := h.service.Get()
 	page := createMetricsPage(metrics)
+	w.WriteHeader(http.StatusOK)
 	_, err := w.Write([]byte(page))
 	if err != nil {
 		log.Fatal(err)

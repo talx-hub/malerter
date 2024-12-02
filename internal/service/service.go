@@ -5,7 +5,7 @@ import (
 )
 
 type Service interface {
-	Store(metric model.Metric) error
-	Get(metric model.Metric) (model.Metric, error)
-	GetAll() []model.Metric
+	Add(metric model.Metric) error
+	Find(key string) (model.Metric, error)
+	Get() []model.Metric
 }

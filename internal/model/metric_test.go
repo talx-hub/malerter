@@ -52,27 +52,39 @@ func TestMetricSetValue(t *testing.T) {
 		wantErr bool
 	}{
 		{
-			name:    "int64 value type",
-			value:   int64(10),
-			want:    Metric{Delta: func(i int64) *int64 { return &i }(10), Value: nil},
+			name:  "int64 value type",
+			value: int64(10),
+			want: Metric{
+				Delta: func(i int64) *int64 { return &i }(10),
+				Value: nil,
+			},
 			wantErr: false,
 		},
 		{
-			name:    "float64 value type",
-			value:   float64(10),
-			want:    Metric{Delta: nil, Value: func(f float64) *float64 { return &f }(10)},
+			name:  "float64 value type",
+			value: float64(10),
+			want: Metric{
+				Delta: nil,
+				Value: func(f float64) *float64 { return &f }(10),
+			},
 			wantErr: false,
 		},
 		{
-			name:    "string to int64 value type",
-			value:   "10",
-			want:    Metric{Delta: func(i int64) *int64 { return &i }(10), Value: func(f float64) *float64 { return &f }(10)},
+			name:  "string to int64 value type",
+			value: "10",
+			want: Metric{
+				Delta: func(i int64) *int64 { return &i }(10),
+				Value: func(f float64) *float64 { return &f }(10),
+			},
 			wantErr: false,
 		},
 		{
-			name:    "string to float64 value type",
-			value:   "10.0",
-			want:    Metric{Delta: nil, Value: func(f float64) *float64 { return &f }(10)},
+			name:  "string to float64 value type",
+			value: "10.0",
+			want: Metric{
+				Delta: nil,
+				Value: func(f float64) *float64 { return &f }(10),
+			},
 			wantErr: false,
 		},
 		{
@@ -124,24 +136,54 @@ func TestMetricClean(t *testing.T) {
 		want  Metric
 	}{
 		{
-			name:  "gauge clean",
-			dirty: Metric{Type: MetricTypeGauge, Delta: nil, Value: func(f float64) *float64 { return &f }(10)},
-			want:  Metric{Type: MetricTypeGauge, Delta: nil, Value: func(f float64) *float64 { return &f }(10)},
+			name: "gauge clean",
+			dirty: Metric{
+				Type:  MetricTypeGauge,
+				Delta: nil,
+				Value: func(f float64) *float64 { return &f }(10),
+			},
+			want: Metric{
+				Type:  MetricTypeGauge,
+				Delta: nil,
+				Value: func(f float64) *float64 { return &f }(10),
+			},
 		},
 		{
-			name:  "counter clean",
-			dirty: Metric{Type: MetricTypeCounter, Delta: func(i int64) *int64 { return &i }(10)},
-			want:  Metric{Type: MetricTypeCounter, Delta: func(i int64) *int64 { return &i }(10)},
+			name: "counter clean",
+			dirty: Metric{
+				Type:  MetricTypeCounter,
+				Delta: func(i int64) *int64 { return &i }(10),
+			},
+			want: Metric{
+				Type:  MetricTypeCounter,
+				Delta: func(i int64) *int64 { return &i }(10),
+			},
 		},
 		{
-			name:  "gauge with extra field",
-			dirty: Metric{Type: MetricTypeGauge, Delta: func(i int64) *int64 { return &i }(10), Value: func(f float64) *float64 { return &f }(10)},
-			want:  Metric{Type: MetricTypeGauge, Delta: nil, Value: func(f float64) *float64 { return &f }(10)},
+			name: "gauge with extra field",
+			dirty: Metric{
+				Type:  MetricTypeGauge,
+				Delta: func(i int64) *int64 { return &i }(10),
+				Value: func(f float64) *float64 { return &f }(10),
+			},
+			want: Metric{
+				Type:  MetricTypeGauge,
+				Delta: nil,
+				Value: func(f float64) *float64 { return &f }(10),
+			},
 		},
 		{
-			name:  "counter with extra field",
-			dirty: Metric{Type: MetricTypeCounter, Delta: func(i int64) *int64 { return &i }(10), Value: func(f float64) *float64 { return &f }(10)},
-			want:  Metric{Type: MetricTypeCounter, Delta: func(i int64) *int64 { return &i }(10), Value: nil},
+			name: "counter with extra field",
+			dirty: Metric{
+				Type:  MetricTypeCounter,
+				Delta: func(i int64) *int64 { return &i }(10),
+				Value: func(f float64) *float64 { return &f }(10),
+			},
+			want: Metric{
+				Type:  MetricTypeCounter,
+				Delta: func(i int64) *int64 { return &i }(10),
+				Value: nil,
+			},
 		},
 	}
 
@@ -165,19 +207,26 @@ func TestMetricIsEmpty(t *testing.T) {
 			want:   true,
 		},
 		{
-			name:   "has delta",
-			metric: Metric{Delta: func(i int64) *int64 { return &i }(10)},
-			want:   false,
+			name: "has delta",
+			metric: Metric{
+				Delta: func(i int64) *int64 { return &i }(10),
+			},
+			want: false,
 		},
 		{
-			name:   "has value",
-			metric: Metric{Value: func(f float64) *float64 { return &f }(10)},
-			want:   false,
+			name: "has value",
+			metric: Metric{
+				Value: func(f float64) *float64 { return &f }(10),
+			},
+			want: false,
 		},
 		{
-			name:   "has both",
-			metric: Metric{Delta: func(i int64) *int64 { return &i }(10), Value: func(f float64) *float64 { return &f }(10)},
-			want:   false,
+			name: "has both",
+			metric: Metric{
+				Delta: func(i int64) *int64 { return &i }(10),
+				Value: func(f float64) *float64 { return &f }(10),
+			},
+			want: false,
 		},
 	}
 
@@ -195,58 +244,111 @@ func TestMetricIsValid(t *testing.T) {
 		wantErr bool
 	}{
 		{
-			name:    "valid gauge",
-			metric:  Metric{Type: MetricTypeGauge, Name: "name", Delta: nil, Value: func(f float64) *float64 { return &f }(10)},
+			name: "valid gauge",
+			metric: Metric{
+				Type:  MetricTypeGauge,
+				Name:  "name",
+				Delta: nil,
+				Value: func(f float64) *float64 { return &f }(10),
+			},
 			wantErr: false,
 		},
 		{
-			name:    "valid counter",
-			metric:  Metric{Type: MetricTypeCounter, Name: "name", Delta: func(i int64) *int64 { return &i }(10), Value: nil},
+			name: "valid counter",
+			metric: Metric{
+				Type:  MetricTypeCounter,
+				Name:  "name",
+				Delta: func(i int64) *int64 { return &i }(10),
+				Value: nil,
+			},
 			wantErr: false,
 		},
 		{
-			name:    "empty name",
-			metric:  Metric{Type: MetricTypeGauge, Name: "", Delta: nil, Value: func(f float64) *float64 { return &f }(10)},
+			name: "empty name",
+			metric: Metric{
+				Type:  MetricTypeGauge,
+				Name:  "",
+				Delta: nil,
+				Value: func(f float64) *float64 { return &f }(10),
+			},
 			wantErr: true,
 		},
 		{
-			name:    "invalid name",
-			metric:  Metric{Type: MetricTypeGauge, Name: "42", Delta: nil, Value: func(f float64) *float64 { return &f }(10)},
+			name: "invalid name",
+			metric: Metric{
+				Type:  MetricTypeGauge,
+				Name:  "42",
+				Delta: nil,
+				Value: func(f float64) *float64 { return &f }(10),
+			},
 			wantErr: true,
 		},
 		{
-			name:    "invalid type",
-			metric:  Metric{Type: MetricType("invalid"), Name: "name", Delta: nil, Value: func(f float64) *float64 { return &f }(10)},
+			name: "invalid type",
+			metric: Metric{
+				Type:  MetricType("invalid"),
+				Name:  "name",
+				Delta: nil,
+				Value: func(f float64) *float64 { return &f }(10),
+			},
 			wantErr: true,
 		},
 		{
-			name:    "empty gauge",
-			metric:  Metric{Type: MetricTypeGauge, Name: "name", Delta: nil, Value: nil},
+			name: "empty gauge",
+			metric: Metric{
+				Type:  MetricTypeGauge,
+				Name:  "name",
+				Delta: nil,
+				Value: nil,
+			},
 			wantErr: false,
 		},
 		{
-			name:    "empty counter",
-			metric:  Metric{Type: MetricTypeCounter, Name: "name", Delta: nil, Value: nil},
+			name: "empty counter",
+			metric: Metric{
+				Type:  MetricTypeCounter,
+				Name:  "name",
+				Delta: nil,
+				Value: nil,
+			},
 			wantErr: false,
 		},
 		{
-			name:    "invalid value for gauge #1",
-			metric:  Metric{Type: MetricTypeGauge, Name: "name", Delta: func(i int64) *int64 { return &i }(10), Value: func(f float64) *float64 { return &f }(10)},
+			name: "invalid value for gauge #1",
+			metric: Metric{
+				Type: MetricTypeGauge,
+				Name: "name", Delta: func(i int64) *int64 { return &i }(10),
+				Value: func(f float64) *float64 { return &f }(10),
+			},
 			wantErr: true,
 		},
 		{
-			name:    "invalid value for gauge #2",
-			metric:  Metric{Type: MetricTypeGauge, Name: "name", Delta: func(i int64) *int64 { return &i }(10), Value: nil},
+			name: "invalid value for gauge #2",
+			metric: Metric{
+				Type:  MetricTypeGauge,
+				Name:  "name",
+				Delta: func(i int64) *int64 { return &i }(10), Value: nil,
+			},
 			wantErr: true,
 		},
 		{
-			name:    "invalid value for counter #1",
-			metric:  Metric{Type: MetricTypeCounter, Name: "name", Delta: func(i int64) *int64 { return &i }(10), Value: func(f float64) *float64 { return &f }(10)},
+			name: "invalid value for counter #1",
+			metric: Metric{
+				Type:  MetricTypeCounter,
+				Name:  "name",
+				Delta: func(i int64) *int64 { return &i }(10),
+				Value: func(f float64) *float64 { return &f }(10),
+			},
 			wantErr: true,
 		},
 		{
-			name:    "invalid value for counter #2",
-			metric:  Metric{Type: MetricTypeCounter, Name: "name", Delta: nil, Value: func(f float64) *float64 { return &f }(10)},
+			name: "invalid value for counter #2",
+			metric: Metric{
+				Type:  MetricTypeCounter,
+				Name:  "name",
+				Delta: nil,
+				Value: func(f float64) *float64 { return &f }(10),
+			},
 			wantErr: true,
 		},
 	}
@@ -710,7 +812,7 @@ func TestFromJSON(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			buf := bytes.NewBuffer([]byte(test.json))
+			buf := bytes.NewBufferString(test.json)
 			m, err := NewMetric().FromJSON(buf)
 			if !test.wantErr {
 				require.NoError(t, err)

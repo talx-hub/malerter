@@ -1,4 +1,4 @@
-package logger
+package zerologger
 
 import (
 	"fmt"
@@ -9,20 +9,19 @@ import (
 	"github.com/rs/zerolog"
 )
 
-type Logger struct {
-	Logger zerolog.Logger
+type ZeroLogger struct {
+	zerolog.Logger
 }
 
-func New(logLevel string) (*Logger, error) {
+func New(logLevel string) (*ZeroLogger, error) {
 	level, err := zerolog.ParseLevel(logLevel)
 	if err != nil {
-		return nil, fmt.Errorf("unable to init logger: %v", err)
+		return nil, fmt.Errorf("unable to init logger: %w", err)
 	}
-	zerolog.DurationFieldUnit = time.Second
-	logger := Logger{
-		zerolog.New(zerolog.ConsoleWriter{
+	logger := ZeroLogger{
+		Logger: zerolog.New(zerolog.ConsoleWriter{
 			Out:        os.Stdout,
-			TimeFormat: time.Stamp,
+			TimeFormat: time.RFC3339,
 		}).
 			Level(level).
 			With().
@@ -40,47 +39,52 @@ type (
 	}
 
 	loggingResponseWriter struct {
-		http.ResponseWriter
+		w            http.ResponseWriter
 		responseData *responseData
 	}
 )
 
 func (w *loggingResponseWriter) Write(b []byte) (int, error) {
-	size, err := w.ResponseWriter.Write(b)
+	size, err := w.w.Write(b)
+	if err != nil {
+		return size,
+			fmt.Errorf("failed to write with logging middleware %w", err)
+	}
 	w.responseData.size += size
-	return size, err
+	return size, nil
 }
 
 func (w *loggingResponseWriter) WriteHeader(statusCode int) {
-	w.ResponseWriter.WriteHeader(statusCode)
+	w.w.WriteHeader(statusCode)
 	w.responseData.status = statusCode
 }
 
-func (logger Logger) WrapHandler(h http.HandlerFunc) http.HandlerFunc {
+func (w *loggingResponseWriter) Header() http.Header {
+	return w.w.Header()
+}
+
+func (logger *ZeroLogger) Middleware(h http.Handler) http.Handler {
 	logFn := func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
 
 		uri := r.RequestURI
 		method := r.Method
-		responseData := &responseData{
-			status: 0,
-			size:   0,
-		}
+		responseData := &responseData{}
 		lw := loggingResponseWriter{
-			ResponseWriter: w,
-			responseData:   responseData,
+			w:            w,
+			responseData: responseData,
 		}
 
 		h.ServeHTTP(&lw, r)
 		duration := time.Since(start)
-		logger.Logger.Info().
+		logger.Info().
 			Str("URI", uri).
 			Str("method", method).
 			Int("status", responseData.status).
 			Int("size", responseData.size).
-			Dur("duration", duration).
+			Str("duration", duration.String()).
 			Send()
 	}
 
-	return logFn
+	return http.HandlerFunc(logFn)
 }

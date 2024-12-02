@@ -11,8 +11,10 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/talx-hub/malerter/internal/constants"
 	"github.com/talx-hub/malerter/internal/model"
-	"github.com/talx-hub/malerter/internal/repo"
+	"github.com/talx-hub/malerter/internal/repository/memory"
 	"github.com/talx-hub/malerter/internal/service"
 	"github.com/talx-hub/malerter/internal/service/server"
 )
@@ -38,8 +40,8 @@ func TestNewHTTPHandler(t *testing.T) {
 		},
 		{
 			name: "simple constructor test #2",
-			args: args{service: server.NewMetricsDumper(repo.NewMemRepository())},
-			want: &HTTPHandler{server.NewMetricsDumper(repo.NewMemRepository())},
+			args: args{service: server.NewMetricsDumper(memory.New())},
+			want: &HTTPHandler{server.NewMetricsDumper(memory.New())},
 		},
 	}
 	for _, tt := range tests {
@@ -62,32 +64,47 @@ func TestHTTPHandler_DumpMetric(t *testing.T) {
 		{"/update/counter/someMetric/123", "", 200},
 		{"/update/gauge/someMetric/123.1", "", 200},
 		{"/update/gauge/someMetric/1", "", 200},
-		{"/update/gauge/1", "metric gauge/1/<nil> not found: metric name must be a string\n", 404},
-		{"/update/WRONG/someMetric/1", "metric WRONG/someMetric/<nil> is incorrect: only counter and gauge types are allowed\n", 400},
-		{"/update/counter/someMetric/1.0", "metric counter/someMetric/<nil> is incorrect: metric has invalid value\n", 400},
-		{"/update/counter/someMetric", "metric counter/someMetric/<nil> not found: metric value is empty\n", 404},
-		{"/update/counter/someMetric/9223372036854775808", "metric counter/someMetric/<nil> is incorrect: metric has invalid value\n", 400},
-		{"/update/counter/someMetric/string", "metric counter/someMetric/<nil> is incorrect: invalid value <string>\n", 400},
+		{
+			"/update/gauge/1",
+			"/update/gauge/1 fails: metric, parsed from URL is invalid: " +
+				"not found: metric name must be a string\n",
+			404,
+		},
+		{
+			"/update/WRONG/someMetric/1",
+			"/update/WRONG/someMetric/1 fails: parsed metric from URL is invalid: " +
+				"incorrect request: only counter and gauge types are allowed\n",
+			400,
+		},
+		{
+			"/update/counter/someMetric/1.0",
+			"/update/counter/someMetric/1.0 fails: parsed metric from URL is invalid: " +
+				"incorrect request: metric has invalid value\n",
+			400,
+		},
+		{
+			"/update/counter/someMetric",
+			"/update/counter/someMetric fails: metric value is empty\n",
+			404,
+		},
+		{
+			"/update/counter/someMetric/9223372036854775808",
+			"/update/counter/someMetric/9223372036854775808 fails: " +
+				"parsed metric from URL is invalid: incorrect request: metric has invalid value\n",
+			400,
+		},
+		{
+			"/update/counter/someMetric/string",
+			"/update/counter/someMetric/string fails: unable to set value for metric: " +
+				"incorrect request: invalid value <string>\n",
+			400,
+		},
 	}
-	rep := repo.NewMemRepository()
+	rep := memory.New()
 	serv := server.NewMetricsDumper(rep)
 	handler := NewHTTPHandler(serv)
 	ts := httptest.NewServer(http.HandlerFunc(handler.DumpMetric))
 	defer ts.Close()
-
-	wrongMethodTest := test{
-		url:    "/update/gauge/someMetric/1",
-		want:   "only POST requests are allowed\n",
-		status: 400,
-	}
-	t.Run("wrong method test", func(t *testing.T) {
-		resp, got := testRequest(t, ts, http.MethodGet, wrongMethodTest.url, "", nil)
-		assert.Equal(t, wrongMethodTest.status, resp.StatusCode)
-		assert.Equal(t, wrongMethodTest.want, got)
-		if err := resp.Body.Close(); err != nil {
-			log.Fatal(err)
-		}
-	})
 
 	for _, tt := range tests {
 		t.Run(tt.url, func(t *testing.T) {
@@ -111,17 +128,22 @@ func TestHTTPHandler_GetMetric(t *testing.T) {
 	tests := []test{
 		{"/value/counter/mainQuestion", "42", 200},
 		{"/value/gauge/pi", "3.14", 200},
-		{"/value/wrong/pi", "metric wrong/pi/<nil> is incorrect: only counter and gauge types are allowed\n", 400},
-		{"/value/gauge/wrong", "metric wrong(gauge): <nil> not found: \n", 404},
-		{"/value/counter/wrong", "metric wrong(counter): <nil> not found: \n", 404},
-		{"/value/counter", "metric /value/counter not found: incorrect URL\n", 404},
-		{"/value/gauge", "metric /value/gauge not found: incorrect URL\n", 404},
+		{
+			"/value/wrong/pi",
+			"/value/wrong/pi fails: metric, parsed from URL is invalid: " +
+				"incorrect request: only counter and gauge types are allowed\n",
+			400,
+		},
+		{"/value/gauge/wrong", "/value/gauge/wrong fails: not found: \n", 404},
+		{"/value/counter/wrong", "/value/counter/wrong fails: not found: \n", 404},
+		{"/value/counter", "/value/counter fails: not found: incorrect URL\n", 404},
+		{"/value/gauge", "/value/gauge fails: not found: incorrect URL\n", 404},
 	}
 	m1, _ := model.NewMetric().FromValues("mainQuestion", model.MetricTypeCounter, int64(42))
 	m2, _ := model.NewMetric().FromValues("pi", model.MetricTypeGauge, 3.14)
-	repository := repo.NewMemRepository()
-	_ = repository.Store(*m1)
-	_ = repository.Store(*m2)
+	repository := memory.New()
+	_ = repository.Add(m1)
+	_ = repository.Add(m2)
 
 	dumper := server.NewMetricsDumper(repository)
 	handler := NewHTTPHandler(dumper)
@@ -150,100 +172,92 @@ func TestHTTPHandler_DumpMetricJSON(t *testing.T) {
 		expectedBody string
 	}{
 		{
-			method: http.MethodGet, url: "/update/",
-			expectedCode: http.StatusBadRequest,
-		},
-		{
-			method: http.MethodPost, url: "/update", contentType: "text/plain",
-			expectedCode: http.StatusBadRequest,
-		},
-		{
-			method: http.MethodPost, url: "/update", contentType: "application/json",
+			method: http.MethodPost, url: "/update", contentType: constants.ContentTypeJSON,
 			body:         `{"id":"mainQuestion", "type":"counter", "delta":42}`,
 			expectedCode: http.StatusOK,
 			expectedBody: `{"id":"mainQuestion", "type":"counter", "delta":42}`,
 		},
 		{
-			method: http.MethodPost, url: "/update", contentType: "application/json",
+			method: http.MethodPost, url: "/update", contentType: constants.ContentTypeJSON,
 			body:         `{"id":"mainQuestion", "type":"counter", "delta":42}`,
 			expectedCode: http.StatusOK,
 			expectedBody: `{"id":"mainQuestion", "type":"counter", "delta":84}`,
 		},
 		{
-			method: http.MethodPost, url: "/update", contentType: "application/json",
+			method: http.MethodPost, url: "/update", contentType: constants.ContentTypeJSON,
 			body:         `{"type":"counter", "delta":42}`,
 			expectedCode: http.StatusNotFound,
 		},
 		{
-			method: http.MethodPost, url: "/update", contentType: "application/json",
+			method: http.MethodPost, url: "/update", contentType: constants.ContentTypeJSON,
 			body:         `{"id":"42","type":"counter", "delta":42}`,
 			expectedCode: http.StatusNotFound,
 		},
 		{
-			method: http.MethodPost, url: "/update", contentType: "application/json",
+			method: http.MethodPost, url: "/update", contentType: constants.ContentTypeJSON,
 			body:         `{"id":"m42","type":"wrong", "delta":42}`,
 			expectedCode: http.StatusBadRequest,
 		},
 		{
-			method: http.MethodPost, url: "/update", contentType: "application/json",
+			method: http.MethodPost, url: "/update", contentType: constants.ContentTypeJSON,
 			body:         `{"id":"m42","type":"counter", "delta":42.5}`,
 			expectedCode: http.StatusInternalServerError,
 		},
 		{
-			method: http.MethodPost, url: "/update", contentType: "application/json",
+			method: http.MethodPost, url: "/update", contentType: constants.ContentTypeJSON,
 			body:         `{"id":"m42","type":"counter"}`,
 			expectedCode: http.StatusNotFound,
 		},
 		{
-			method: http.MethodPost, url: "/update", contentType: "application/json",
+			method: http.MethodPost, url: "/update", contentType: constants.ContentTypeJSON,
 			body:         `{"id":"m42"}`,
 			expectedCode: http.StatusBadRequest,
 		},
 		{
-			method: http.MethodPost, url: "/update", contentType: "application/json",
+			method: http.MethodPost, url: "/update", contentType: constants.ContentTypeJSON,
 			body:         `{"type":"counter"}`,
 			expectedCode: http.StatusNotFound,
 		},
 		{
-			method: http.MethodPost, url: "/update", contentType: "application/json",
+			method: http.MethodPost, url: "/update", contentType: constants.ContentTypeJSON,
 			body:         `{"delta":42.5}`,
 			expectedCode: http.StatusInternalServerError,
 		},
 		{
-			method: http.MethodPost, url: "/update", contentType: "application/json",
+			method: http.MethodPost, url: "/update", contentType: constants.ContentTypeJSON,
 			body:         ``,
 			expectedCode: http.StatusInternalServerError,
 		},
 		{
-			method: http.MethodPost, url: "/update", contentType: "application/json",
+			method: http.MethodPost, url: "/update", contentType: constants.ContentTypeJSON,
 			body:         `{"id":"m42","type":"counter", "delta":42, "value":3.14}`,
 			expectedCode: http.StatusBadRequest,
 		},
 		{
-			method: http.MethodPost, url: "/update", contentType: "application/json",
+			method: http.MethodPost, url: "/update", contentType: constants.ContentTypeJSON,
 			body:         `{"id":"m42","type":"wrong", "delta":"42"}`,
 			expectedCode: http.StatusInternalServerError,
 		},
 		{
-			method: http.MethodPost, url: "/update", contentType: "application/json",
+			method: http.MethodPost, url: "/update", contentType: constants.ContentTypeJSON,
 			body:         `{"id":"pi", "type":"gauge", "value":3.14}`,
 			expectedCode: http.StatusOK,
 			expectedBody: `{"id":"pi", "type":"gauge", "value":3.14}`,
 		},
 		{
-			method: http.MethodPost, url: "/update", contentType: "application/json",
+			method: http.MethodPost, url: "/update", contentType: constants.ContentTypeJSON,
 			body:         `{"id":"pi", "type":"gauge", "value":3.1415926}`,
 			expectedCode: http.StatusOK,
 			expectedBody: `{"id":"pi", "type":"gauge", "value":3.1415926}`,
 		},
 		{
-			method: http.MethodPost, url: "/update", contentType: "application/json",
+			method: http.MethodPost, url: "/update", contentType: constants.ContentTypeJSON,
 			body:         `{"id":"pi", "type":"gauge", "delta":3}`,
 			expectedCode: http.StatusBadRequest,
 		},
 	}
 
-	repository := repo.NewMemRepository()
+	repository := memory.New()
 	dumper := server.NewMetricsDumper(repository)
 	handler := NewHTTPHandler(dumper)
 	testServer := httptest.NewServer(http.HandlerFunc(handler.DumpMetricJSON))
@@ -273,57 +287,49 @@ func TestHTTPHandler_GetMetricJSON(t *testing.T) {
 		expectedBody string
 	}{
 		{
-			method: http.MethodGet, url: "/value",
-			expectedCode: http.StatusBadRequest,
-		},
-		{
-			method: http.MethodPost, url: "/value", contentType: "text/plain",
-			expectedCode: http.StatusBadRequest,
-		},
-		{
-			method: http.MethodPost, url: "/value", contentType: "application/json",
+			method: http.MethodPost, url: "/value", contentType: constants.ContentTypeJSON,
 			body:         `{"id":"m42", "type":"counter"}`,
 			expectedCode: http.StatusOK,
 			expectedBody: `{"id":"m42", "type":"counter", "delta":42}`,
 		},
 		{
-			method: http.MethodPost, url: "/value", contentType: "application/json",
+			method: http.MethodPost, url: "/value", contentType: constants.ContentTypeJSON,
 			body:         `{"type":"counter"}`,
 			expectedCode: http.StatusNotFound,
 		},
 		{
-			method: http.MethodPost, url: "/value", contentType: "application/json",
+			method: http.MethodPost, url: "/value", contentType: constants.ContentTypeJSON,
 			body:         `{"id":"42","type":"counter"}`,
 			expectedCode: http.StatusNotFound,
 		},
 		{
-			method: http.MethodPost, url: "/value", contentType: "application/json",
+			method: http.MethodPost, url: "/value", contentType: constants.ContentTypeJSON,
 			body:         `{"id":"m42","type":"wrong"}`,
 			expectedCode: http.StatusBadRequest,
 		},
 		{
-			method: http.MethodPost, url: "/value", contentType: "application/json",
+			method: http.MethodPost, url: "/value", contentType: constants.ContentTypeJSON,
 			body:         `{"id":"m42"}`,
 			expectedCode: http.StatusBadRequest,
 		},
 		{
-			method: http.MethodPost, url: "/value", contentType: "application/json",
+			method: http.MethodPost, url: "/value", contentType: constants.ContentTypeJSON,
 			body:         `{"id":"wrong","type":"counter"}`,
 			expectedCode: http.StatusNotFound,
 		},
 		{
-			method: http.MethodPost, url: "/value", contentType: "application/json",
+			method: http.MethodPost, url: "/value", contentType: constants.ContentTypeJSON,
 			body:         `{"id":"pi", "type":"gauge"}`,
 			expectedCode: http.StatusOK,
 			expectedBody: `{"id":"pi", "type":"gauge", "value":3.14}`,
 		},
 	}
 
-	repository := repo.NewMemRepository()
+	repository := memory.New()
 	m1, _ := model.NewMetric().FromValues("m42", model.MetricTypeCounter, int64(42))
 	m2, _ := model.NewMetric().FromValues("pi", model.MetricTypeGauge, 3.14)
-	_ = repository.Store(*m1)
-	_ = repository.Store(*m2)
+	_ = repository.Add(m1)
+	_ = repository.Add(m2)
 
 	dumper := server.NewMetricsDumper(repository)
 	handler := NewHTTPHandler(dumper)
@@ -346,15 +352,17 @@ func TestHTTPHandler_GetMetricJSON(t *testing.T) {
 
 func testRequest(t *testing.T, ts *httptest.Server,
 	method, path, contentType string, body *string) (*http.Response, string) {
+	t.Helper()
+
 	var request *http.Request
 	var err error
 	if body != nil {
-		request, err = http.NewRequest(method, ts.URL+path, bytes.NewBuffer([]byte(*body)))
+		request, err = http.NewRequest(method, ts.URL+path, bytes.NewBufferString(*body))
 	} else {
-		request, err = http.NewRequest(method, ts.URL+path, nil)
+		request, err = http.NewRequest(method, ts.URL+path, http.NoBody)
 	}
 	require.NoError(t, err)
-	request.Header.Set("Content-Type", contentType)
+	request.Header.Set(constants.KeyContentType, contentType)
 
 	resp, err := ts.Client().Do(request)
 	require.NoError(t, err)
@@ -374,10 +382,6 @@ func TestHTTPHandler_GetAll(t *testing.T) {
 		expectedBody   string
 	}{
 		{
-			method: http.MethodPost, url: "/",
-			expectedStatus: http.StatusBadRequest,
-		},
-		{
 			method: http.MethodGet, url: "/",
 			expectedStatus: http.StatusOK,
 			body:           "<html>\n\t<body>\n\t\t<p>m42(counter): 42</p>\n\t</body>\n</html>",
@@ -385,9 +389,9 @@ func TestHTTPHandler_GetAll(t *testing.T) {
 		},
 	}
 
-	repository := repo.NewMemRepository()
+	repository := memory.New()
 	m1, _ := model.NewMetric().FromValues("m42", model.MetricTypeCounter, int64(42))
-	_ = repository.Store(*m1)
+	_ = repository.Add(m1)
 
 	dumper := server.NewMetricsDumper(repository)
 	handler := NewHTTPHandler(dumper)

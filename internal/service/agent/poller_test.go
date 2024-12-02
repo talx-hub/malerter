@@ -5,7 +5,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/talx-hub/malerter/internal/repo"
+	"github.com/talx-hub/malerter/internal/repository/memory"
 )
 
 func TestCollect(t *testing.T) {
@@ -19,12 +19,12 @@ func TestCollect(t *testing.T) {
 }
 
 func TestStore(t *testing.T) {
-	storage := repo.NewMemRepository()
-	poller := Poller{repo: storage}
+	storage := memory.New()
+	poller := Poller{storage: storage}
 	metrics := collect()
 	poller.store(metrics)
 	t.Run("store runtime metrics", func(t *testing.T) {
-		stored := storage.GetAll()
+		stored := storage.Get()
 		assert.Len(t, stored, MetricCount)
 	})
 }
