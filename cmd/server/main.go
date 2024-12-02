@@ -17,6 +17,7 @@ import (
 	serverCfg "github.com/talx-hub/malerter/internal/config/server"
 	"github.com/talx-hub/malerter/internal/constants"
 	"github.com/talx-hub/malerter/internal/logger/zerologger"
+	"github.com/talx-hub/malerter/internal/repository/db"
 	"github.com/talx-hub/malerter/internal/repository/memory"
 	"github.com/talx-hub/malerter/internal/service/server"
 )
@@ -34,6 +35,24 @@ func main() {
 		log.Fatalf("unable to configure custom logger: %s", err.Error())
 	}
 
+	// var storage server.Storage
+	database, err := metricDB(context.Background(), cfg.DatabaseDSN, zeroLogger)
+	if err != nil {
+		zeroLogger.Warn().
+			Err(err).
+			Msg("store metrics in memory")
+		// storage = database
+	} else {
+		defer func() {
+			if err = database.Close(); err != nil {
+				zeroLogger.Error().
+					Err(err).
+					Msg("unable to close DB")
+			}
+		}()
+		// storage = memory.New()
+	}
+
 	storage := memory.New()
 	bk, err := backup.New(&cfg, storage)
 	if err != nil {
@@ -43,7 +62,7 @@ func main() {
 	}
 	defer func() {
 		if err = bk.Close(); err != nil {
-			zeroLogger.Fatal().
+			zeroLogger.Error().
 				Err(err).
 				Msg("unable to close Backup service")
 		}
@@ -60,7 +79,7 @@ func main() {
 		Msg("Starting server")
 	srv := http.Server{
 		Addr:    cfg.RootAddress,
-		Handler: metricRouter(storage, zeroLogger, bk),
+		Handler: metricRouter(storage, zeroLogger, bk, database),
 	}
 	idleConnectionsClosed := make(chan struct{})
 	go idleShutdown(&srv, idleConnectionsClosed, zeroLogger, bk)
@@ -74,16 +93,19 @@ func main() {
 }
 
 func metricRouter(
-	repo *memory.Metrics, logger *zerologger.ZeroLogger, backer *backup.File,
+	repo *memory.Metrics, logger *zerologger.ZeroLogger,
+	backer *backup.File, database *db.DB,
 ) chi.Router {
 	dumper := server.NewMetricsDumper(repo)
 	handler := api.NewHTTPHandler(dumper)
+	pingHandler := api.NewHTTPHandler(database)
 
 	var updateHandler = backer.Middleware(handler.DumpMetric)
 	var updateJSONHandler = backer.Middleware(handler.DumpMetricJSON)
 	var getHandler = handler.GetMetric
 	var getAllHandler = handler.GetAll
 	var getJSONHandler = handler.GetMetricJSON
+	var pingDBHandler = pingHandler.Ping
 
 	router := chi.NewRouter()
 	router.Use(
@@ -108,13 +130,30 @@ func metricRouter(
 			r.Post("/", updateJSONHandler)
 			r.Post("/{type}/{name}/{val}", updateHandler)
 		})
+		r.Route("/ping", func(r chi.Router) {
+			r.Get("/", pingDBHandler)
+		})
 	})
 
 	return router
 }
 
+func metricDB(ctx context.Context, dsn string, logger *zerologger.ZeroLogger,
+) (*db.DB, error) {
+	if len(dsn) == 0 {
+		return nil, errors.New("DB DSN is empty")
+	}
+
+	database, err := db.New(ctx, dsn, logger)
+	if err != nil {
+		return nil, errors.New("unable to create DB instance")
+	}
+	return database, nil
+}
+
 func idleShutdown(s *http.Server, channel chan struct{},
-	logger *zerologger.ZeroLogger, backer *backup.File) {
+	logger *zerologger.ZeroLogger, backer *backup.File,
+) {
 	sigint := make(chan os.Signal, 1)
 	signal.Notify(sigint, os.Interrupt)
 	<-sigint
@@ -122,7 +161,7 @@ func idleShutdown(s *http.Server, channel chan struct{},
 	logger.Info().
 		Msg("shutdown signal received. Exiting...")
 	if err := s.Shutdown(context.Background()); err != nil {
-		logger.Fatal().
+		logger.Error().
 			Err(err).
 			Msg("error during HTTP server Shutdown")
 	}
