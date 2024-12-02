@@ -35,7 +35,7 @@ func main() {
 	}
 
 	storage := memory.New()
-	bk, err := backup.New(cfg, storage)
+	bk, err := backup.New(&cfg, storage)
 	if err != nil {
 		zeroLogger.Fatal().
 			Err(err).

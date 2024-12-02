@@ -28,7 +28,7 @@ func setupServices(t *testing.T) (*httptest.Server, *backup.File) {
 
 	rep := memory.New()
 
-	bk, err := backup.New(cfg, rep)
+	bk, err := backup.New(&cfg, rep)
 	require.NoError(t, err)
 
 	if cfg.Restore {

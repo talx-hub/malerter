@@ -24,6 +24,7 @@ const (
 	EnvStoreInterval   = "STORE_INTERVAL"
 	EnvFileStoragePath = "FILE_STORAGE_PATH"
 	EnvRestore         = "RESTORE"
+	EnvDatabaseDSN     = "DATABASE_DSN"
 )
 
 func FileStorageDefault() string {
@@ -37,9 +38,10 @@ func NewDirector() *config.Director {
 }
 
 type Builder struct {
-	RootAddress     string
-	LogLevel        string
+	DatabaseDSN     string
 	FileStoragePath string
+	LogLevel        string
+	RootAddress     string
 	StoreInterval   time.Duration
 	Restore         bool
 }
@@ -51,6 +53,7 @@ func (b *Builder) LoadFromFlags() config.Builder {
 	var backupInterval int64
 	flag.Int64Var(&backupInterval, "i", StoreIntervalDefault, "interval in seconds of repository backup")
 	flag.BoolVar(&b.Restore, "r", RestoreDefault, "restore backup while start")
+	flag.StringVar(&b.DatabaseDSN, "d", "", "database source name")
 	flag.Parse()
 
 	b.StoreInterval = time.Duration(backupInterval) * time.Second
@@ -80,6 +83,9 @@ func (b *Builder) LoadFromEnv() config.Builder {
 		if err != nil {
 			log.Fatal(err)
 		}
+	}
+	if d, found := os.LookupEnv(EnvDatabaseDSN); found {
+		b.DatabaseDSN = d
 	}
 	return b
 }
