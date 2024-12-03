@@ -18,7 +18,7 @@ func TestBackupRestore(t *testing.T) {
 	_ = rep1.Add(m2)
 	cfg := server.Builder{FileStoragePath: "temp.bk"}
 
-	bk1, err := New(cfg, rep1)
+	bk1, err := New(&cfg, rep1)
 	require.NoError(t, err)
 	defer func() {
 		err1 := bk1.Close()
@@ -27,7 +27,7 @@ func TestBackupRestore(t *testing.T) {
 	bk1.Backup()
 
 	rep2 := memory.New()
-	bk2, err := New(cfg, rep2)
+	bk2, err := New(&cfg, rep2)
 	require.NoError(t, err)
 	defer func() {
 		err1 := bk2.Close()

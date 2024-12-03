@@ -24,7 +24,10 @@ type File struct {
 	backupInterval time.Duration
 }
 
-func New(config server.Builder, storage Storage) (*File, error) {
+func New(config *server.Builder, storage Storage) (*File, error) {
+	if config == nil {
+		return nil, errors.New("config is nil")
+	}
 	p, err := NewProducer(config.FileStoragePath)
 	if err != nil {
 		return nil, err

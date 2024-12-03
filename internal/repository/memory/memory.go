@@ -1,6 +1,7 @@
 package memory
 
 import (
+	"context"
 	"fmt"
 	"sync"
 
@@ -58,4 +59,8 @@ func (r *Metrics) Get() []model.Metric {
 		metrics = append(metrics, m)
 	}
 	return metrics
+}
+
+func (r *Metrics) Ping(_ context.Context) error {
+	return nil
 }

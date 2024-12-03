@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -180,6 +181,20 @@ func (h *HTTPHandler) GetAll(w http.ResponseWriter, _ *http.Request) {
 	if err != nil {
 		log.Fatal(err)
 	}
+}
+
+func (h *HTTPHandler) Ping(w http.ResponseWriter, _ *http.Request) {
+	if h.service == nil {
+		err := errors.New("the dumping service is not initialised")
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	err := h.service.Ping(context.Background())
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	w.WriteHeader(http.StatusOK)
 }
 
 func createMetricsPage(metrics []model.Metric) string {
