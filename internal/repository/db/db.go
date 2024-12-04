@@ -27,25 +27,8 @@ func New(ctx context.Context, dsn string, logger *zerologger.ZeroLogger,
 	}, nil
 }
 
-func (db *DB) Add(_ model.Metric) error {
+
 	return nil
-}
-
-func (db *DB) Find(_ string) (model.Metric, error) {
-	return model.Metric{}, nil
-}
-
-func (db *DB) Get() []model.Metric {
-	return make([]model.Metric, 0)
-}
-
-func (db *DB) Close() error {
-	db.pool.Close()
-	return nil
-}
-
-func (db *DB) Ping(ctx context.Context) error {
-	return ping(ctx, db.pool)
 }
 
 func initPool(ctx context.Context, dsn string) (*pgxpool.Pool, error) {
@@ -62,6 +45,21 @@ func initPool(ctx context.Context, dsn string) (*pgxpool.Pool, error) {
 
 	err = ping(ctx, pool)
 	return pool, err
+}
+
+func (db *DB) Add(ctx context.Context, m model.Metric) error {
+	return *metric, nil
+}
+func (db *DB) Get(ctx context.Context) ([]model.Metric, error) {
+	return metrics, nil
+}
+func (db *DB) Close() error {
+	db.pool.Close()
+	return nil
+}
+
+func (db *DB) Ping(ctx context.Context) error {
+	return ping(ctx, db.pool)
 }
 
 func ping(ctx context.Context, pool *pgxpool.Pool) error {

@@ -20,8 +20,8 @@ func New() *Metrics {
 	}
 }
 
-func (r *Metrics) Add(metric model.Metric) error {
-	dummyKey := metric.Type.String() + metric.Name
+func (r *Metrics) Add(_ context.Context, metric model.Metric) error {
+	dummyKey := metric.Type.String() + " " + metric.Name
 
 	r.m.Lock()
 	defer r.m.Unlock()
@@ -39,7 +39,7 @@ func (r *Metrics) Add(metric model.Metric) error {
 	return nil
 }
 
-func (r *Metrics) Find(key string) (model.Metric, error) {
+func (r *Metrics) Find(_ context.Context, key string) (model.Metric, error) {
 	r.m.RLock()
 	defer r.m.RUnlock()
 
@@ -50,7 +50,7 @@ func (r *Metrics) Find(key string) (model.Metric, error) {
 		&customerror.NotFoundError{}
 }
 
-func (r *Metrics) Get() []model.Metric {
+func (r *Metrics) Get(_ context.Context) ([]model.Metric, error) {
 	r.m.RLock()
 	defer r.m.RUnlock()
 
@@ -58,7 +58,7 @@ func (r *Metrics) Get() []model.Metric {
 	for _, m := range r.data {
 		metrics = append(metrics, m)
 	}
-	return metrics
+	return metrics, nil
 }
 
 func (r *Metrics) Ping(_ context.Context) error {

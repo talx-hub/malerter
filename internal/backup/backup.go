@@ -1,6 +1,7 @@
 package backup
 
 import (
+	"context"
 	"errors"
 	"io"
 	"log"
@@ -12,8 +13,8 @@ import (
 )
 
 type Storage interface {
-	Add(model.Metric) error
-	Get() []model.Metric
+	Add(context.Context, model.Metric) error
+	Get(context.Context) ([]model.Metric, error)
 }
 
 type File struct {
@@ -55,7 +56,7 @@ func (b *File) Restore() {
 			}
 			log.Printf("unable to restore metric: %v", err)
 		}
-		err = b.storage.Add(*metric)
+		err = b.storage.Add(context.TODO(), *metric)
 		if err != nil {
 			log.Printf("unable to store metric, during backup restore: %v", err)
 		}
@@ -63,7 +64,7 @@ func (b *File) Restore() {
 }
 
 func (b *File) Backup() {
-	metrics := b.storage.Get()
+	metrics, _ := b.storage.Get(context.TODO())
 	for _, m := range metrics {
 		if err := b.producer.WriteMetric(m); err != nil {
 			log.Printf("unable to backup metric: %v\n", err)

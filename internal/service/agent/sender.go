@@ -2,6 +2,7 @@ package agent
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"log"
 	"net/http"
@@ -19,13 +20,14 @@ type Sender struct {
 }
 
 func (s *Sender) send() {
-	metrics := s.get()
+	metrics, _ := s.get()
 	jsons := convertToJSONs(metrics)
 	send(s.client, s.host, jsons, s.compress)
 }
 
-func (s *Sender) get() []model.Metric {
-	return s.storage.Get()
+func (s *Sender) get() ([]model.Metric, error) {
+	metrics, _ := s.storage.Get(context.TODO())
+	return metrics, nil
 }
 
 func convertToJSONs(metrics []model.Metric) []string {

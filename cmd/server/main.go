@@ -76,6 +76,7 @@ func main() {
 		Dur(`"backup interval"`, cfg.StoreInterval).
 		Bool(`"restore backup"`, cfg.Restore).
 		Str(`"backup path"`, cfg.FileStoragePath).
+		Str(`dsn`, cfg.DatabaseDSN).
 		Msg("Starting server")
 	srv := http.Server{
 		Addr:    cfg.RootAddress,
@@ -93,7 +94,7 @@ func main() {
 }
 
 func metricRouter(
-	repo *memory.Metrics, logger *zerologger.ZeroLogger,
+	repo server.Storage, logger *zerologger.ZeroLogger,
 	backer *backup.File, database *db.DB,
 ) chi.Router {
 	dumper := server.NewMetricsDumper(repo)

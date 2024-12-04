@@ -1,6 +1,7 @@
 package agent
 
 import (
+	"context"
 	"net/http"
 	"time"
 
@@ -9,9 +10,8 @@ import (
 )
 
 type Storage interface {
-	Add(metric model.Metric) error
-	Find(key string) (model.Metric, error)
-	Get() []model.Metric
+	Add(context.Context, model.Metric) error
+	Get(context.Context) ([]model.Metric, error)
 }
 
 type Agent struct {

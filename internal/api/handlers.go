@@ -58,7 +58,7 @@ func (h *HTTPHandler) DumpMetricJSON(w http.ResponseWriter, r *http.Request) {
 			http.StatusNotFound)
 		return
 	}
-	if err = h.service.Add(metric); err != nil {
+	if err = h.service.Add(context.Background(), metric); err != nil {
 		http.Error(
 			w,
 			fmt.Sprintf(errMsgPattern, r.URL.Path, err.Error()),
@@ -66,8 +66,8 @@ func (h *HTTPHandler) DumpMetricJSON(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	dummyKey := metric.Type.String() + metric.Name
-	metric, err = h.service.Find(dummyKey)
+	dummyKey := metric.Type.String() + " " + metric.Name
+	metric, err = h.service.Find(context.Background(), dummyKey)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -99,7 +99,7 @@ func (h *HTTPHandler) DumpMetric(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = h.service.Add(metric)
+	err = h.service.Add(context.Background(), metric)
 	if err != nil {
 		http.Error(
 			w,
@@ -122,8 +122,8 @@ func (h *HTTPHandler) GetMetric(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	dummyKey := metric.Type.String() + metric.Name
-	m, err := h.service.Find(dummyKey)
+	dummyKey := metric.Type.String() + " " + metric.Name
+	m, err := h.service.Find(context.Background(), dummyKey)
 	if err != nil {
 		st := getStatusFromError(err)
 		http.Error(
@@ -153,8 +153,8 @@ func (h *HTTPHandler) GetMetricJSON(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	dummyKey := metric.Type.String() + metric.Name
-	metric, err = h.service.Find(dummyKey)
+	dummyKey := metric.Type.String() + " " + metric.Name
+	metric, err = h.service.Find(context.Background(), dummyKey)
 	if err != nil {
 		st := getStatusFromError(err)
 		http.Error(
@@ -174,10 +174,14 @@ func (h *HTTPHandler) GetMetricJSON(w http.ResponseWriter, r *http.Request) {
 
 func (h *HTTPHandler) GetAll(w http.ResponseWriter, _ *http.Request) {
 	w.Header().Set(constants.KeyContentType, constants.ContentTypeHTML)
-	metrics := h.service.Get()
+	metrics, err := h.service.Get(context.Background())
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+
 	page := createMetricsPage(metrics)
 	w.WriteHeader(http.StatusOK)
-	_, err := w.Write([]byte(page))
+	_, err = w.Write([]byte(page))
 	if err != nil {
 		log.Fatal(err)
 	}

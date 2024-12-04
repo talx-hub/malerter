@@ -7,9 +7,9 @@ import (
 )
 
 type Storage interface {
-	Add(metric model.Metric) error
-	Find(key string) (model.Metric, error)
-	Get() []model.Metric
+	Add(ctx context.Context, metric model.Metric) error
+	Find(ctx context.Context, key string) (model.Metric, error)
+	Get(ctx context.Context) ([]model.Metric, error)
 	Ping(context.Context) error
 }
 
