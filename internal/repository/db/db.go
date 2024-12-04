@@ -100,7 +100,7 @@ VALUES (
     (SELECT id_designation FROM designation WHERE name_designation = $1)
 )
 ON CONFLICT (type_metric, name_metric) DO UPDATE
-SET value_metric = EXCLUDED.value_metric;`
+SET delta_metric = metric.delta_metric + EXCLUDED.delta_metric;`
 
 	if m.Type == model.MetricTypeGauge {
 		_, err = db.pool.Exec(
