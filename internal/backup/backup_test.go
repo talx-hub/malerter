@@ -1,6 +1,7 @@
 package backup
 
 import (
+	"context"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -14,8 +15,8 @@ func TestBackupRestore(t *testing.T) {
 	m1, _ := model.NewMetric().FromValues("mainQuestion", model.MetricTypeCounter, int64(42))
 	m2, _ := model.NewMetric().FromValues("pi", model.MetricTypeGauge, 3.14)
 	rep1 := memory.New()
-	_ = rep1.Add(m1)
-	_ = rep1.Add(m2)
+	_ = rep1.Add(context.TODO(), m1)
+	_ = rep1.Add(context.TODO(), m2)
 	cfg := server.Builder{FileStoragePath: "temp.bk"}
 
 	bk1, err := New(&cfg, rep1)
@@ -34,6 +35,8 @@ func TestBackupRestore(t *testing.T) {
 		require.NoError(t, err1)
 	}()
 	bk2.Restore()
+	ms1, _ := rep1.Get(context.TODO())
+	ms2, _ := rep2.Get(context.TODO())
 
-	assert.ElementsMatch(t, rep1.Get(), rep2.Get())
+	assert.ElementsMatch(t, ms1, ms2)
 }

@@ -1,6 +1,7 @@
 package agent
 
 import (
+	"context"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -24,7 +25,7 @@ func TestStore(t *testing.T) {
 	metrics := collect()
 	poller.store(metrics)
 	t.Run("store runtime metrics", func(t *testing.T) {
-		stored := storage.Get()
+		stored, _ := storage.Get(context.TODO())
 		assert.Len(t, stored, MetricCount)
 	})
 }
