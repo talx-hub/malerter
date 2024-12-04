@@ -2,6 +2,7 @@ package api
 
 import (
 	"bytes"
+	"context"
 	"io"
 	"log"
 	"net/http"
@@ -142,8 +143,8 @@ func TestHTTPHandler_GetMetric(t *testing.T) {
 	m1, _ := model.NewMetric().FromValues("mainQuestion", model.MetricTypeCounter, int64(42))
 	m2, _ := model.NewMetric().FromValues("pi", model.MetricTypeGauge, 3.14)
 	repository := memory.New()
-	_ = repository.Add(m1)
-	_ = repository.Add(m2)
+	_ = repository.Add(context.TODO(), m1)
+	_ = repository.Add(context.TODO(), m2)
 
 	dumper := server.NewMetricsDumper(repository)
 	handler := NewHTTPHandler(dumper)
@@ -328,8 +329,8 @@ func TestHTTPHandler_GetMetricJSON(t *testing.T) {
 	repository := memory.New()
 	m1, _ := model.NewMetric().FromValues("m42", model.MetricTypeCounter, int64(42))
 	m2, _ := model.NewMetric().FromValues("pi", model.MetricTypeGauge, 3.14)
-	_ = repository.Add(m1)
-	_ = repository.Add(m2)
+	_ = repository.Add(context.TODO(), m1)
+	_ = repository.Add(context.TODO(), m2)
 
 	dumper := server.NewMetricsDumper(repository)
 	handler := NewHTTPHandler(dumper)
@@ -391,7 +392,7 @@ func TestHTTPHandler_GetAll(t *testing.T) {
 
 	repository := memory.New()
 	m1, _ := model.NewMetric().FromValues("m42", model.MetricTypeCounter, int64(42))
-	_ = repository.Add(m1)
+	_ = repository.Add(context.TODO(), m1)
 
 	dumper := server.NewMetricsDumper(repository)
 	handler := NewHTTPHandler(dumper)

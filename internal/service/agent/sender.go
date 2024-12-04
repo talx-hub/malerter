@@ -2,7 +2,9 @@ package agent
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 
@@ -19,13 +21,17 @@ type Sender struct {
 }
 
 func (s *Sender) send() {
-	metrics := s.get()
+	metrics, _ := s.get()
 	jsons := convertToJSONs(metrics)
 	send(s.client, s.host, jsons, s.compress)
 }
 
-func (s *Sender) get() []model.Metric {
-	return s.storage.Get()
+func (s *Sender) get() ([]model.Metric, error) {
+	metrics, err := s.storage.Get(context.TODO())
+	if err != nil {
+		return nil, fmt.Errorf("failed to get metrics from storage: %w", err)
+	}
+	return metrics, nil
 }
 
 func convertToJSONs(metrics []model.Metric) []string {

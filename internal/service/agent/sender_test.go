@@ -1,6 +1,7 @@
 package agent
 
 import (
+	"context"
 	"io"
 	"log"
 	"net/http"
@@ -17,10 +18,10 @@ func TestGet(t *testing.T) {
 	storage := memory.New()
 	m1, _ := model.NewMetric().FromValues("m42", model.MetricTypeCounter, int64(42))
 	m2, _ := model.NewMetric().FromValues("pi", model.MetricTypeGauge, 3.14)
-	_ = storage.Add(m1)
-	_ = storage.Add(m2)
+	_ = storage.Add(context.TODO(), m1)
+	_ = storage.Add(context.TODO(), m2)
 	sender := Sender{storage: storage, host: ""}
-	got := sender.get()
+	got, _ := sender.get()
 	require.Len(t, got, 2)
 	assert.Contains(t, got, m1)
 	assert.Contains(t, got, m2)

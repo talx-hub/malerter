@@ -28,13 +28,13 @@ func setupServices(t *testing.T) (*httptest.Server, *backup.File) {
 
 	rep := memory.New()
 
-	bk, err := backup.New(cfg, rep)
+	bk, err := backup.New(&cfg, rep)
 	require.NoError(t, err)
 
 	if cfg.Restore {
 		bk.Restore()
 	}
-	ts := httptest.NewServer(metricRouter(rep, zeroLogger, bk))
+	ts := httptest.NewServer(metricRouter(rep, zeroLogger, bk, nil))
 
 	return ts, bk
 }
