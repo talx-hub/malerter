@@ -177,6 +177,7 @@ func (h *HTTPHandler) GetAll(w http.ResponseWriter, _ *http.Request) {
 	metrics, err := h.service.Get(context.Background())
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
 	}
 
 	page := createMetricsPage(metrics)

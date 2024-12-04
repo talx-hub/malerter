@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 
@@ -26,7 +27,10 @@ func (s *Sender) send() {
 }
 
 func (s *Sender) get() ([]model.Metric, error) {
-	metrics, _ := s.storage.Get(context.TODO())
+	metrics, err := s.storage.Get(context.TODO())
+	if err != nil {
+		return nil, fmt.Errorf("failed to get metrics from storage: %w", err)
+	}
 	return metrics, nil
 }
 
