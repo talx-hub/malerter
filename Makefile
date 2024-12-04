@@ -46,7 +46,7 @@ SERVER_PORT := 37797
 ADDRESS := "localhost:37797"
 TEMP_FILE := "temp.bk"
 .PHONY : run-autotests
-run-autotests: iter1 iter2 iter3 iter4 iter5 iter6 iter7 iter8 iter9
+run-autotests: iter1 iter2 iter3 iter4 iter5 iter6 iter7 iter8 iter9 iter10 iter11
 
 .PHONY : iter1
 iter1:
@@ -94,6 +94,15 @@ iter10:
 	  -source-path=. \
       -database-dsn='postgres://godevops:godevops@localhost:5432/godevops_alerts?sslmode=disable'
 	./bin/metricstest -test.run=^TestIteration10B$$ \
+	  -agent-binary-path=./bin/agent \
+	  -binary-path=./bin/server \
+	  -server-port=$(SERVER_PORT) \
+	  -source-path=. \
+      -database-dsn='postgres://godevops:godevops@localhost:5432/godevops_alerts?sslmode=disable'
+
+.PHONY : iter11
+iter11:
+	./bin/metricstest -test.run=^TestIteration11$$ \
 	  -agent-binary-path=./bin/agent \
 	  -binary-path=./bin/server \
 	  -server-port=$(SERVER_PORT) \
