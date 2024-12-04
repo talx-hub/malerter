@@ -45,10 +45,7 @@ func (db *DB) Close() error {
 }
 
 func (db *DB) Ping(ctx context.Context) error {
-	if err := db.pool.Ping(ctx); err != nil {
-		return fmt.Errorf("failed to ping the DB: %w", err)
-	}
-	return nil
+	return ping(ctx, db.pool)
 }
 
 func initPool(ctx context.Context, dsn string) (*pgxpool.Pool, error) {
@@ -62,9 +59,14 @@ func initPool(ctx context.Context, dsn string) (*pgxpool.Pool, error) {
 		return nil,
 			fmt.Errorf("failed to create connection pool: %w", err)
 	}
-	if err = pool.Ping(ctx); err != nil {
-		return nil, fmt.Errorf("failed to ping the DB: %w", err)
-	}
 
-	return pool, nil
+	err = ping(ctx, pool)
+	return pool, err
+}
+
+func ping(ctx context.Context, pool *pgxpool.Pool) error {
+	if err := pool.Ping(ctx); err != nil {
+		return fmt.Errorf("failed to ping the DB: %w", err)
+	}
+	return nil
 }
