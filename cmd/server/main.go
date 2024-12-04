@@ -35,13 +35,13 @@ func main() {
 		log.Fatalf("unable to configure custom logger: %s", err.Error())
 	}
 
-	// var storage server.Storage
+	var storage server.Storage
 	database, err := metricDB(context.Background(), cfg.DatabaseDSN, zeroLogger)
 	if err != nil {
 		zeroLogger.Warn().
 			Err(err).
 			Msg("store metrics in memory")
-		// storage = database
+		storage = memory.New()
 	} else {
 		defer func() {
 			if err = database.Close(); err != nil {
@@ -50,10 +50,9 @@ func main() {
 					Msg("unable to close DB")
 			}
 		}()
-		// storage = memory.New()
+		storage = database
 	}
 
-	storage := memory.New()
 	bk, err := backup.New(&cfg, storage)
 	if err != nil {
 		zeroLogger.Fatal().

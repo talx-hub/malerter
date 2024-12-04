@@ -17,6 +17,9 @@ type DB struct {
 
 func New(ctx context.Context, dsn string, logger *zerologger.ZeroLogger,
 ) (*DB, error) {
+	if err := runMigrations(dsn); err != nil {
+		return nil, fmt.Errorf("failed to run DB migrations: %w", err)
+	}
 	pool, err := initPool(ctx, dsn)
 	if err != nil {
 		return nil, fmt.Errorf("failed to init DB pool: %w", err)
@@ -27,7 +30,24 @@ func New(ctx context.Context, dsn string, logger *zerologger.ZeroLogger,
 	}, nil
 }
 
+//go:embed migrations/*.sql
+var migrationsDir embed.FS
 
+func runMigrations(dsn string) error {
+	d, err := iofs.New(migrationsDir, "migrations")
+	if err != nil {
+		return fmt.Errorf("failed to return an iofs driver: %w", err)
+	}
+
+	m, err := migrate.NewWithSourceInstance("iofs", d, dsn)
+	if err != nil {
+		return fmt.Errorf("failed to get a new migrate instance: %w", err)
+	}
+	if err := m.Up(); err != nil {
+		if !errors.Is(err, migrate.ErrNoChange) {
+			return fmt.Errorf("failed to apply migrations to the DB: %w", err)
+		}
+	}
 	return nil
 }
 
@@ -50,6 +70,7 @@ func initPool(ctx context.Context, dsn string) (*pgxpool.Pool, error) {
 func (db *DB) Add(ctx context.Context, m model.Metric) error {
 	return *metric, nil
 }
+
 func (db *DB) Get(ctx context.Context) ([]model.Metric, error) {
 	return metrics, nil
 }
