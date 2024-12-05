@@ -12,7 +12,7 @@ CREATE TABLE designation(
 
 CREATE TABLE metric(
     id_metric INT PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
-    delta_metric INT DEFAULT NULL,
+    delta_metric BIGINT DEFAULT NULL,
     value_metric DOUBLE PRECISION DEFAULT NULL,
     type_metric INT NOT NULL REFERENCES type(id_type),
     name_metric INT NOT NULL REFERENCES designation(id_designation),
