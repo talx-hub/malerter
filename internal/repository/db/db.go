@@ -14,6 +14,7 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 	_ "github.com/jackc/pgx/v5/stdlib"
+	"github.com/talx-hub/malerter/internal/customerror"
 	"github.com/talx-hub/malerter/internal/logger/zerologger"
 	"github.com/talx-hub/malerter/internal/model"
 )
@@ -121,12 +122,7 @@ JOIN
 )
 
 func (db *DB) Add(ctx context.Context, m model.Metric) error {
-	_, err := db.pool.Exec(ctx, tryNameQuery, m.Name)
-	if err != nil {
-		return fmt.Errorf("failed to update the metric name in DB: %w", err)
-	}
-
-	if err = push(ctx, m, db.pool); err != nil {
+	if err := push(ctx, m, db.pool); err != nil {
 		return fmt.Errorf("failed to add the metric: %w", err)
 	}
 
@@ -165,6 +161,11 @@ type executor interface {
 
 func push(ctx context.Context, m model.Metric, e executor) error {
 	var err error
+	_, err = e.Exec(ctx, tryNameQuery, m.Name)
+	if err != nil {
+		return fmt.Errorf("failed to update the metric name in DB: %w", err)
+	}
+
 	if m.Type == model.MetricTypeGauge {
 		_, err = e.Exec(
 			ctx, gaugeQuery, m.Name, m.Type.String(), m.ActualValue())
@@ -224,6 +225,12 @@ func fromRow(row pgx.Row) (*model.Metric, error) {
 		&metric.Delta,
 		&metric.Value,
 	); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil,
+				&customerror.NotFoundError{
+					Message: fmt.Sprintf("metric not found: %s", metric.String()),
+				}
+		}
 		return nil, fmt.Errorf("failed to scan a response row: %w", err)
 	}
 	metric.Type = model.MetricType(t)
