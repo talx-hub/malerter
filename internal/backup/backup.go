@@ -74,11 +74,11 @@ func (b *File) Backup() {
 
 func (b *File) Middleware(h http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		h.ServeHTTP(w, r)
 		now := time.Now().UTC()
 		if now.Sub(b.lastBackup) >= b.backupInterval {
 			b.Backup()
 		}
-		h.ServeHTTP(w, r)
 	}
 }
 
