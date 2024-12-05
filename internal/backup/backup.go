@@ -1,6 +1,7 @@
 package backup
 
 import (
+	"context"
 	"errors"
 	"io"
 	"log"
@@ -12,8 +13,8 @@ import (
 )
 
 type Storage interface {
-	Add(model.Metric) error
-	Get() []model.Metric
+	Add(context.Context, model.Metric) error
+	Get(context.Context) ([]model.Metric, error)
 }
 
 type File struct {
@@ -24,7 +25,10 @@ type File struct {
 	backupInterval time.Duration
 }
 
-func New(config server.Builder, storage Storage) (*File, error) {
+func New(config *server.Builder, storage Storage) (*File, error) {
+	if config == nil {
+		return nil, errors.New("config is nil")
+	}
 	p, err := NewProducer(config.FileStoragePath)
 	if err != nil {
 		return nil, err
@@ -52,7 +56,7 @@ func (b *File) Restore() {
 			}
 			log.Printf("unable to restore metric: %v", err)
 		}
-		err = b.storage.Add(*metric)
+		err = b.storage.Add(context.TODO(), *metric)
 		if err != nil {
 			log.Printf("unable to store metric, during backup restore: %v", err)
 		}
@@ -60,7 +64,7 @@ func (b *File) Restore() {
 }
 
 func (b *File) Backup() {
-	metrics := b.storage.Get()
+	metrics, _ := b.storage.Get(context.TODO())
 	for _, m := range metrics {
 		if err := b.producer.WriteMetric(m); err != nil {
 			log.Printf("unable to backup metric: %v\n", err)
@@ -70,11 +74,11 @@ func (b *File) Backup() {
 
 func (b *File) Middleware(h http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		h.ServeHTTP(w, r)
 		now := time.Now().UTC()
 		if now.Sub(b.lastBackup) >= b.backupInterval {
 			b.Backup()
 		}
-		h.ServeHTTP(w, r)
 	}
 }
 

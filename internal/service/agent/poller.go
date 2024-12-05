@@ -1,6 +1,7 @@
 package agent
 
 import (
+	"context"
 	"log"
 	"math/rand/v2"
 	"runtime"
@@ -92,7 +93,7 @@ func collect() []model.Metric {
 
 func (p *Poller) store(metrics []model.Metric) {
 	for _, m := range metrics {
-		if p.storage.Add(m) != nil {
+		if p.storage.Add(context.TODO(), m) != nil {
 			log.Println("error during storing of metric")
 		}
 	}
