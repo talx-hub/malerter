@@ -228,7 +228,7 @@ func fromRow(row pgx.Row) (*model.Metric, error) {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil,
 				&customerror.NotFoundError{
-					Message: fmt.Sprintf("metric not found: %s", metric.String()),
+					Message: "metric not found: %s" + metric.String(),
 				}
 		}
 		return nil, fmt.Errorf("failed to scan a response row: %w", err)

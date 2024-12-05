@@ -99,6 +99,7 @@ func (h *HTTPHandler) DumpMetricJSON(w http.ResponseWriter, r *http.Request) {
 	}
 	if metric.IsEmpty() {
 		http.Error(w, "failed to dump empty metric", http.StatusBadRequest)
+		return
 	}
 
 	if err = h.service.Add(context.Background(), metric); err != nil {
