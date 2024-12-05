@@ -34,7 +34,7 @@ func setupServices(t *testing.T) (*httptest.Server, *backup.File) {
 	if cfg.Restore {
 		bk.Restore()
 	}
-	ts := httptest.NewServer(metricRouter(rep, zeroLogger, bk, nil))
+	ts := httptest.NewServer(metricRouter(rep, zeroLogger, bk))
 
 	return ts, bk
 }
