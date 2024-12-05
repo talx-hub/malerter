@@ -79,7 +79,7 @@ func main() {
 		Msg("Starting server")
 	srv := http.Server{
 		Addr:    cfg.RootAddress,
-		Handler: metricRouter(storage, zeroLogger, bk, database),
+		Handler: metricRouter(storage, zeroLogger, bk),
 	}
 	idleConnectionsClosed := make(chan struct{})
 	go idleShutdown(&srv, idleConnectionsClosed, zeroLogger, bk)
@@ -94,18 +94,18 @@ func main() {
 
 func metricRouter(
 	repo server.Storage, logger *zerologger.ZeroLogger,
-	backer *backup.File, database *db.DB,
+	backer *backup.File,
 ) chi.Router {
 	dumper := server.NewMetricsDumper(repo)
 	handler := api.NewHTTPHandler(dumper)
-	pingHandler := api.NewHTTPHandler(database)
 
 	var updateHandler = backer.Middleware(handler.DumpMetric)
 	var updateJSONHandler = backer.Middleware(handler.DumpMetricJSON)
 	var getHandler = handler.GetMetric
 	var getAllHandler = handler.GetAll
 	var getJSONHandler = handler.GetMetricJSON
-	var pingDBHandler = pingHandler.Ping
+	var pingDBHandler = handler.Ping
+	var batchHandler = backer.Middleware(handler.DumpMetricList)
 
 	router := chi.NewRouter()
 	router.Use(
@@ -132,6 +132,12 @@ func metricRouter(
 		})
 		r.Route("/ping", func(r chi.Router) {
 			r.Get("/", pingDBHandler)
+		})
+		r.Route("/updates", func(r chi.Router) {
+			r.Group(func(r chi.Router) {
+				r.Use(middleware.AllowContentType(constants.ContentTypeJSON))
+				r.Post("/", batchHandler)
+			})
 		})
 	})
 
