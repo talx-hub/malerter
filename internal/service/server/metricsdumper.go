@@ -8,6 +8,7 @@ import (
 
 type Storage interface {
 	Add(ctx context.Context, metric model.Metric) error
+	Batch(context.Context, []model.Metric) error
 	Find(ctx context.Context, key string) (model.Metric, error)
 	Get(ctx context.Context) ([]model.Metric, error)
 	Ping(context.Context) error

@@ -11,6 +11,7 @@ import (
 	_ "github.com/golang-migrate/migrate/v4/database/postgres"
 	"github.com/golang-migrate/migrate/v4/source/iofs"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/talx-hub/malerter/internal/logger/zerologger"
@@ -74,50 +75,30 @@ func initPool(ctx context.Context, dsn string) (*pgxpool.Pool, error) {
 	return pool, err
 }
 
-func (db *DB) Add(ctx context.Context, m model.Metric) error {
-	const tryInsertMetricName = `INSERT INTO designation(name_designation)
+const (
+	tryNameQuery = `INSERT INTO designation(name_designation)
 VALUES ($1)
 ON CONFLICT (name_designation) DO NOTHING;`
 
-	_, err := db.pool.Exec(ctx, tryInsertMetricName, m.Name)
-	if err != nil {
-		return fmt.Errorf("failed to update the metric name in DB: %w", err)
-	}
-
-	const insertGauge = `INSERT INTO metric(value_metric, type_metric, name_metric)
+	gaugeQuery = `INSERT INTO metric(value_metric, type_metric, name_metric)
 VALUES (
-    $3, 
-    (SELECT id_type FROM type WHERE name_type = $2), 
+    $3,
+    (SELECT id_type FROM type WHERE name_type = $2),
     (SELECT id_designation FROM designation WHERE name_designation = $1)
 )
 ON CONFLICT (type_metric, name_metric) DO UPDATE
 SET value_metric = EXCLUDED.value_metric;`
 
-	const insertCounter = `INSERT INTO metric(delta_metric, type_metric, name_metric)
+	counterQuery = `INSERT INTO metric(delta_metric, type_metric, name_metric)
 VALUES (
-    $3, 
-    (SELECT id_type FROM type WHERE name_type = $2), 
+    $3,
+    (SELECT id_type FROM type WHERE name_type = $2),
     (SELECT id_designation FROM designation WHERE name_designation = $1)
 )
 ON CONFLICT (type_metric, name_metric) DO UPDATE
 SET delta_metric = metric.delta_metric + EXCLUDED.delta_metric;`
 
-	if m.Type == model.MetricTypeGauge {
-		_, err = db.pool.Exec(
-			ctx, insertGauge, m.Name, m.Type.String(), m.ActualValue())
-	} else {
-		_, err = db.pool.Exec(
-			ctx, insertCounter, m.Name, m.Type.String(), m.ActualValue())
-	}
-	if err != nil {
-		return fmt.Errorf("failed to update the metric in DB: %w", err)
-	}
-
-	return nil
-}
-
-func (db *DB) Find(ctx context.Context, typeAndName string) (model.Metric, error) {
-	const findMetricQuery = `SELECT 
+	findQuery = `SELECT 
 d.name_designation, t.name_type, m.delta_metric, m.value_metric
 FROM 
 	metric m
@@ -129,12 +110,82 @@ WHERE
 	t.name_type = $1
 	AND d.name_designation = $2;`
 
+	getQuery = `SELECT 
+d.name_designation, t.name_type, m.delta_metric, m.value_metric
+FROM 
+	metric m
+JOIN 
+	designation d ON m.name_metric = d.id_designation
+JOIN
+	type t ON m.type_metric = t.id_type`
+)
+
+func (db *DB) Add(ctx context.Context, m model.Metric) error {
+	_, err := db.pool.Exec(ctx, tryNameQuery, m.Name)
+	if err != nil {
+		return fmt.Errorf("failed to update the metric name in DB: %w", err)
+	}
+
+	if err = push(ctx, m, db.pool); err != nil {
+		return fmt.Errorf("failed to add the metric: %w", err)
+	}
+
+	return nil
+}
+
+func (db *DB) Batch(ctx context.Context, batch []model.Metric) error {
+	tx, err := db.pool.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to start transaction: %w", err)
+	}
+	for _, m := range batch {
+		err = push(ctx, m, tx)
+		if err == nil {
+			continue
+		}
+
+		db.log.
+			Err(err).
+			Msg("failed to add the metric")
+		if err = tx.Rollback(ctx); err != nil {
+			return fmt.Errorf("rollback failed: %w", err)
+		}
+		return fmt.Errorf("transaction failed: %w", err)
+	}
+
+	if err = tx.Commit(ctx); err != nil {
+		return fmt.Errorf("commit failed: %w", err)
+	}
+	return nil
+}
+
+type executor interface {
+	Exec(ctx context.Context, sql string, arguments ...any) (pgconn.CommandTag, error)
+}
+
+func push(ctx context.Context, m model.Metric, e executor) error {
+	var err error
+	if m.Type == model.MetricTypeGauge {
+		_, err = e.Exec(
+			ctx, gaugeQuery, m.Name, m.Type.String(), m.ActualValue())
+	} else {
+		_, err = e.Exec(
+			ctx, counterQuery, m.Name, m.Type.String(), m.ActualValue())
+	}
+	if err != nil {
+		return fmt.Errorf("DB insert error: %w", err)
+	}
+
+	return nil
+}
+
+func (db *DB) Find(ctx context.Context, typeAndName string) (model.Metric, error) {
 	const typePos = 0
 	const namePos = 1
 	result := strings.Split(typeAndName, " ")
 
 	row := db.pool.QueryRow(
-		ctx, findMetricQuery, result[typePos], result[namePos])
+		ctx, findQuery, result[typePos], result[namePos])
 	metric, err := fromRow(row)
 	if err != nil {
 		return model.Metric{}, fmt.Errorf("failed DB query: %w", err)
@@ -143,16 +194,7 @@ WHERE
 }
 
 func (db *DB) Get(ctx context.Context) ([]model.Metric, error) {
-	const getAll = `SELECT 
-d.name_designation, t.name_type, m.delta_metric, m.value_metric
-FROM 
-	metric m
-JOIN 
-	designation d ON m.name_metric = d.id_designation
-JOIN
-	type t ON m.type_metric = t.id_type`
-
-	rows, err := db.pool.Query(ctx, getAll)
+	rows, err := db.pool.Query(ctx, getQuery)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query DB: %w", err)
 	}
