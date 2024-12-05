@@ -63,7 +63,7 @@ func fromJSONs(body io.Reader) ([]model.Metric, error) {
 			fmt.Errorf("unable to decode batch: %w", err)
 	}
 
-	validList := make([]model.Metric, len(metrics))
+	validList := make([]model.Metric, 0)
 	for _, m := range metrics {
 		if err := m.CheckValid(); err != nil || m.IsEmpty() {
 			continue
