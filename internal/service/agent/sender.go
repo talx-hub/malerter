@@ -57,6 +57,7 @@ func (s *Sender) batch(batch string) {
 		body, err = gzip.Compress([]byte(batch))
 		if err != nil {
 			log.Printf("unable to compress json %s: %v", batch, err)
+			return
 		}
 	} else {
 		body = bytes.NewBufferString(batch)
@@ -64,15 +65,17 @@ func (s *Sender) batch(batch string) {
 	request, err := http.NewRequest(http.MethodPost, s.host+"/updates/", body)
 	if err != nil {
 		log.Printf("unable to send json %s to %s: %v", batch, s.host, err)
+		return
 	}
 	request.Header.Set(constants.KeyContentType, constants.ContentTypeJSON)
 	request.Header.Set(constants.KeyContentEncoding, "gzip")
 	response, err := s.client.Do(request)
 	if err != nil {
 		log.Printf("unable to send json %s to %s: %v", batch, s.host, err)
+		return
 	}
 	err = response.Body.Close()
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalf("unable to close the body: %v", err)
 	}
 }
