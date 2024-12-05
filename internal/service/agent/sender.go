@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"strings"
 
 	"github.com/talx-hub/malerter/internal/compressor/gzip"
 	"github.com/talx-hub/malerter/internal/constants"
@@ -23,7 +24,9 @@ type Sender struct {
 func (s *Sender) send() {
 	metrics, _ := s.get()
 	jsons := convertToJSONs(metrics)
-	send(s.client, s.host, jsons, s.compress)
+	batch := "[" + strings.Join(jsons, ",") + "]"
+	s.batch(batch)
+	s.storage.Clear()
 }
 
 func (s *Sender) get() ([]model.Metric, error) {
@@ -47,33 +50,29 @@ func convertToJSONs(metrics []model.Metric) []string {
 	return jsons
 }
 
-func send(client *http.Client, host string, jsons []string, compress bool) {
-	for _, j := range jsons {
-		var body *bytes.Buffer
-		var err error
-		if compress {
-			body, err = gzip.Compress([]byte(j))
-			if err != nil {
-				log.Printf("unable to compress json %s: %v", j, err)
-			}
-		} else {
-			body = bytes.NewBufferString(j)
-		}
-		request, err := http.NewRequest(http.MethodPost, host+"/update/", body)
+func (s *Sender) batch(batch string) {
+	var body *bytes.Buffer
+	var err error
+	if s.compress {
+		body, err = gzip.Compress([]byte(batch))
 		if err != nil {
-			log.Printf("unable to send json %s to %s: %v", j, host, err)
-			continue
+			log.Printf("unable to compress json %s: %v", batch, err)
 		}
-		request.Header.Set(constants.KeyContentType, constants.ContentTypeJSON)
-		request.Header.Set(constants.KeyContentEncoding, "gzip")
-		response, err := client.Do(request)
-		if err != nil {
-			log.Printf("unable to send json %s to %s: %v", j, host, err)
-			continue
-		}
-		err = response.Body.Close()
-		if err != nil {
-			log.Fatal(err)
-		}
+	} else {
+		body = bytes.NewBufferString(batch)
+	}
+	request, err := http.NewRequest(http.MethodPost, s.host+"/updates/", body)
+	if err != nil {
+		log.Printf("unable to send json %s to %s: %v", batch, s.host, err)
+	}
+	request.Header.Set(constants.KeyContentType, constants.ContentTypeJSON)
+	request.Header.Set(constants.KeyContentEncoding, "gzip")
+	response, err := s.client.Do(request)
+	if err != nil {
+		log.Printf("unable to send json %s to %s: %v", batch, s.host, err)
+	}
+	err = response.Body.Close()
+	if err != nil {
+		log.Fatal(err)
 	}
 }

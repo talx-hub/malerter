@@ -75,3 +75,7 @@ func (r *Memory) Get(_ context.Context) ([]model.Metric, error) {
 func (r *Memory) Ping(_ context.Context) error {
 	return errors.New("a DB is not initialised, store in memory")
 }
+
+func (r *Memory) Clear() {
+	r.data = make(map[string]model.Metric)
+}

@@ -12,6 +12,7 @@ import (
 type Storage interface {
 	Add(context.Context, model.Metric) error
 	Get(context.Context) ([]model.Metric, error)
+	Clear()
 }
 
 type Agent struct {
