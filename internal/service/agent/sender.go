@@ -4,10 +4,13 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
 	"strings"
+	"syscall"
+	"time"
 
 	"github.com/talx-hub/malerter/internal/compressor/gzip"
 	"github.com/talx-hub/malerter/internal/constants"
@@ -70,12 +73,38 @@ func (s *Sender) batch(batch string) {
 	request.Header.Set(constants.KeyContentType, constants.ContentTypeJSON)
 	request.Header.Set(constants.KeyContentEncoding, "gzip")
 	response, err := s.client.Do(request)
-	if err != nil {
+	if err != nil && !errors.Is(err, syscall.ECONNREFUSED) {
 		log.Printf("unable to send json %s to %s: %v", batch, s.host, err)
 		return
+	}
+	if err != nil && errors.Is(err, syscall.ECONNREFUSED) {
+		err = retry(request, s.client, 0)
+		if err != nil {
+			log.Println(err)
+		}
+		return
+	}
+
+	err = response.Body.Close()
+	if err != nil {
+		log.Fatalf("unable to close the body: %v", err)
+	}
+}
+
+func retry(r *http.Request, c *http.Client, count int) error {
+	const maxAttemptCount = 4
+	if count == maxAttemptCount {
+		return errors.New("all attempts to retry request are out")
+	}
+
+	response, err := c.Do(r)
+	if err != nil && errors.Is(err, syscall.ECONNREFUSED) {
+		time.Sleep((time.Duration(count*2 + 1)) * time.Second) // count: 0 1 2 -> seconds: 1 3 5.
+		return retry(r, c, count+1)
 	}
 	err = response.Body.Close()
 	if err != nil {
 		log.Fatalf("unable to close the body: %v", err)
 	}
+	return nil
 }

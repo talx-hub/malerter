@@ -7,7 +7,7 @@ CREATE TABLE type(
 
 CREATE TABLE designation(
     id_designation INT PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
-    name_designation VARCHAR(64) UNIQUE NOT NULL
+    name_designation VARCHAR(128) UNIQUE NOT NULL
 );
 
 CREATE TABLE metric(
