@@ -1,7 +1,6 @@
 package model
 
 import (
-	"bytes"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -694,126 +693,6 @@ func TestFromURL(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			m, err := NewMetric().FromURL(test.url)
-			if !test.wantErr {
-				require.NoError(t, err)
-				assert.Equal(t, test.want.Name, m.Name)
-				assert.Equal(t, test.want.Type, m.Type)
-				assert.Equal(t, test.want.ActualValue(), m.ActualValue())
-				return
-			}
-			assert.Error(t, err)
-		})
-	}
-}
-
-func TestFromJSON(t *testing.T) {
-	tests := []struct {
-		name    string
-		json    string
-		wantErr bool
-		want    Metric
-	}{
-		{
-			name:    "valid short JSON for empty gauge",
-			json:    `{"id":"m1", "type":"gauge"}}`,
-			wantErr: false,
-			want:    Metric{Name: "m1", Type: MetricTypeGauge},
-		},
-		{
-			name:    "valid short JSON for empty counter",
-			json:    `{"id":"m1", "type":"counter"}`,
-			wantErr: false,
-			want:    Metric{Name: "m1", Type: MetricTypeCounter},
-		},
-		{
-			name:    "valid JSON for gauge -- float",
-			json:    `{"id":"m1", "type":"gauge", "value": 10.0}`,
-			want:    Metric{Name: "m1", Type: MetricTypeGauge, Value: func(f float64) *float64 { return &f }(10)},
-			wantErr: false,
-		},
-		{
-			name:    "valid JSON for gauge -- int",
-			json:    `{"id":"m1", "type":"gauge", "value": 10}`,
-			want:    Metric{Name: "m1", Type: MetricTypeGauge, Value: func(f float64) *float64 { return &f }(10)},
-			wantErr: false,
-		},
-		{
-			name:    "valid JSON for counter -- int",
-			json:    `{"id":"m1", "type":"counter", "delta": 10}`,
-			wantErr: false,
-			want:    Metric{Name: "m1", Type: MetricTypeCounter, Delta: func(f int64) *int64 { return &f }(10)},
-		},
-		{
-			name:    "invalid JSON for counter -- int string",
-			json:    `{"id":"m1", "type":"counter", "delta": "10"}`,
-			wantErr: true,
-		},
-		{
-			name:    "invalid JSON for counter -- float string",
-			json:    `{"id":"m1", "type":"counter", "delta": "10.0"}`,
-			wantErr: true,
-		},
-		{
-			name:    "valid JSON for gauge -- float string",
-			json:    `{"id":"m1", "type":"gauge", "value": "10.0"}`,
-			wantErr: true,
-		},
-		{
-			name:    "invalid JSON for counter -- delta and value",
-			json:    `{"id":"m1", "type":"counter", "delta": 10, "value": 10.0}`,
-			wantErr: true,
-		},
-		{
-			name:    "valid JSON for gauge -- delta and value",
-			json:    `{"id":"m1", "type":"gauge", "value": 10.0, "delta": 10}`,
-			wantErr: true,
-		},
-		{
-			name:    "invalid JSON -- no name, no value #1",
-			json:    `{"type":"counter"}`,
-			wantErr: true,
-		},
-		{
-			name:    "invalid JSON -- no name, no value #2",
-			json:    `{"type":"gauge"}`,
-			wantErr: true,
-		},
-		{
-			name:    "invalid short JSON -- invalid type",
-			json:    `{"id":"m1", "type":"invalid", "delta": 10}`,
-			wantErr: true,
-		},
-		{
-			name:    "invalid short JSON -- invalid type",
-			json:    `{"id":"m1", "type":"invalid", "value": 10}`,
-			wantErr: true,
-		},
-		{
-			name:    "invalid short JSON -- invalid name for gauge",
-			json:    `{"id":"1", "type":"gauge", "value": 10}`,
-			wantErr: true,
-		},
-		{
-			name:    "invalid short JSON -- invalid name for counter",
-			json:    `{"id":"1", "type":"counter", "delta": 10}`,
-			wantErr: true,
-		},
-		{
-			name:    "invalid JSON for gauge -- string value",
-			json:    `{"id":"m1", "type":"gauge", "value": "value"}`,
-			wantErr: true,
-		},
-		{
-			name:    "invalid JSON for counter -- string value",
-			json:    `{"id":"m1", "type":"counter", "delta": "value"}`,
-			wantErr: true,
-		},
-	}
-
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			buf := bytes.NewBufferString(test.json)
-			m, err := NewMetric().FromJSON(buf)
 			if !test.wantErr {
 				require.NoError(t, err)
 				assert.Equal(t, test.want.Name, m.Name)

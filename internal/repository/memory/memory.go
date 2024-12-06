@@ -1,26 +1,29 @@
 package memory
 
 import (
+	"context"
+	"errors"
 	"fmt"
+	"log"
 	"sync"
 
 	"github.com/talx-hub/malerter/internal/customerror"
 	"github.com/talx-hub/malerter/internal/model"
 )
 
-type Metrics struct {
+type Memory struct {
 	data map[string]model.Metric
 	m    sync.RWMutex
 }
 
-func New() *Metrics {
-	return &Metrics{
+func New() *Memory {
+	return &Memory{
 		data: make(map[string]model.Metric),
 	}
 }
 
-func (r *Metrics) Add(metric model.Metric) error {
-	dummyKey := metric.Type.String() + metric.Name
+func (r *Memory) Add(_ context.Context, metric model.Metric) error {
+	dummyKey := metric.Type.String() + " " + metric.Name
 
 	r.m.Lock()
 	defer r.m.Unlock()
@@ -38,7 +41,16 @@ func (r *Metrics) Add(metric model.Metric) error {
 	return nil
 }
 
-func (r *Metrics) Find(key string) (model.Metric, error) {
+func (r *Memory) Batch(ctx context.Context, batch []model.Metric) error {
+	for _, m := range batch {
+		if err := r.Add(ctx, m); err != nil {
+			log.Printf("failed to update batch metric: %v", err)
+		}
+	}
+	return nil
+}
+
+func (r *Memory) Find(_ context.Context, key string) (model.Metric, error) {
 	r.m.RLock()
 	defer r.m.RUnlock()
 
@@ -49,7 +61,7 @@ func (r *Metrics) Find(key string) (model.Metric, error) {
 		&customerror.NotFoundError{}
 }
 
-func (r *Metrics) Get() []model.Metric {
+func (r *Memory) Get(_ context.Context) ([]model.Metric, error) {
 	r.m.RLock()
 	defer r.m.RUnlock()
 
@@ -57,5 +69,13 @@ func (r *Metrics) Get() []model.Metric {
 	for _, m := range r.data {
 		metrics = append(metrics, m)
 	}
-	return metrics
+	return metrics, nil
+}
+
+func (r *Memory) Ping(_ context.Context) error {
+	return errors.New("a DB is not initialised, store in memory")
+}
+
+func (r *Memory) Clear() {
+	r.data = make(map[string]model.Metric)
 }
