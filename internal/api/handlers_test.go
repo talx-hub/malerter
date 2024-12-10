@@ -135,8 +135,12 @@ func TestHTTPHandler_GetMetric(t *testing.T) {
 				"incorrect request: only counter and gauge types are allowed\n",
 			400,
 		},
-		{"/value/gauge/wrong", "/value/gauge/wrong fails: not found: \n", 404},
-		{"/value/counter/wrong", "/value/counter/wrong fails: not found: \n", 404},
+		{"/value/gauge/wrong",
+			"/value/gauge/wrong fails: request failed: on attempt #0 error occurred: not found: \n",
+			404},
+		{"/value/counter/wrong",
+			"/value/counter/wrong fails: request failed: on attempt #0 error occurred: not found: \n",
+			404},
 		{"/value/counter", "/value/counter fails: not found: incorrect URL\n", 404},
 		{"/value/gauge", "/value/gauge fails: not found: incorrect URL\n", 404},
 	}
@@ -519,7 +523,7 @@ func TestFromJSON(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			buf := bytes.NewBufferString(test.json)
-			m, err := fromJSON(buf)
+			m, err := extractJSON(buf)
 			if !test.wantErr {
 				require.NoError(t, err)
 				assert.Equal(t, test.want.Name, m.Name)

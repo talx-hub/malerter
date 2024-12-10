@@ -6,10 +6,12 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/golang-migrate/migrate/v4"
 	_ "github.com/golang-migrate/migrate/v4/database/postgres"
 	"github.com/golang-migrate/migrate/v4/source/iofs"
+	"github.com/jackc/pgerrcode"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -123,7 +125,7 @@ JOIN
 
 func (db *DB) Add(ctx context.Context, m model.Metric) error {
 	if err := push(ctx, m, db.pool); err != nil {
-		return fmt.Errorf("failed to add the metric: %w", err)
+		return fmt.Errorf("failed to add the metric %s: %w", m.String(), err)
 	}
 
 	return nil
@@ -134,6 +136,14 @@ func (db *DB) Batch(ctx context.Context, batch []model.Metric) error {
 	if err != nil {
 		return fmt.Errorf("failed to start transaction: %w", err)
 	}
+	defer func() {
+		err := tx.Rollback(ctx)
+		if err != nil {
+			db.log.
+				Err(err).
+				Msg("rollback failed")
+		}
+	}()
 	for _, m := range batch {
 		err = push(ctx, m, tx)
 		if err == nil {
@@ -142,7 +152,7 @@ func (db *DB) Batch(ctx context.Context, batch []model.Metric) error {
 
 		db.log.
 			Err(err).
-			Msg("failed to add the metric")
+			Msg("failed to add the metric: " + m.String())
 		if err = tx.Rollback(ctx); err != nil {
 			return fmt.Errorf("rollback failed: %w", err)
 		}
@@ -252,4 +262,38 @@ func ping(ctx context.Context, pool *pgxpool.Pool) error {
 		return fmt.Errorf("failed to ping the DB: %w", err)
 	}
 	return nil
+}
+
+type Data interface{}
+
+type Method func(args ...any) (any, error)
+
+func WithConnectionCheck(dbMethod Method) (any, error) {
+	data, err := try(0, dbMethod)
+	if err != nil {
+		return nil, fmt.Errorf(
+			"request failed: %w", err)
+	}
+
+	return data, nil
+}
+
+func try(count int, dbMethod Method) (any, error) {
+	const maxAttemptCount = 3
+	if count > maxAttemptCount {
+		return nil, errors.New("all attempts to try are out")
+	}
+
+	data, err := dbMethod()
+	if err != nil {
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgerrcode.IsConnectionException(pgErr.Code) {
+			time.Sleep((time.Duration(count*2 + 1)) * time.Second) // count: 0 1 2 -> seconds: 1 3 5.
+			return try(count+1, dbMethod)
+		}
+		return nil, fmt.Errorf(
+			"on attempt #%d error occurred: %w", count, err)
+	}
+
+	return data, nil
 }

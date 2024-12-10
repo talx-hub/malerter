@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -152,7 +153,7 @@ func metricDB(ctx context.Context, dsn string, logger *zerologger.ZeroLogger,
 
 	database, err := db.New(ctx, dsn, logger)
 	if err != nil {
-		return nil, errors.New("unable to create DB instance")
+		return nil, fmt.Errorf("unable to create DB instance: %w", err)
 	}
 	return database, nil
 }
