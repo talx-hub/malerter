@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -17,12 +18,14 @@ import (
 	serverCfg "github.com/talx-hub/malerter/internal/config/server"
 	"github.com/talx-hub/malerter/internal/constants"
 	"github.com/talx-hub/malerter/internal/logger/zerologger"
+	"github.com/talx-hub/malerter/internal/repository/db"
 	"github.com/talx-hub/malerter/internal/repository/memory"
 	"github.com/talx-hub/malerter/internal/service/server"
 )
 
 func main() {
-	// TODO: тут какие-то кошмары с указателями(см. config/server/builder/.Build())... разобраться
+	// TODO: тут какие-то кошмары с указателями
+	// (см. config/server/builder/.Build())... разобраться
 	cfg, ok := serverCfg.NewDirector().Build().(serverCfg.Builder)
 	if !ok {
 		log.Fatal("unable to load server serverCfg")
@@ -33,8 +36,25 @@ func main() {
 		log.Fatalf("unable to configure custom logger: %s", err.Error())
 	}
 
-	storage := memory.New()
-	bk, err := backup.New(cfg, storage)
+	var storage server.Storage
+	database, err := metricDB(context.Background(), cfg.DatabaseDSN, zeroLogger)
+	if err != nil {
+		zeroLogger.Warn().
+			Err(err).
+			Msg("store metrics in memory")
+		storage = memory.New()
+	} else {
+		defer func() {
+			if err = database.Close(); err != nil {
+				zeroLogger.Error().
+					Err(err).
+					Msg("unable to close DB")
+			}
+		}()
+		storage = database
+	}
+
+	bk, err := backup.New(&cfg, storage)
 	if err != nil {
 		zeroLogger.Fatal().
 			Err(err).
@@ -42,7 +62,7 @@ func main() {
 	}
 	defer func() {
 		if err = bk.Close(); err != nil {
-			zeroLogger.Fatal().
+			zeroLogger.Error().
 				Err(err).
 				Msg("unable to close Backup service")
 		}
@@ -56,6 +76,7 @@ func main() {
 		Dur(`"backup interval"`, cfg.StoreInterval).
 		Bool(`"restore backup"`, cfg.Restore).
 		Str(`"backup path"`, cfg.FileStoragePath).
+		Str(`dsn`, cfg.DatabaseDSN).
 		Msg("Starting server")
 	srv := http.Server{
 		Addr:    cfg.RootAddress,
@@ -72,7 +93,10 @@ func main() {
 	<-idleConnectionsClosed
 }
 
-func metricRouter(repo *memory.Metrics, logger *zerologger.ZeroLogger, backer *backup.File) chi.Router {
+func metricRouter(
+	repo server.Storage, logger *zerologger.ZeroLogger,
+	backer *backup.File,
+) chi.Router {
 	dumper := server.NewMetricsDumper(repo)
 	handler := api.NewHTTPHandler(dumper)
 
@@ -81,6 +105,8 @@ func metricRouter(repo *memory.Metrics, logger *zerologger.ZeroLogger, backer *b
 	var getHandler = handler.GetMetric
 	var getAllHandler = handler.GetAll
 	var getJSONHandler = handler.GetMetricJSON
+	var pingDBHandler = handler.Ping
+	var batchHandler = backer.Middleware(handler.DumpMetricList)
 
 	router := chi.NewRouter()
 	router.Use(
@@ -105,13 +131,36 @@ func metricRouter(repo *memory.Metrics, logger *zerologger.ZeroLogger, backer *b
 			r.Post("/", updateJSONHandler)
 			r.Post("/{type}/{name}/{val}", updateHandler)
 		})
+		r.Route("/ping", func(r chi.Router) {
+			r.Get("/", pingDBHandler)
+		})
+		r.Route("/updates", func(r chi.Router) {
+			r.Group(func(r chi.Router) {
+				r.Use(middleware.AllowContentType(constants.ContentTypeJSON))
+				r.Post("/", batchHandler)
+			})
+		})
 	})
 
 	return router
 }
 
+func metricDB(ctx context.Context, dsn string, logger *zerologger.ZeroLogger,
+) (*db.DB, error) {
+	if len(dsn) == 0 {
+		return nil, errors.New("DB DSN is empty")
+	}
+
+	database, err := db.New(ctx, dsn, logger)
+	if err != nil {
+		return nil, fmt.Errorf("unable to create DB instance: %w", err)
+	}
+	return database, nil
+}
+
 func idleShutdown(s *http.Server, channel chan struct{},
-	logger *zerologger.ZeroLogger, backer *backup.File) {
+	logger *zerologger.ZeroLogger, backer *backup.File,
+) {
 	sigint := make(chan os.Signal, 1)
 	signal.Notify(sigint, os.Interrupt)
 	<-sigint
@@ -119,7 +168,7 @@ func idleShutdown(s *http.Server, channel chan struct{},
 	logger.Info().
 		Msg("shutdown signal received. Exiting...")
 	if err := s.Shutdown(context.Background()); err != nil {
-		logger.Fatal().
+		logger.Error().
 			Err(err).
 			Msg("error during HTTP server Shutdown")
 	}

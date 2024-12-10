@@ -4,13 +4,14 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 
 	"github.com/talx-hub/malerter/internal/constants"
-
 	"github.com/talx-hub/malerter/internal/customerror"
 	"github.com/talx-hub/malerter/internal/model"
+	"github.com/talx-hub/malerter/internal/repository/db"
 	"github.com/talx-hub/malerter/internal/service"
 )
 
@@ -39,25 +40,75 @@ func getStatusFromError(err error) int {
 	}
 }
 
-func (h *HTTPHandler) DumpMetricJSON(w http.ResponseWriter, r *http.Request) {
-	metric, err := model.NewMetric().FromJSON(r.Body)
+func extractJSON(body io.Reader) (model.Metric, error) {
+	m := model.NewMetric()
+	if err := json.NewDecoder(body).Decode(m); err != nil {
+		return model.Metric{},
+			fmt.Errorf("unable to decode metric: %w", err)
+	}
+	if err := m.CheckValid(); err != nil {
+		return model.Metric{},
+			&customerror.InvalidArgumentError{
+				Info: fmt.Sprintf("decoded metric is invalid: %v", err)}
+	}
+
+	return *m, nil
+}
+
+func extractJSONs(body io.Reader) ([]model.Metric, error) {
+	var metrics []model.Metric
+	if err := json.NewDecoder(body).Decode(&metrics); err != nil {
+		return nil,
+			fmt.Errorf("unable to decode batch: %w", err)
+	}
+
+	validList := make([]model.Metric, 0)
+	for _, m := range metrics {
+		if err := m.CheckValid(); err != nil || m.IsEmpty() {
+			continue
+		}
+		validList = append(validList, m)
+	}
+	return validList, nil
+}
+
+func (h *HTTPHandler) DumpMetricList(w http.ResponseWriter, r *http.Request) {
+	metrics, err := extractJSONs(r.Body)
 	if err != nil {
 		st := getStatusFromError(err)
-		http.Error(
-			w,
-			fmt.Sprintf(errMsgPattern, r.URL.Path, err.Error()),
-			st)
+		http.Error(w, err.Error(), st)
 		return
 	}
 
+	wrappedBatch := func(args ...any) (any, error) {
+		return nil, h.service.Batch(r.Context(), metrics)
+	}
+	if _, err = db.WithConnectionCheck(wrappedBatch); err != nil {
+		st := getStatusFromError(err)
+		http.Error(w, err.Error(), st)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+}
+
+func (h *HTTPHandler) DumpMetricJSON(w http.ResponseWriter, r *http.Request) {
+	metric, err := extractJSON(r.Body)
+	if err != nil {
+		st := getStatusFromError(err)
+		http.Error(w, err.Error(), st)
+		return
+	}
 	if metric.IsEmpty() {
-		http.Error(
-			w,
-			fmt.Sprintf(errMsgPattern, r.URL.Path, "metric value is empty"),
-			http.StatusNotFound)
+		http.Error(w, "failed to dump empty metric", http.StatusBadRequest)
 		return
 	}
-	if err = h.service.Add(metric); err != nil {
+
+	wrappedAdd := func(args ...any) (any, error) {
+		return nil, h.service.Add(r.Context(), metric)
+	}
+	_, err = db.WithConnectionCheck(wrappedAdd)
+	if err != nil {
 		http.Error(
 			w,
 			fmt.Sprintf(errMsgPattern, r.URL.Path, err.Error()),
@@ -65,10 +116,22 @@ func (h *HTTPHandler) DumpMetricJSON(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	dummyKey := metric.Type.String() + metric.Name
-	metric, err = h.service.Find(dummyKey)
+	dummyKey := metric.Type.String() + " " + metric.Name
+	wrappedFind := func(args ...any) (any, error) {
+		return h.service.Find(r.Context(), dummyKey)
+	}
+	m, err := db.WithConnectionCheck(wrappedFind)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	metric, ok := m.(model.Metric)
+	if !ok {
+		log.Printf("failed to convert any to model.Metric")
+		http.Error(
+			w,
+			"failed to convert find result",
+			http.StatusInternalServerError)
 		return
 	}
 
@@ -84,10 +147,7 @@ func (h *HTTPHandler) DumpMetric(w http.ResponseWriter, r *http.Request) {
 	metric, err := model.NewMetric().FromURL(r.URL.Path)
 	if err != nil {
 		st := getStatusFromError(err)
-		http.Error(
-			w,
-			fmt.Sprintf(errMsgPattern, r.URL.Path, err.Error()),
-			st)
+		http.Error(w, fmt.Sprintf(errMsgPattern, r.URL.Path, err.Error()), st)
 		return
 	}
 	if metric.IsEmpty() {
@@ -98,7 +158,10 @@ func (h *HTTPHandler) DumpMetric(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = h.service.Add(metric)
+	wrappedAdd := func(args ...any) (any, error) {
+		return nil, h.service.Add(r.Context(), metric)
+	}
+	_, err = db.WithConnectionCheck(wrappedAdd)
 	if err != nil {
 		http.Error(
 			w,
@@ -114,52 +177,58 @@ func (h *HTTPHandler) GetMetric(w http.ResponseWriter, r *http.Request) {
 	metric, err := model.NewMetric().FromURL(r.URL.Path)
 	if err != nil {
 		st := getStatusFromError(err)
-		http.Error(
-			w,
-			fmt.Sprintf(errMsgPattern, r.URL.Path, err.Error()),
-			st)
+		http.Error(w, fmt.Sprintf(errMsgPattern, r.URL.Path, err.Error()), st)
 		return
 	}
 
-	dummyKey := metric.Type.String() + metric.Name
-	m, err := h.service.Find(dummyKey)
+	dummyKey := metric.Type.String() + " " + metric.Name
+	wrappedFind := func(args ...any) (any, error) {
+		return h.service.Find(r.Context(), dummyKey)
+	}
+	m, err := db.WithConnectionCheck(wrappedFind)
 	if err != nil {
 		st := getStatusFromError(err)
-		http.Error(
-			w,
-			fmt.Sprintf(errMsgPattern, r.URL.Path, err.Error()),
-			st)
+		http.Error(w, fmt.Sprintf(errMsgPattern, r.URL.Path, err.Error()), st)
+		return
+	}
+	metric, ok := m.(model.Metric)
+	if !ok {
+		log.Printf("failed to convert any to model.Metric")
+		http.Error(w, "failed to convert 'find' result", http.StatusInternalServerError)
 		return
 	}
 
 	w.Header().Set(constants.KeyContentType, constants.ContentTypeText)
 	w.WriteHeader(http.StatusOK)
-	valueStr := fmt.Sprintf("%v", m.ActualValue())
+	valueStr := fmt.Sprintf("%v", metric.ActualValue())
 	_, err = w.Write([]byte(valueStr))
 	if err != nil {
-		log.Fatal(err)
+		log.Printf("failed to write response: %v", err)
 	}
 }
 
 func (h *HTTPHandler) GetMetricJSON(w http.ResponseWriter, r *http.Request) {
-	metric, err := model.NewMetric().FromJSON(r.Body)
+	metric, err := extractJSON(r.Body)
 	if err != nil {
 		st := getStatusFromError(err)
-		http.Error(
-			w,
-			fmt.Sprintf(errMsgPattern, r.URL.Path, err.Error()),
-			st)
+		http.Error(w, fmt.Sprintf(errMsgPattern, r.URL.Path, err.Error()), st)
 		return
 	}
 
-	dummyKey := metric.Type.String() + metric.Name
-	metric, err = h.service.Find(dummyKey)
+	dummyKey := metric.Type.String() + " " + metric.Name
+	wrappedFind := func(args ...any) (any, error) {
+		return h.service.Find(r.Context(), dummyKey)
+	}
+	m, err := db.WithConnectionCheck(wrappedFind)
 	if err != nil {
 		st := getStatusFromError(err)
-		http.Error(
-			w,
-			fmt.Sprintf(errMsgPattern, r.URL.Path, err.Error()),
-			st)
+		http.Error(w, fmt.Sprintf(errMsgPattern, r.URL.Path, err.Error()), st)
+		return
+	}
+	metric, ok := m.(model.Metric)
+	if !ok {
+		log.Printf("failed to convert any to model.Metric")
+		http.Error(w, "failed to convert 'find' result", http.StatusInternalServerError)
 		return
 	}
 
@@ -171,15 +240,47 @@ func (h *HTTPHandler) GetMetricJSON(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (h *HTTPHandler) GetAll(w http.ResponseWriter, _ *http.Request) {
+func (h *HTTPHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set(constants.KeyContentType, constants.ContentTypeHTML)
-	metrics := h.service.Get()
-	page := createMetricsPage(metrics)
-	w.WriteHeader(http.StatusOK)
-	_, err := w.Write([]byte(page))
-	if err != nil {
-		log.Fatal(err)
+	wrappedGet := func(args ...any) (any, error) {
+		return h.service.Get(r.Context())
 	}
+	metrics, err := db.WithConnectionCheck(wrappedGet)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	m, ok := metrics.([]model.Metric)
+	if !ok {
+		log.Printf("failed to convert any to []model.Metric")
+		http.Error(w, "failed to convert 'get' result", http.StatusInternalServerError)
+		return
+	}
+
+	page := createMetricsPage(m)
+	w.WriteHeader(http.StatusOK)
+	_, err = w.Write([]byte(page))
+	if err != nil {
+		log.Printf("failed to write response: %v", err)
+	}
+}
+
+func (h *HTTPHandler) Ping(w http.ResponseWriter, r *http.Request) {
+	if h.service == nil {
+		err := errors.New("the dumping service is not initialised")
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	wrappedPing := func(args ...any) (any, error) {
+		return nil, h.service.Ping(r.Context())
+	}
+	_, err := db.WithConnectionCheck(wrappedPing)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	w.WriteHeader(http.StatusOK)
 }
 
 func createMetricsPage(metrics []model.Metric) string {
