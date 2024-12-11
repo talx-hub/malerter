@@ -46,41 +46,83 @@ SERVER_PORT := 37797
 ADDRESS := "localhost:37797"
 TEMP_FILE := "temp.bk"
 .PHONY : run-autotests
-run-autotests: iter1 iter2 iter3 iter4 iter5 iter6 iter7 iter8 iter9
+run-autotests: iter01 iter02 iter03 iter04 iter05 iter06 iter07 iter08 iter09 iter10 iter11 iter12 iter13
 
-.PHONY : iter1
-iter1:
+.PHONY : iter01
+iter01:
 	./bin/metricstest -test.run=^TestIteration1$$ -binary-path=./bin/server
 
-.PHONY : iter2
-iter2:
+.PHONY : iter02
+iter02:
 	./bin/metricstest -test.run=^TestIteration2A$$ -source-path=. -agent-binary-path=./bin/agent
 
-.PHONY : iter3
-iter3:
+.PHONY : iter03
+iter03:
 	./bin/metricstest -test.run=^TestIteration3A$$ -source-path=. -agent-binary-path=./bin/agent -binary-path=./bin/server
 	./bin/metricstest -test.run=^TestIteration3B$$ -source-path=. -agent-binary-path=./bin/agent -binary-path=./bin/server
 
-.PHONY : iter4
-iter4:
+.PHONY : iter04
+iter04:
 	./bin/metricstest -test.run=^TestIteration4$$ -source-path=. -agent-binary-path=./bin/agent -binary-path=./bin/server -server-port=$(SERVER_PORT)
 
-.PHONY : iter5
-iter5:
+.PHONY : iter05
+iter05:
 	./bin/metricstest -test.run=^TestIteration5$$ -agent-binary-path=./bin/agent -binary-path=./bin/server -server-port=$(SERVER_PORT) -source-path=.
 
-.PHONY : iter6
-iter6:
+.PHONY : iter06
+iter06:
 	./bin/metricstest -test.run=^TestIteration6$$ -agent-binary-path=./bin/agent -binary-path=./bin/server -server-port=$(SERVER_PORT) -source-path=.
 
-.PHONY : iter7
-iter7:
+.PHONY : iter07
+iter07:
 	./bin/metricstest -test.run=^TestIteration7$$ -agent-binary-path=./bin/agent -binary-path=./bin/server -server-port=$(SERVER_PORT) -source-path=.
 
-.PHONY : iter8
-iter8:
+.PHONY : iter08
+iter08:
 	./bin/metricstest -test.run=^TestIteration8$$ -agent-binary-path=./bin/agent -binary-path=./bin/server -server-port=$(SERVER_PORT) -source-path=.
 
-.PHONY : iter9
-iter9:
+.PHONY : iter09
+iter09:
 	./bin/metricstest -test.run=^TestIteration9$$ -agent-binary-path=./bin/agent -binary-path=./bin/server -server-port=$(SERVER_PORT) -source-path=. -file-storage-path=$(TEMP_FILE)
+
+.PHONY : iter10
+iter10:
+	./bin/metricstest -test.run=^TestIteration10A$$ \
+	  -agent-binary-path=./bin/agent \
+	  -binary-path=./bin/server \
+	  -server-port=$(SERVER_PORT) \
+	  -source-path=. \
+      -database-dsn='postgres://godevops:godevops@localhost:5432/godevops_alerts?sslmode=disable'
+	./bin/metricstest -test.run=^TestIteration10B$$ \
+	  -agent-binary-path=./bin/agent \
+	  -binary-path=./bin/server \
+	  -server-port=$(SERVER_PORT) \
+	  -source-path=. \
+      -database-dsn='postgres://godevops:godevops@localhost:5432/godevops_alerts?sslmode=disable'
+
+.PHONY : iter11
+iter11:
+	./bin/metricstest -test.run=^TestIteration11$$ \
+	  -agent-binary-path=./bin/agent \
+	  -binary-path=./bin/server \
+	  -server-port=$(SERVER_PORT) \
+	  -source-path=. \
+      -database-dsn='postgres://godevops:godevops@localhost:5432/godevops_alerts?sslmode=disable'
+
+.PHONY : iter12
+iter12:
+	./bin/metricstest -test.run=^TestIteration12$$ \
+	  -agent-binary-path=./bin/agent \
+	  -binary-path=./bin/server \
+	  -server-port=$(SERVER_PORT) \
+	  -source-path=. \
+      -database-dsn='postgres://godevops:godevops@localhost:5432/godevops_alerts?sslmode=disable'
+
+.PHONY : iter13
+iter13:
+	./bin/metricstest -test.run=^TestIteration13$$ \
+	  -agent-binary-path=./bin/agent \
+	  -binary-path=./bin/server \
+	  -server-port=$(SERVER_PORT) \
+	  -source-path=. \
+      -database-dsn='postgres://godevops:godevops@localhost:5432/godevops_alerts?sslmode=disable'

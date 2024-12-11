@@ -1,10 +1,8 @@
 package model
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"strconv"
 	"strings"
 
@@ -227,17 +225,6 @@ func (m *Metric) FromURL(url string) (Metric, error) {
 	if err := m.CheckValid(); err != nil {
 		return Metric{},
 			fmt.Errorf("parsed metric from URL is invalid: %w", err)
-	}
-
-	return *m, nil
-}
-
-func (m *Metric) FromJSON(body io.Reader) (Metric, error) {
-	if err := json.NewDecoder(body).Decode(m); err != nil {
-		return Metric{}, fmt.Errorf("unable to decode metric: %w", err)
-	}
-	if err := m.CheckValid(); err != nil {
-		return Metric{}, fmt.Errorf("decoded metric is invalid: %w", err)
 	}
 
 	return *m, nil
