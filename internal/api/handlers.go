@@ -65,6 +65,7 @@ func extractJSONs(body io.Reader) ([]model.Metric, error) {
 	validList := make([]model.Metric, 0)
 	for _, m := range metrics {
 		if err := m.CheckValid(); err != nil || m.IsEmpty() {
+			fmt.Printf("decoded metric is invalid: %v", err)
 			continue
 		}
 		validList = append(validList, m)

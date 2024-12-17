@@ -264,15 +264,13 @@ func ping(ctx context.Context, pool *pgxpool.Pool) error {
 	return nil
 }
 
-type Data interface{}
-
 type Method func(args ...any) (any, error)
 
 func WithConnectionCheck(dbMethod Method) (any, error) {
 	data, err := try(0, dbMethod)
 	if err != nil {
 		return nil, fmt.Errorf(
-			"request failed: %w", err)
+			"DB op failed: %w", err)
 	}
 
 	return data, nil
@@ -281,7 +279,7 @@ func WithConnectionCheck(dbMethod Method) (any, error) {
 func try(count int, dbMethod Method) (any, error) {
 	const maxAttemptCount = 3
 	if count > maxAttemptCount {
-		return nil, errors.New("all attempts to try are out")
+		return nil, errors.New("DB connection error")
 	}
 
 	data, err := dbMethod()
