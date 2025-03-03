@@ -7,9 +7,12 @@ import (
 	"log"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"reflect"
+	"strconv"
 	"testing"
 
+	"github.com/go-chi/chi/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -19,6 +22,54 @@ import (
 	"github.com/talx-hub/malerter/internal/service"
 	"github.com/talx-hub/malerter/internal/service/server"
 )
+
+func testRequest(t *testing.T,
+	handler http.HandlerFunc,
+	method,
+	path,
+	contentType string,
+	body *string, metric ...string) (*http.Response, string) {
+	t.Helper()
+
+	var name, mType, val string
+	switch len(metric) {
+	case 3:
+		val = metric[2]
+		fallthrough
+	case 2:
+		mType = metric[0]
+		name = metric[1]
+	}
+
+	path, err := url.JoinPath(path, metric...)
+	require.NoError(t, err)
+
+	var r *http.Request
+	if body != nil {
+		r = httptest.NewRequest(method, path, bytes.NewBufferString(*body))
+	} else {
+		r = httptest.NewRequest(method, path, http.NoBody)
+	}
+	r.Header.Set(constants.KeyContentType, contentType)
+	chiCtx := chi.NewRouteContext()
+	r = r.WithContext(context.WithValue(r.Context(), chi.RouteCtxKey, chiCtx))
+	chiCtx.URLParams.Add("name", name)
+	chiCtx.URLParams.Add("type", mType)
+	chiCtx.URLParams.Add("val", val)
+
+	w := httptest.NewRecorder()
+	handler(w, r)
+	response := w.Result()
+	defer func() {
+		err := response.Body.Close()
+		require.NoError(t, err)
+	}()
+
+	respBody, err := io.ReadAll(response.Body)
+	require.NoError(t, err)
+
+	return response, string(respBody)
+}
 
 func TestNewHTTPHandler(t *testing.T) {
 	type args struct {
@@ -56,60 +107,57 @@ func TestNewHTTPHandler(t *testing.T) {
 
 func TestHTTPHandler_DumpMetric(t *testing.T) {
 	type test struct {
-		url    string
+		mType  string
+		mName  string
+		mVal   string
 		want   string
 		status int
 	}
 
 	tests := []test{
-		{"/update/counter/someMetric/123", "", 200},
-		{"/update/gauge/someMetric/123.1", "", 200},
-		{"/update/gauge/someMetric/1", "", 200},
+		{"counter", "someMetric", "123", "", 200},
+		{"gauge", "someMetric", "123.1", "", 200},
+		{"gauge", "someMetric", "1", "", 200},
 		{
-			"/update/gauge/1",
-			"/update/gauge/1 fails: metric, parsed from URL is invalid: " +
-				"not found: metric name must be a string\n",
+			"gauge", "", "1",
+			"/update/gauge/1 fails: metric, constructed from values is incorrect: " +
+				"not found: metric name must be not empty\n",
 			404,
 		},
 		{
-			"/update/WRONG/someMetric/1",
-			"/update/WRONG/someMetric/1 fails: parsed metric from URL is invalid: " +
+			"WRONG", "someMetric", "1",
+			"/update/WRONG/someMetric/1 fails: metric, constructed from values is incorrect: " +
 				"incorrect request: only counter and gauge types are allowed\n",
 			400,
 		},
 		{
-			"/update/counter/someMetric/1.0",
-			"/update/counter/someMetric/1.0 fails: parsed metric from URL is invalid: " +
+			"counter", "someMetric", "1.0",
+			"/update/counter/someMetric/1.0 fails: metric, constructed from values is incorrect: " +
 				"incorrect request: metric has invalid value\n",
 			400,
 		},
 		{
-			"/update/counter/someMetric",
-			"/update/counter/someMetric fails: metric value is empty\n",
-			404,
-		},
-		{
-			"/update/counter/someMetric/9223372036854775808",
-			"/update/counter/someMetric/9223372036854775808 fails: " +
-				"parsed metric from URL is invalid: incorrect request: metric has invalid value\n",
+			"counter", "someMetric", "9223372036854775808",
+			"/update/counter/someMetric/9223372036854775808 fails: metric, " +
+				"constructed from values is incorrect: incorrect request: metric has invalid value\n",
 			400,
 		},
 		{
-			"/update/counter/someMetric/string",
-			"/update/counter/someMetric/string fails: unable to set value for metric: " +
-				"incorrect request: invalid value <string>\n",
+			"counter", "someMetric", "string",
+			"/update/counter/someMetric/string fails: unable to set value:" +
+				" incorrect request: invalid value <string>\n",
 			400,
 		},
 	}
 	rep := memory.New()
-	serv := server.NewMetricsDumper(rep)
-	handler := NewHTTPHandler(serv)
-	ts := httptest.NewServer(http.HandlerFunc(handler.DumpMetric))
-	defer ts.Close()
+	srvce := server.NewMetricsDumper(rep)
+	handler := NewHTTPHandler(srvce).DumpMetric
 
-	for _, tt := range tests {
-		t.Run(tt.url, func(t *testing.T) {
-			resp, got := testRequest(t, ts, http.MethodPost, tt.url, "", nil)
+	for i, tt := range tests {
+		t.Run(strconv.Itoa(i), func(t *testing.T) {
+			resp, got := testRequest(
+				t, handler, http.MethodPost, "/update",
+				"", nil, tt.mType, tt.mName, tt.mVal)
 			assert.Equal(t, tt.status, resp.StatusCode)
 			assert.Equal(t, tt.want, got)
 			if err := resp.Body.Close(); err != nil {
@@ -121,28 +169,31 @@ func TestHTTPHandler_DumpMetric(t *testing.T) {
 
 func TestHTTPHandler_GetMetric(t *testing.T) {
 	type test struct {
-		url    string
+		mType  string
+		mName  string
 		want   string
 		status int
 	}
 
 	tests := []test{
-		{"/value/counter/mainQuestion", "42", 200},
-		{"/value/gauge/pi", "3.14", 200},
+		{"counter", "mainQuestion", "42", 200},
+		{"gauge", "pi", "3.14", 200},
 		{
-			"/value/wrong/pi",
-			"/value/wrong/pi fails: metric, parsed from URL is invalid: " +
+			"wrong", "pi",
+			"/value/wrong/pi fails: metric, constructed from values is incorrect: " +
 				"incorrect request: only counter and gauge types are allowed\n",
 			400,
 		},
-		{"/value/gauge/wrong",
-			"/value/gauge/wrong fails: request failed: on attempt #0 error occurred: not found: \n",
+		{"gauge", "wrong",
+			"/value/gauge/wrong fails: DB op failed: on attempt #0 error occurred: not found: \n",
 			404},
-		{"/value/counter/wrong",
-			"/value/counter/wrong fails: request failed: on attempt #0 error occurred: not found: \n",
+		{"counter", "wrong",
+			"/value/counter/wrong fails: DB op failed: on attempt #0 error occurred: not found: \n",
 			404},
-		{"/value/counter", "/value/counter fails: not found: incorrect URL\n", 404},
-		{"/value/gauge", "/value/gauge fails: not found: incorrect URL\n", 404},
+		{"counter", "", "/value/counter fails: metric, constructed from values is incorrect: " +
+			"not found: metric name must be not empty\n", 404},
+		{"gauge", "", "/value/gauge fails: metric, constructed from values is incorrect: " +
+			"not found: metric name must be not empty\n", 404},
 	}
 	m1, _ := model.NewMetric().FromValues("mainQuestion", model.MetricTypeCounter, int64(42))
 	m2, _ := model.NewMetric().FromValues("pi", model.MetricTypeGauge, 3.14)
@@ -151,13 +202,14 @@ func TestHTTPHandler_GetMetric(t *testing.T) {
 	_ = repository.Add(context.TODO(), m2)
 
 	dumper := server.NewMetricsDumper(repository)
-	handler := NewHTTPHandler(dumper)
-	ts := httptest.NewServer(http.HandlerFunc(handler.GetMetric))
-	defer ts.Close()
+	handler := NewHTTPHandler(dumper).GetMetric
 
-	for _, tt := range tests {
-		t.Run(tt.url, func(t *testing.T) {
-			resp, got := testRequest(t, ts, http.MethodGet, tt.url, "", nil)
+	for i, tt := range tests {
+		t.Run(strconv.Itoa(i), func(t *testing.T) {
+			resp, got := testRequest(
+				t, handler, http.MethodGet,
+				"/value", "", nil,
+				tt.mType, tt.mName)
 			assert.Equal(t, tt.status, resp.StatusCode)
 			assert.Equal(t, tt.want, got)
 			if err := resp.Body.Close(); err != nil {
@@ -265,12 +317,10 @@ func TestHTTPHandler_DumpMetricJSON(t *testing.T) {
 	repository := memory.New()
 	dumper := server.NewMetricsDumper(repository)
 	handler := NewHTTPHandler(dumper)
-	testServer := httptest.NewServer(http.HandlerFunc(handler.DumpMetricJSON))
-	defer testServer.Close()
 
 	for _, test := range tests {
 		t.Run(test.url, func(t *testing.T) {
-			resp, got := testRequest(t, testServer, test.method, test.url, test.contentType, &test.body)
+			resp, got := testRequest(t, handler.DumpMetricJSON, test.method, test.url, test.contentType, &test.body)
 			assert.Equal(t, test.expectedCode, resp.StatusCode)
 			if test.expectedCode == http.StatusOK {
 				assert.JSONEq(t, test.expectedBody, got)
@@ -338,12 +388,10 @@ func TestHTTPHandler_GetMetricJSON(t *testing.T) {
 
 	dumper := server.NewMetricsDumper(repository)
 	handler := NewHTTPHandler(dumper)
-	testServer := httptest.NewServer(http.HandlerFunc(handler.GetMetricJSON))
-	defer testServer.Close()
 
 	for _, test := range tests {
 		t.Run(test.url, func(t *testing.T) {
-			resp, got := testRequest(t, testServer, test.method, test.url, test.contentType, &test.body)
+			resp, got := testRequest(t, handler.GetMetricJSON, test.method, test.url, test.contentType, &test.body)
 			assert.Equal(t, test.expectedCode, resp.StatusCode)
 			if test.expectedCode == http.StatusOK {
 				assert.JSONEq(t, test.expectedBody, got)
@@ -353,29 +401,6 @@ func TestHTTPHandler_GetMetricJSON(t *testing.T) {
 			}
 		})
 	}
-}
-
-func testRequest(t *testing.T, ts *httptest.Server,
-	method, path, contentType string, body *string) (*http.Response, string) {
-	t.Helper()
-
-	var request *http.Request
-	var err error
-	if body != nil {
-		request, err = http.NewRequest(method, ts.URL+path, bytes.NewBufferString(*body))
-	} else {
-		request, err = http.NewRequest(method, ts.URL+path, http.NoBody)
-	}
-	require.NoError(t, err)
-	request.Header.Set(constants.KeyContentType, contentType)
-
-	resp, err := ts.Client().Do(request)
-	require.NoError(t, err)
-
-	respBody, err := io.ReadAll(resp.Body)
-	require.NoError(t, err)
-
-	return resp, string(respBody)
 }
 
 func TestHTTPHandler_GetAll(t *testing.T) {
@@ -400,11 +425,10 @@ func TestHTTPHandler_GetAll(t *testing.T) {
 
 	dumper := server.NewMetricsDumper(repository)
 	handler := NewHTTPHandler(dumper)
-	testServer := httptest.NewServer(http.HandlerFunc(handler.GetAll))
 
 	for _, test := range tests {
 		t.Run(test.url, func(t *testing.T) {
-			resp, got := testRequest(t, testServer, test.method, test.url, "", &test.body)
+			resp, got := testRequest(t, handler.GetAll, test.method, test.url, "", &test.body)
 			assert.Equal(t, test.expectedStatus, resp.StatusCode)
 			if test.expectedStatus == http.StatusOK {
 				assert.Equal(t, test.expectedBody, got)
@@ -416,7 +440,7 @@ func TestHTTPHandler_GetAll(t *testing.T) {
 	}
 }
 
-func TestFromJSON(t *testing.T) {
+func TestExtractJSON(t *testing.T) {
 	tests := []struct {
 		name    string
 		json    string

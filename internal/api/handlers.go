@@ -8,6 +8,8 @@ import (
 	"log"
 	"net/http"
 
+	"github.com/go-chi/chi/v5"
+
 	"github.com/talx-hub/malerter/internal/constants"
 	"github.com/talx-hub/malerter/internal/customerror"
 	"github.com/talx-hub/malerter/internal/model"
@@ -145,7 +147,11 @@ func (h *HTTPHandler) DumpMetricJSON(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *HTTPHandler) DumpMetric(w http.ResponseWriter, r *http.Request) {
-	metric, err := model.NewMetric().FromURL(r.URL.Path)
+	mName := chi.URLParam(r, "name")
+	mType := chi.URLParam(r, "type")
+	mValue := chi.URLParam(r, "val")
+	metric, err := model.NewMetric().FromValues(
+		mName, model.MetricType(mType), mValue)
 	if err != nil {
 		st := getStatusFromError(err)
 		http.Error(w, fmt.Sprintf(errMsgPattern, r.URL.Path, err.Error()), st)
@@ -175,14 +181,16 @@ func (h *HTTPHandler) DumpMetric(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *HTTPHandler) GetMetric(w http.ResponseWriter, r *http.Request) {
-	metric, err := model.NewMetric().FromURL(r.URL.Path)
+	mName := chi.URLParam(r, "name")
+	mType := chi.URLParam(r, "type")
+	metric, err := model.NewMetric().FromValues(
+		mName, model.MetricType(mType), "0")
 	if err != nil {
 		st := getStatusFromError(err)
 		http.Error(w, fmt.Sprintf(errMsgPattern, r.URL.Path, err.Error()), st)
 		return
 	}
-
-	dummyKey := metric.Type.String() + " " + metric.Name
+	dummyKey := mType + " " + mName
 	wrappedFind := func(args ...any) (any, error) {
 		return h.service.Find(r.Context(), dummyKey)
 	}

@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"strconv"
-	"strings"
 
 	"github.com/talx-hub/malerter/internal/customerror"
 )
@@ -192,40 +191,5 @@ func (m *Metric) FromValues(name string, t MetricType, value any) (Metric, error
 		return Metric{},
 			fmt.Errorf("metric, constructed from values is incorrect: %w", err)
 	}
-	return *m, nil
-}
-
-func (m *Metric) FromURL(url string) (Metric, error) {
-	const minCorrectURLParts = 4
-	parts := strings.Split(url, "/")
-	if len(parts) < minCorrectURLParts {
-		return Metric{}, &customerror.NotFoundError{
-			Message: "incorrect URL",
-		}
-	}
-
-	const idxName = 3
-	const idxType = 2
-	const idxValue = 4
-	m.Name = parts[idxName]
-	m.Type = MetricType(parts[idxType])
-	if len(parts) == minCorrectURLParts {
-		if err := m.CheckValid(); err != nil {
-			return Metric{},
-				fmt.Errorf("metric, parsed from URL is invalid: %w", err)
-		}
-		return *m, nil
-	}
-
-	if err := m.setValue(parts[idxValue]); err != nil {
-		return Metric{},
-			fmt.Errorf("unable to set value for metric: %w", err)
-	}
-	m.clean()
-	if err := m.CheckValid(); err != nil {
-		return Metric{},
-			fmt.Errorf("parsed metric from URL is invalid: %w", err)
-	}
-
 	return *m, nil
 }
