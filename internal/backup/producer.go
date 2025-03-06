@@ -31,17 +31,9 @@ func NewProducer(filename string) (*Producer, error) {
 }
 
 func (p *Producer) WriteMetric(metric model.Metric) error {
-	data, err := json.Marshal(&metric)
-	if err != nil {
-		return fmt.Errorf("unable marshal metric: %w", err)
-	}
-
-	if _, err := p.writer.Write(data); err != nil {
-		return fmt.Errorf("unable to write backup: %w", err)
-	}
-
-	if err := p.writer.WriteByte('\n'); err != nil {
-		return fmt.Errorf("unable to write string: %w", err)
+	jsonEncoder := json.NewEncoder(p.writer)
+	if err := jsonEncoder.Encode(&metric); err != nil {
+		return fmt.Errorf("unable to backup metric: %w", err)
 	}
 
 	if err := p.writer.Flush(); err != nil {
