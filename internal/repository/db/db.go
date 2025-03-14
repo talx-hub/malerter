@@ -16,17 +16,18 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 	_ "github.com/jackc/pgx/v5/stdlib"
+
 	"github.com/talx-hub/malerter/internal/customerror"
-	"github.com/talx-hub/malerter/internal/logger/zerologger"
+	"github.com/talx-hub/malerter/internal/logger"
 	"github.com/talx-hub/malerter/internal/model"
 )
 
 type DB struct {
 	pool *pgxpool.Pool
-	log  *zerologger.ZeroLogger
+	log  *logger.ZeroLogger
 }
 
-func New(ctx context.Context, dsn string, logger *zerologger.ZeroLogger,
+func New(ctx context.Context, dsn string, log *logger.ZeroLogger,
 ) (*DB, error) {
 	if err := runMigrations(dsn); err != nil {
 		return nil, fmt.Errorf("failed to run DB migrations: %w", err)
@@ -37,7 +38,7 @@ func New(ctx context.Context, dsn string, logger *zerologger.ZeroLogger,
 	}
 	return &DB{
 		pool: pool,
-		log:  logger,
+		log:  log,
 	}, nil
 }
 
@@ -238,7 +239,7 @@ func fromRow(row pgx.Row) (*model.Metric, error) {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil,
 				&customerror.NotFoundError{
-					Message: "metric not found: %s" + metric.String(),
+					Info: "metric not found: %s" + metric.String(),
 				}
 		}
 		return nil, fmt.Errorf("failed to scan a response row: %w", err)

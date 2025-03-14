@@ -4,11 +4,11 @@ import (
 	"context"
 	"errors"
 	"io"
-	"log"
 	"net/http"
 	"time"
 
 	"github.com/talx-hub/malerter/internal/config/server"
+	"github.com/talx-hub/malerter/internal/logger"
 	"github.com/talx-hub/malerter/internal/model"
 )
 
@@ -22,20 +22,28 @@ type File struct {
 	storage        Storage
 	producer       Producer
 	restorer       Restorer
+	log            *logger.ZeroLogger
 	backupInterval time.Duration
 }
 
-func New(config *server.Builder, storage Storage) (*File, error) {
+func New(
+	config *server.Builder,
+	storage Storage,
+	log *logger.ZeroLogger,
+) *File {
 	if config == nil {
-		return nil, errors.New("config is nil")
+		log.Error().Msg("unable to load Backup service: config is nil")
+		return nil
 	}
 	p, err := NewProducer(config.FileStoragePath)
 	if err != nil {
-		return nil, err
+		log.Error().Err(err).Msg("unable to create backup Producer")
+		return nil
 	}
 	r, err := NewRestorer(config.FileStoragePath)
 	if err != nil {
-		return nil, err
+		log.Error().Err(err).Msg("unable to create backup Restorer")
+		return nil
 	}
 
 	return &File{
@@ -44,7 +52,8 @@ func New(config *server.Builder, storage Storage) (*File, error) {
 		backupInterval: config.StoreInterval,
 		lastBackup:     time.Now().UTC(),
 		storage:        storage,
-	}, nil
+		log:            log,
+	}
 }
 
 func (b *File) Restore() {
@@ -54,11 +63,13 @@ func (b *File) Restore() {
 			if errors.Is(err, io.EOF) {
 				break
 			}
-			log.Printf("unable to restore metric: %v", err)
+			b.log.Error().Err(err).
+				Msg("unable to restore metric")
 		}
 		err = b.storage.Add(context.TODO(), *metric)
 		if err != nil {
-			log.Printf("unable to store metric, during backup restore: %v", err)
+			b.log.Error().Err(err).
+				Msg("unable to store metric, during backup restore")
 		}
 	}
 }
@@ -67,7 +78,7 @@ func (b *File) Backup() {
 	metrics, _ := b.storage.Get(context.TODO())
 	for _, m := range metrics {
 		if err := b.producer.WriteMetric(m); err != nil {
-			log.Printf("unable to backup metric: %v\n", err)
+			b.log.Error().Err(err).Msg("unable to backup metric")
 		}
 	}
 }
@@ -82,12 +93,13 @@ func (b *File) Middleware(h http.HandlerFunc) http.HandlerFunc {
 	}
 }
 
-func (b *File) Close() error {
+func (b *File) Close() {
 	if err := b.producer.Close(); err != nil {
-		return err
+		b.log.Error().Err(err).
+			Msg("unable to properly close Backup service")
 	}
 	if err := b.restorer.Close(); err != nil {
-		return err
+		b.log.Error().Err(err).
+			Msg("unable to properly close Backup service")
 	}
-	return nil
 }

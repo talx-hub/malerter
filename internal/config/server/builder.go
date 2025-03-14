@@ -9,11 +9,11 @@ import (
 	"time"
 
 	"github.com/talx-hub/malerter/internal/config"
+	"github.com/talx-hub/malerter/internal/constants"
 )
 
 const (
 	AddressDefault       = "localhost:8080"
-	LogLevelDefault      = "Info"
 	StoreIntervalDefault = 300
 	RestoreDefault       = true
 )
@@ -48,7 +48,7 @@ type Builder struct {
 
 func (b *Builder) LoadFromFlags() config.Builder {
 	flag.StringVar(&b.RootAddress, "a", AddressDefault, "server root address")
-	flag.StringVar(&b.LogLevel, "l", LogLevelDefault, "server log level")
+	flag.StringVar(&b.LogLevel, "l", constants.LogLevelDefault, "server log level")
 	flag.StringVar(&b.FileStoragePath, "f", FileStorageDefault(), "backup file path")
 	var backupInterval int64
 	flag.Int64Var(&backupInterval, "i", StoreIntervalDefault, "interval in seconds of repository backup")

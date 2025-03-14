@@ -4,20 +4,22 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log"
 	"sync"
 
 	"github.com/talx-hub/malerter/internal/customerror"
+	"github.com/talx-hub/malerter/internal/logger"
 	"github.com/talx-hub/malerter/internal/model"
 )
 
 type Memory struct {
+	log  *logger.ZeroLogger
 	data map[string]model.Metric
 	m    sync.RWMutex
 }
 
-func New() *Memory {
+func New(log *logger.ZeroLogger) *Memory {
 	return &Memory{
+		log:  log,
 		data: make(map[string]model.Metric),
 	}
 }
@@ -44,7 +46,7 @@ func (r *Memory) Add(_ context.Context, metric model.Metric) error {
 func (r *Memory) Batch(ctx context.Context, batch []model.Metric) error {
 	for _, m := range batch {
 		if err := r.Add(ctx, m); err != nil {
-			log.Printf("failed to update batch metric: %v", err)
+			r.log.Error().Err(err).Msg("failed to update batch metric")
 		}
 	}
 	return nil

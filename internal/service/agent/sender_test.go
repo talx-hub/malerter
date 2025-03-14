@@ -6,17 +6,22 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/talx-hub/malerter/internal/constants"
+	"github.com/talx-hub/malerter/internal/logger"
 	"github.com/talx-hub/malerter/internal/model"
 	"github.com/talx-hub/malerter/internal/repository/memory"
 )
 
 func TestGet(t *testing.T) {
-	storage := memory.New()
+	log, err := logger.New(constants.LogLevelDefault)
+	require.NoError(t, err)
+	storage := memory.New(log)
 	m1, _ := model.NewMetric().FromValues("m42", model.MetricTypeCounter, int64(42))
 	m2, _ := model.NewMetric().FromValues("pi", model.MetricTypeGauge, 3.14)
 	_ = storage.Add(context.TODO(), m1)
 	_ = storage.Add(context.TODO(), m2)
-	sender := Sender{storage: storage, host: ""}
+	sender := Sender{storage: storage, host: "", log: log}
 	got, _ := sender.get()
 	require.Len(t, got, 2)
 	assert.Contains(t, got, m1)
@@ -24,6 +29,11 @@ func TestGet(t *testing.T) {
 }
 
 func TestConvertToJSONs(t *testing.T) {
+	log, err := logger.New(constants.LogLevelDefault)
+	require.NoError(t, err)
+	storage := memory.New(log)
+	sender := Sender{storage: storage, host: "", log: log}
+
 	tests := []struct {
 		name    string
 		metrics []model.Metric
@@ -49,7 +59,7 @@ func TestConvertToJSONs(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			got := convertToJSONs(test.metrics)
+			got := sender.convertToJSONs(test.metrics)
 			require.Equal(t, len(test.want), len(got))
 			for i, json := range got {
 				assert.JSONEq(t, json, test.want[i])

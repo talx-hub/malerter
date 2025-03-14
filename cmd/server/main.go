@@ -11,6 +11,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+
 	"github.com/talx-hub/malerter/internal/api/handlers"
 	"github.com/talx-hub/malerter/internal/api/middlewares"
 	"github.com/talx-hub/malerter/internal/backup"
@@ -49,21 +50,14 @@ func main() {
 		storage = database
 	}
 
-	bk, err := backup.New(&cfg, storage)
-	if err != nil {
-		zeroLogger.Fatal().
-			Err(err).
-			Msg("unable to load Backup service")
-	}
-	defer func() {
-		if err = bk.Close(); err != nil {
-			zeroLogger.Error().
-				Err(err).
-				Msg("unable to close Backup service")
+	bk := backup.New(&cfg, storage, zeroLogger)
+	if bk == nil {
+		zeroLogger.Error().Msg("running without backup")
+	} else {
+		defer bk.Close()
+		if cfg.Restore {
+			bk.Restore()
 		}
-	}()
-	if cfg.Restore {
-		bk.Restore()
 	}
 
 	zeroLogger.Info().

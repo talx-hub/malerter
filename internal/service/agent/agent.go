@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/talx-hub/malerter/internal/config/agent"
+	"github.com/talx-hub/malerter/internal/logger"
 	"github.com/talx-hub/malerter/internal/model"
 )
 
@@ -22,16 +23,22 @@ type Agent struct {
 	sender  Sender
 }
 
-func NewAgent(storage Storage, cfg *agent.Builder, client *http.Client) *Agent {
+func NewAgent(
+	storage Storage,
+	cfg *agent.Builder,
+	client *http.Client,
+	log *logger.ZeroLogger,
+) *Agent {
 	return &Agent{
 		config:  cfg,
 		storage: storage,
-		poller:  Poller{storage: storage},
+		poller:  Poller{storage: storage, log: log},
 		sender: Sender{
 			storage:  storage,
 			host:     "http://" + cfg.ServerAddress,
 			client:   client,
 			compress: true,
+			log:      log,
 		},
 	}
 }

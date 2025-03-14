@@ -88,7 +88,7 @@ func (m *Metric) IsEmpty() bool {
 func (m *Metric) CheckValid() error {
 	if m.Name == "" {
 		return &customerror.NotFoundError{
-			Message: "metric name must be not empty",
+			Info: "metric name must be not empty",
 		}
 	}
 
@@ -97,7 +97,7 @@ func (m *Metric) CheckValid() error {
 	_, errI := strconv.Atoi(m.Name)
 	if errF == nil || errI == nil {
 		return &customerror.NotFoundError{
-			Message: "metric name must be a string",
+			Info: "metric name must be a string",
 		}
 	}
 

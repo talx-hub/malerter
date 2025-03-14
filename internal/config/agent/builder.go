@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/talx-hub/malerter/internal/config"
+	"github.com/talx-hub/malerter/internal/constants"
 )
 
 const (
@@ -31,12 +32,14 @@ func NewDirector() *config.Director {
 
 type Builder struct {
 	ServerAddress  string
+	LogLevel       string
 	ReportInterval time.Duration
 	PollInterval   time.Duration
 }
 
 func (b *Builder) LoadFromFlags() config.Builder {
 	flag.StringVar(&b.ServerAddress, "a", HostDefault, "alert-host address")
+	flag.StringVar(&b.LogLevel, "l", constants.LogLevelDefault, "server log level")
 
 	var ri int64
 	flag.Int64Var(&ri, "r", ReportIntervalDefault, "interval in seconds of sending metrics to alert server")

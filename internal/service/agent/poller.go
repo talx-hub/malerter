@@ -2,10 +2,10 @@ package agent
 
 import (
 	"context"
-	"log"
 	"math/rand/v2"
 	"runtime"
 
+	"github.com/talx-hub/malerter/internal/logger"
 	"github.com/talx-hub/malerter/internal/model"
 )
 
@@ -45,6 +45,7 @@ const (
 
 type Poller struct {
 	storage Storage
+	log     *logger.ZeroLogger
 }
 
 func (p *Poller) update() {
@@ -94,7 +95,7 @@ func collect() []model.Metric {
 func (p *Poller) store(metrics []model.Metric) {
 	for _, m := range metrics {
 		if p.storage.Add(context.TODO(), m) != nil {
-			log.Println("error during storing of metric")
+			p.log.Error().Msg("error during storing of metric")
 		}
 	}
 }

@@ -6,6 +6,9 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/talx-hub/malerter/internal/constants"
+	"github.com/talx-hub/malerter/internal/logger"
 	"github.com/talx-hub/malerter/internal/repository/memory"
 )
 
@@ -20,8 +23,10 @@ func TestCollect(t *testing.T) {
 }
 
 func TestStore(t *testing.T) {
-	storage := memory.New()
-	poller := Poller{storage: storage}
+	log, err := logger.New(constants.LogLevelDefault)
+	require.NoError(t, err)
+	storage := memory.New(log)
+	poller := Poller{storage: storage, log: log}
 	metrics := collect()
 	poller.store(metrics)
 	t.Run("store runtime metrics", func(t *testing.T) {
