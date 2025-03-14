@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	agentCfg "github.com/talx-hub/malerter/internal/config/agent"
+	"github.com/talx-hub/malerter/internal/logger"
 	"github.com/talx-hub/malerter/internal/repository/memory"
 	"github.com/talx-hub/malerter/internal/service/agent"
 )
@@ -22,9 +23,13 @@ func main() {
 	if !ok {
 		log.Fatal("unable to load agent config")
 	}
+	zeroLogger, err := logger.New(cfg.LogLevel)
+	if err != nil {
+		log.Fatalf("unable to configure custom logger: %s", err.Error())
+	}
 
-	rep := memory.New()
-	agt := agent.NewAgent(rep, &cfg, &http.Client{})
+	rep := memory.New(zeroLogger)
+	agt := agent.NewAgent(rep, &cfg, &http.Client{}, zeroLogger)
 
 	agt.Run()
 }

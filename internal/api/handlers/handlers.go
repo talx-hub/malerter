@@ -1,17 +1,17 @@
-package api
+package handlers
 
 import (
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
 
 	"github.com/talx-hub/malerter/internal/constants"
 	"github.com/talx-hub/malerter/internal/customerror"
+	"github.com/talx-hub/malerter/internal/logger"
 	"github.com/talx-hub/malerter/internal/model"
 	"github.com/talx-hub/malerter/internal/repository/db"
 	"github.com/talx-hub/malerter/internal/service"
@@ -23,10 +23,11 @@ const (
 
 type HTTPHandler struct {
 	service service.Service
+	log     *logger.ZeroLogger
 }
 
-func NewHTTPHandler(s service.Service) *HTTPHandler {
-	return &HTTPHandler{service: s}
+func NewHTTPHandler(s service.Service, log *logger.ZeroLogger) *HTTPHandler {
+	return &HTTPHandler{service: s, log: log}
 }
 
 func getStatusFromError(err error) int {
@@ -57,7 +58,7 @@ func extractJSON(body io.Reader) (model.Metric, error) {
 	return *m, nil
 }
 
-func extractJSONs(body io.Reader) ([]model.Metric, error) {
+func (h *HTTPHandler) extractJSONs(body io.Reader) ([]model.Metric, error) {
 	var metrics []model.Metric
 	if err := json.NewDecoder(body).Decode(&metrics); err != nil {
 		return nil,
@@ -67,7 +68,7 @@ func extractJSONs(body io.Reader) ([]model.Metric, error) {
 	validList := make([]model.Metric, 0)
 	for _, m := range metrics {
 		if err := m.CheckValid(); err != nil || m.IsEmpty() {
-			fmt.Printf("decoded metric is invalid: %v", err)
+			h.log.Error().Err(err).Msg("decoded metric is invalid")
 			continue
 		}
 		validList = append(validList, m)
@@ -76,7 +77,7 @@ func extractJSONs(body io.Reader) ([]model.Metric, error) {
 }
 
 func (h *HTTPHandler) DumpMetricList(w http.ResponseWriter, r *http.Request) {
-	metrics, err := extractJSONs(r.Body)
+	metrics, err := h.extractJSONs(r.Body)
 	if err != nil {
 		st := getStatusFromError(err)
 		http.Error(w, err.Error(), st)
@@ -130,7 +131,7 @@ func (h *HTTPHandler) DumpMetricJSON(w http.ResponseWriter, r *http.Request) {
 	}
 	metric, ok := m.(model.Metric)
 	if !ok {
-		log.Printf("failed to convert any to model.Metric")
+		h.log.Error().Msg("failed to convert 'any' to model.Metric")
 		http.Error(
 			w,
 			"failed to convert find result",
@@ -202,7 +203,7 @@ func (h *HTTPHandler) GetMetric(w http.ResponseWriter, r *http.Request) {
 	}
 	metric, ok := m.(model.Metric)
 	if !ok {
-		log.Printf("failed to convert any to model.Metric")
+		h.log.Error().Msg("failed to convert 'any' to model.Metric")
 		http.Error(w, "failed to convert 'find' result", http.StatusInternalServerError)
 		return
 	}
@@ -212,7 +213,7 @@ func (h *HTTPHandler) GetMetric(w http.ResponseWriter, r *http.Request) {
 	valueStr := fmt.Sprintf("%v", metric.ActualValue())
 	_, err = w.Write([]byte(valueStr))
 	if err != nil {
-		log.Printf("failed to write response: %v", err)
+		h.log.Error().Err(err).Msg("failed to write response")
 	}
 }
 
@@ -236,7 +237,7 @@ func (h *HTTPHandler) GetMetricJSON(w http.ResponseWriter, r *http.Request) {
 	}
 	metric, ok := m.(model.Metric)
 	if !ok {
-		log.Printf("failed to convert any to model.Metric")
+		h.log.Error().Msg("failed to convert 'any' to model.Metric")
 		http.Error(w, "failed to convert 'find' result", http.StatusInternalServerError)
 		return
 	}
@@ -261,8 +262,8 @@ func (h *HTTPHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 	}
 	m, ok := metrics.([]model.Metric)
 	if !ok {
-		log.Printf("failed to convert any to []model.Metric")
-		http.Error(w, "failed to convert 'get' result", http.StatusInternalServerError)
+		h.log.Error().Msg("failed to convert 'any' to []model.Metric")
+		http.Error(w, "failed to convert 'GetAll' result", http.StatusInternalServerError)
 		return
 	}
 
@@ -270,7 +271,7 @@ func (h *HTTPHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	_, err = w.Write([]byte(page))
 	if err != nil {
-		log.Printf("failed to write response: %v", err)
+		h.log.Error().Err(err).Msg("failed to write response")
 	}
 }
 

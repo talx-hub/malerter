@@ -1,4 +1,4 @@
-package api
+package handlers
 
 import (
 	"bytes"
@@ -11,6 +11,8 @@ import (
 	"reflect"
 	"strconv"
 	"testing"
+
+	"github.com/talx-hub/malerter/internal/logger"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/stretchr/testify/assert"
@@ -75,6 +77,9 @@ func TestNewHTTPHandler(t *testing.T) {
 	type args struct {
 		service service.Service
 	}
+
+	lg, _ := logger.New(constants.LogLevelDefault)
+
 	tests := []struct {
 		name string
 		args args
@@ -83,22 +88,22 @@ func TestNewHTTPHandler(t *testing.T) {
 		{
 			name: "simple constructor test #0",
 			args: args{nil},
-			want: &HTTPHandler{nil},
+			want: &HTTPHandler{nil, lg},
 		},
 		{
 			name: "simple constructor test #1",
 			args: args{service: server.NewMetricsDumper(nil)},
-			want: &HTTPHandler{server.NewMetricsDumper(nil)},
+			want: &HTTPHandler{server.NewMetricsDumper(nil), lg},
 		},
 		{
 			name: "simple constructor test #2",
-			args: args{service: server.NewMetricsDumper(memory.New())},
-			want: &HTTPHandler{server.NewMetricsDumper(memory.New())},
+			args: args{service: server.NewMetricsDumper(memory.New(lg))},
+			want: &HTTPHandler{server.NewMetricsDumper(memory.New(lg)), lg},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := NewHTTPHandler(tt.args.service); !reflect.DeepEqual(got, tt.want) {
+			if got := NewHTTPHandler(tt.args.service, lg); !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("NewHTTPHandler() = %v, want %v", got, tt.want)
 			}
 		})
@@ -149,9 +154,10 @@ func TestHTTPHandler_DumpMetric(t *testing.T) {
 			400,
 		},
 	}
-	rep := memory.New()
+	lg, _ := logger.New(constants.LogLevelDefault)
+	rep := memory.New(lg)
 	srvce := server.NewMetricsDumper(rep)
-	handler := NewHTTPHandler(srvce).DumpMetric
+	handler := NewHTTPHandler(srvce, lg).DumpMetric
 
 	for i, tt := range tests {
 		t.Run(strconv.Itoa(i), func(t *testing.T) {
@@ -197,12 +203,13 @@ func TestHTTPHandler_GetMetric(t *testing.T) {
 	}
 	m1, _ := model.NewMetric().FromValues("mainQuestion", model.MetricTypeCounter, int64(42))
 	m2, _ := model.NewMetric().FromValues("pi", model.MetricTypeGauge, 3.14)
-	repository := memory.New()
+	lg, _ := logger.New(constants.LogLevelDefault)
+	repository := memory.New(lg)
 	_ = repository.Add(context.TODO(), m1)
 	_ = repository.Add(context.TODO(), m2)
 
 	dumper := server.NewMetricsDumper(repository)
-	handler := NewHTTPHandler(dumper).GetMetric
+	handler := NewHTTPHandler(dumper, lg).GetMetric
 
 	for i, tt := range tests {
 		t.Run(strconv.Itoa(i), func(t *testing.T) {
@@ -314,9 +321,10 @@ func TestHTTPHandler_DumpMetricJSON(t *testing.T) {
 		},
 	}
 
-	repository := memory.New()
+	lg, _ := logger.New(constants.LogLevelDefault)
+	repository := memory.New(lg)
 	dumper := server.NewMetricsDumper(repository)
-	handler := NewHTTPHandler(dumper)
+	handler := NewHTTPHandler(dumper, lg)
 
 	for _, test := range tests {
 		t.Run(test.url, func(t *testing.T) {
@@ -380,14 +388,15 @@ func TestHTTPHandler_GetMetricJSON(t *testing.T) {
 		},
 	}
 
-	repository := memory.New()
+	lg, _ := logger.New(constants.LogLevelDefault)
+	repository := memory.New(lg)
 	m1, _ := model.NewMetric().FromValues("m42", model.MetricTypeCounter, int64(42))
 	m2, _ := model.NewMetric().FromValues("pi", model.MetricTypeGauge, 3.14)
 	_ = repository.Add(context.TODO(), m1)
 	_ = repository.Add(context.TODO(), m2)
 
 	dumper := server.NewMetricsDumper(repository)
-	handler := NewHTTPHandler(dumper)
+	handler := NewHTTPHandler(dumper, lg)
 
 	for _, test := range tests {
 		t.Run(test.url, func(t *testing.T) {
@@ -419,12 +428,13 @@ func TestHTTPHandler_GetAll(t *testing.T) {
 		},
 	}
 
-	repository := memory.New()
+	lg, _ := logger.New(constants.LogLevelDefault)
+	repository := memory.New(lg)
 	m1, _ := model.NewMetric().FromValues("m42", model.MetricTypeCounter, int64(42))
 	_ = repository.Add(context.TODO(), m1)
 
 	dumper := server.NewMetricsDumper(repository)
-	handler := NewHTTPHandler(dumper)
+	handler := NewHTTPHandler(dumper, lg)
 
 	for _, test := range tests {
 		t.Run(test.url, func(t *testing.T) {

@@ -11,13 +11,12 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
-
-	"github.com/talx-hub/malerter/internal/api"
+	"github.com/talx-hub/malerter/internal/api/handlers"
+	"github.com/talx-hub/malerter/internal/api/middlewares"
 	"github.com/talx-hub/malerter/internal/backup"
-	"github.com/talx-hub/malerter/internal/compressor/gzip"
 	serverCfg "github.com/talx-hub/malerter/internal/config/server"
 	"github.com/talx-hub/malerter/internal/constants"
-	"github.com/talx-hub/malerter/internal/logger/zerologger"
+	"github.com/talx-hub/malerter/internal/logger"
 	"github.com/talx-hub/malerter/internal/repository/db"
 	"github.com/talx-hub/malerter/internal/repository/memory"
 	"github.com/talx-hub/malerter/internal/service/server"
@@ -31,7 +30,7 @@ func main() {
 		log.Fatal("unable to load server serverCfg")
 	}
 
-	zeroLogger, err := zerologger.New(cfg.LogLevel)
+	zeroLogger, err := logger.New(cfg.LogLevel)
 	if err != nil {
 		log.Fatalf("unable to configure custom logger: %s", err.Error())
 	}
@@ -39,16 +38,12 @@ func main() {
 	var storage server.Storage
 	database, err := metricDB(context.Background(), cfg.DatabaseDSN, zeroLogger)
 	if err != nil {
-		zeroLogger.Warn().
-			Err(err).
-			Msg("store metrics in memory")
-		storage = memory.New()
+		zeroLogger.Warn().Err(err).Msg("store metrics in memory")
+		storage = memory.New(zeroLogger)
 	} else {
 		defer func() {
 			if err = database.Close(); err != nil {
-				zeroLogger.Error().
-					Err(err).
-					Msg("unable to close DB")
+				zeroLogger.Error().Err(err).Msg("unable to close DB")
 			}
 		}()
 		storage = database
@@ -87,31 +82,41 @@ func main() {
 
 	if err = srv.ListenAndServe(); !errors.Is(err, http.ErrServerClosed) {
 		zeroLogger.Fatal().
-			Err(err).
-			Msg("error during HTTP server ListenAndServe")
+			Err(err).Msg("error during HTTP server ListenAndServe")
 	}
 	<-idleConnectionsClosed
 }
 
 func metricRouter(
-	repo server.Storage, logger *zerologger.ZeroLogger,
+	repo server.Storage,
+	loggr *logger.ZeroLogger,
 	backer *backup.File,
 ) chi.Router {
 	dumper := server.NewMetricsDumper(repo)
-	handler := api.NewHTTPHandler(dumper)
+	handler := handlers.NewHTTPHandler(dumper, loggr)
 
-	var updateHandler = backer.Middleware(handler.DumpMetric)
-	var updateJSONHandler = backer.Middleware(handler.DumpMetricJSON)
 	var getHandler = handler.GetMetric
 	var getAllHandler = handler.GetAll
 	var getJSONHandler = handler.GetMetricJSON
 	var pingDBHandler = handler.Ping
-	var batchHandler = backer.Middleware(handler.DumpMetricList)
+
+	var updateHandler http.HandlerFunc
+	var updateJSONHandler http.HandlerFunc
+	var batchHandler http.HandlerFunc
+	if backer != nil {
+		updateHandler = backer.Middleware(handler.DumpMetric)
+		updateJSONHandler = backer.Middleware(handler.DumpMetricJSON)
+		batchHandler = backer.Middleware(handler.DumpMetricList)
+	} else {
+		updateHandler = handler.DumpMetric
+		updateJSONHandler = handler.DumpMetricJSON
+		batchHandler = handler.DumpMetricList
+	}
 
 	router := chi.NewRouter()
 	router.Use(
-		logger.Middleware,
-		gzip.Middleware,
+		middlewares.Logging(loggr),
+		middlewares.Gzip(loggr),
 	)
 
 	router.Route("/", func(r chi.Router) {
@@ -145,32 +150,36 @@ func metricRouter(
 	return router
 }
 
-func metricDB(ctx context.Context, dsn string, logger *zerologger.ZeroLogger,
+func metricDB(
+	ctx context.Context,
+	dsn string,
+	loggr *logger.ZeroLogger,
 ) (*db.DB, error) {
 	if len(dsn) == 0 {
 		return nil, errors.New("DB DSN is empty")
 	}
 
-	database, err := db.New(ctx, dsn, logger)
+	database, err := db.New(ctx, dsn, loggr)
 	if err != nil {
 		return nil, fmt.Errorf("unable to create DB instance: %w", err)
 	}
 	return database, nil
 }
 
-func idleShutdown(s *http.Server, channel chan struct{},
-	logger *zerologger.ZeroLogger, backer *backup.File,
+func idleShutdown(
+	s *http.Server,
+	channel chan struct{},
+	loggr *logger.ZeroLogger,
+	backer *backup.File,
 ) {
 	sigint := make(chan os.Signal, 1)
 	signal.Notify(sigint, os.Interrupt)
 	<-sigint
 
-	logger.Info().
+	loggr.Info().
 		Msg("shutdown signal received. Exiting...")
 	if err := s.Shutdown(context.Background()); err != nil {
-		logger.Error().
-			Err(err).
-			Msg("error during HTTP server Shutdown")
+		loggr.Error().Err(err).Msg("error during HTTP server Shutdown")
 	}
 
 	backer.Backup()
