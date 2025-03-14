@@ -278,13 +278,13 @@ func WithConnectionCheck(dbMethod Method) (any, error) {
 }
 
 func try(count int, dbMethod Method) (any, error) {
-	const maxAttemptCount = 3
-	if count > maxAttemptCount {
-		return nil, errors.New("DB connection error")
+	data, err := dbMethod()
+	if err == nil {
+		return data, nil
 	}
 
-	data, err := dbMethod()
-	if err != nil {
+	const maxAttemptCount = 3
+	if count < maxAttemptCount {
 		var pgErr *pgconn.PgError
 		if errors.As(err, &pgErr) && pgerrcode.IsConnectionException(pgErr.Code) {
 			time.Sleep((time.Duration(count*2 + 1)) * time.Second) // count: 0 1 2 -> seconds: 1 3 5.
@@ -293,6 +293,5 @@ func try(count int, dbMethod Method) (any, error) {
 		return nil, fmt.Errorf(
 			"on attempt #%d error occurred: %w", count, err)
 	}
-
-	return data, nil
+	return nil, errors.New("DB connection error")
 }
