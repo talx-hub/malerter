@@ -14,4 +14,5 @@ const (
 
 const (
 	PermissionFilePrivate = 0o600
+	LogLevelDefault       = "Info"
 )
