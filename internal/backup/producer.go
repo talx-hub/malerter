@@ -44,7 +44,7 @@ func (p *producer) write(metrics []model.Metric) error {
 	errCount := 0
 	for _, m := range metrics {
 		if err := p.writeMetric(m); err != nil {
-			errCount += 1
+			errCount++
 		}
 	}
 	if errCount == 0 {

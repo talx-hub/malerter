@@ -10,14 +10,13 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/talx-hub/malerter/internal/backup"
 	serverCfg "github.com/talx-hub/malerter/internal/config/server"
 	"github.com/talx-hub/malerter/internal/constants"
 	"github.com/talx-hub/malerter/internal/logger"
 	"github.com/talx-hub/malerter/internal/repository/memory"
 )
 
-func setupServices(t *testing.T) (*httptest.Server, *backup.File) {
+func setupServices(t *testing.T) *httptest.Server {
 	t.Helper()
 
 	cfg, ok := serverCfg.NewDirector().Build().(serverCfg.Builder)
@@ -28,19 +27,13 @@ func setupServices(t *testing.T) (*httptest.Server, *backup.File) {
 
 	rep := memory.New(zeroLogger)
 	require.NotNil(t, rep)
-	bk := backup.New(&cfg, rep, zeroLogger)
-	require.NotNil(t, bk)
-	if cfg.Restore {
-		bk.Restore()
-	}
-	ts := httptest.NewServer(metricRouter(rep, zeroLogger, bk))
+	ts := httptest.NewServer(metricRouter(rep, zeroLogger))
 
-	return ts, bk
+	return ts
 }
 
 func TestMetricRouter(t *testing.T) {
-	ts, bk := setupServices(t)
-	defer bk.Close()
+	ts := setupServices(t)
 	defer ts.Close()
 
 	tests := []struct {

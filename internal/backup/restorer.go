@@ -62,7 +62,7 @@ func (r *restorer) read() ([]model.Metric, error) {
 		if errors.Is(err, io.EOF) {
 			break
 		}
-		errCount += 1
+		errCount++
 	}
 
 	if errCount == 0 {

@@ -15,10 +15,10 @@ type Storage interface {
 }
 
 type Manager struct {
-	storage        Storage
 	log            *logger.ZeroLogger
-	backupInterval time.Duration
+	storage        Storage
 	filename       string
+	backupInterval time.Duration
 	needRestore    bool
 }
 
@@ -46,12 +46,12 @@ func (b *Manager) Run(ctx context.Context) {
 		b.restore(ctx)
 	}
 
-	ticker := time.NewTicker(b.backupInterval * time.Second)
-	b.log.Info().Msg("start backup service")
+	ticker := time.NewTicker(b.backupInterval)
+	b.log.Info().Msg("START backup SERVICE")
 	for {
 		select {
 		case <-ctx.Done():
-			b.log.Info().Msg("shutdown backup service...")
+			b.log.Info().Msg("SHUTDOWN backup SERVICE...")
 			b.backup(ctx)
 			return
 		default:
@@ -62,7 +62,7 @@ func (b *Manager) Run(ctx context.Context) {
 }
 
 func (b *Manager) restore(ctx context.Context) {
-	b.log.Info().Msg("start restore metrics from backup...")
+	b.log.Info().Msg("start RESTORE metrics from backup...")
 	r, err := newRestorer(b.filename)
 	if err != nil {
 		b.log.Error().Err(err).Msg("unable to open backup Restorer")
@@ -84,7 +84,7 @@ func (b *Manager) restore(ctx context.Context) {
 		b.log.Error().Err(err).Msg("write backup batch failed")
 		return
 	}
-	b.log.Info().Msg("backup restore successful!")
+	b.log.Info().Msg("backup RESTORE successful!")
 }
 
 func (b *Manager) backup(ctx context.Context) {
