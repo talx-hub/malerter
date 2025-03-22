@@ -2,9 +2,6 @@ package backup
 
 import (
 	"context"
-	"errors"
-	"io"
-	"net/http"
 	"time"
 
 	"github.com/talx-hub/malerter/internal/config/server"
@@ -13,93 +10,110 @@ import (
 )
 
 type Storage interface {
-	Add(context.Context, model.Metric) error
+	Batch(context.Context, []model.Metric) error
 	Get(context.Context) ([]model.Metric, error)
 }
 
-type File struct {
-	lastBackup     time.Time
+type Manager struct {
 	storage        Storage
-	producer       Producer
-	restorer       Restorer
 	log            *logger.ZeroLogger
 	backupInterval time.Duration
+	filename       string
+	needRestore    bool
 }
 
 func New(
 	config *server.Builder,
 	storage Storage,
 	log *logger.ZeroLogger,
-) *File {
+) *Manager {
 	if config == nil {
 		log.Error().Msg("unable to load Backup service: config is nil")
 		return nil
 	}
-	p, err := NewProducer(config.FileStoragePath)
-	if err != nil {
-		log.Error().Err(err).Msg("unable to create backup Producer")
-		return nil
-	}
-	r, err := NewRestorer(config.FileStoragePath)
-	if err != nil {
-		log.Error().Err(err).Msg("unable to create backup Restorer")
-		return nil
-	}
 
-	return &File{
-		producer:       *p,
-		restorer:       *r,
+	return &Manager{
 		backupInterval: config.StoreInterval,
-		lastBackup:     time.Now().UTC(),
 		storage:        storage,
 		log:            log,
+		filename:       config.FileStoragePath,
+		needRestore:    config.Restore,
 	}
 }
 
-func (b *File) Restore() {
+func (b *Manager) Run(ctx context.Context) {
+	if b.needRestore {
+		b.restore(ctx)
+	}
+
+	ticker := time.NewTicker(b.backupInterval * time.Second)
+	b.log.Info().Msg("start backup service")
 	for {
-		metric, err := b.restorer.ReadMetric()
-		if err != nil {
-			if errors.Is(err, io.EOF) {
-				break
-			}
-			b.log.Error().Err(err).
-				Msg("unable to restore metric")
-		}
-		err = b.storage.Add(context.TODO(), *metric)
-		if err != nil {
-			b.log.Error().Err(err).
-				Msg("unable to store metric, during backup restore")
+		select {
+		case <-ctx.Done():
+			b.log.Info().Msg("shutdown backup service...")
+			b.backup(ctx)
+			return
+		default:
+			<-ticker.C
+			b.backup(ctx)
 		}
 	}
 }
 
-func (b *File) Backup() {
-	metrics, _ := b.storage.Get(context.TODO())
-	for _, m := range metrics {
-		if err := b.producer.WriteMetric(m); err != nil {
-			b.log.Error().Err(err).Msg("unable to backup metric")
-		}
+func (b *Manager) restore(ctx context.Context) {
+	b.log.Info().Msg("start restore metrics from backup...")
+	r, err := newRestorer(b.filename)
+	if err != nil {
+		b.log.Error().Err(err).Msg("unable to open backup Restorer")
+		return
 	}
+	defer func() {
+		if err := r.close(); err != nil {
+			b.log.Error().Err(err).Msg("close backup failed")
+		}
+	}()
+
+	metrics, err := r.read()
+	if err != nil {
+		b.log.Error().Err(err).Msg("read backup failed")
+		return
+	}
+	err = b.storage.Batch(ctx, metrics)
+	if err != nil {
+		b.log.Error().Err(err).Msg("write backup batch failed")
+		return
+	}
+	b.log.Info().Msg("backup restore successful!")
 }
 
-func (b *File) Middleware(h http.HandlerFunc) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		h.ServeHTTP(w, r)
-		now := time.Now().UTC()
-		if now.Sub(b.lastBackup) >= b.backupInterval {
-			b.Backup()
+func (b *Manager) backup(ctx context.Context) {
+	b.log.Info().Msg("start metrics backup...")
+	p, err := newProducer(b.filename)
+	if err != nil {
+		b.log.Error().Err(err).Msg("unable to open backup Producer")
+		return
+	}
+	defer func() {
+		if err := p.close(); err != nil {
+			b.log.Error().Err(err).Msg("close backup failed")
 		}
-	}
-}
+	}()
 
-func (b *File) Close() {
-	if err := b.producer.Close(); err != nil {
-		b.log.Error().Err(err).
-			Msg("unable to properly close Backup service")
+	metrics, err := b.storage.Get(ctx)
+	if err != nil {
+		b.log.Error().Err(err).Msg("get metrics from storage failed")
+		return
 	}
-	if err := b.restorer.Close(); err != nil {
-		b.log.Error().Err(err).
-			Msg("unable to properly close Backup service")
+
+	if err = p.write(metrics); err != nil {
+		b.log.Error().Err(err).Msg("write metrics to file failed")
+		return
 	}
+
+	if err = p.flush(); err != nil {
+		b.log.Error().Err(err).Msg("flush metrics to backup failed")
+		return
+	}
+	b.log.Info().Msg("metrics backup successful!")
 }

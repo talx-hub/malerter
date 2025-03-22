@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
@@ -33,7 +34,7 @@ func main() {
 
 	zeroLogger, err := logger.New(cfg.LogLevel)
 	if err != nil {
-		log.Fatalf("unable to configure custom logger: %s", err.Error())
+		log.Fatalf("unable to configure custom logger: %v", err)
 	}
 
 	var storage server.Storage
@@ -50,14 +51,10 @@ func main() {
 		storage = database
 	}
 
-	bk := backup.New(&cfg, storage, zeroLogger)
-	if bk == nil {
-		zeroLogger.Error().Msg("running without backup")
-	} else {
-		defer bk.Close()
-		if cfg.Restore {
-			bk.Restore()
-		}
+	ctxBackup, cancelBackup := context.WithCancel(context.Background())
+	defer cancelBackup()
+	if bk := backup.New(&cfg, storage, zeroLogger); bk != nil {
+		bk.Run(ctxBackup)
 	}
 
 	zeroLogger.Info().
@@ -69,10 +66,10 @@ func main() {
 		Msg("Starting server")
 	srv := http.Server{
 		Addr:    cfg.RootAddress,
-		Handler: metricRouter(storage, zeroLogger, bk),
+		Handler: metricRouter(storage, zeroLogger),
 	}
 	idleConnectionsClosed := make(chan struct{})
-	go idleShutdown(&srv, idleConnectionsClosed, zeroLogger, bk)
+	go idleShutdown(&srv, idleConnectionsClosed, zeroLogger, cancelBackup)
 
 	if err = srv.ListenAndServe(); !errors.Is(err, http.ErrServerClosed) {
 		zeroLogger.Fatal().
@@ -84,7 +81,6 @@ func main() {
 func metricRouter(
 	repo server.Storage,
 	loggr *logger.ZeroLogger,
-	backer *backup.File,
 ) chi.Router {
 	dumper := server.NewMetricsDumper(repo)
 	handler := handlers.NewHTTPHandler(dumper, loggr)
@@ -93,19 +89,9 @@ func metricRouter(
 	var getAllHandler = handler.GetAll
 	var getJSONHandler = handler.GetMetricJSON
 	var pingDBHandler = handler.Ping
-
-	var updateHandler http.HandlerFunc
-	var updateJSONHandler http.HandlerFunc
-	var batchHandler http.HandlerFunc
-	if backer != nil {
-		updateHandler = backer.Middleware(handler.DumpMetric)
-		updateJSONHandler = backer.Middleware(handler.DumpMetricJSON)
-		batchHandler = backer.Middleware(handler.DumpMetricList)
-	} else {
-		updateHandler = handler.DumpMetric
-		updateJSONHandler = handler.DumpMetricJSON
-		batchHandler = handler.DumpMetricList
-	}
+	var updateHandler = handler.DumpMetric
+	var updateJSONHandler = handler.DumpMetricJSON
+	var batchHandler = handler.DumpMetricList
 
 	router := chi.NewRouter()
 	router.Use(
@@ -164,19 +150,21 @@ func idleShutdown(
 	s *http.Server,
 	channel chan struct{},
 	loggr *logger.ZeroLogger,
-	backer *backup.File,
+	cancelBackup context.CancelFunc,
 ) {
 	sigint := make(chan os.Signal, 1)
 	signal.Notify(sigint, os.Interrupt)
 	<-sigint
 
-	loggr.Info().
-		Msg("shutdown signal received. Exiting...")
-	if err := s.Shutdown(context.Background()); err != nil {
+	loggr.Info().Msg("shutdown signal received. Exiting...")
+	ctxServer, cancelSrv := context.WithTimeout(
+		context.Background(), constants.Timeout*time.Second)
+	defer cancelSrv()
+	if err := s.Shutdown(ctxServer); err != nil {
 		loggr.Error().Err(err).Msg("error during HTTP server Shutdown")
 	}
 
-	backer.Backup()
+	cancelBackup()
 
 	close(channel)
 }
