@@ -28,7 +28,7 @@ func main() {
 		log.Fatalf("unable to configure custom logger: %s", err.Error())
 	}
 
-	rep := memory.New(zeroLogger)
+	rep := memory.New(zeroLogger, nil)
 	agt := agent.NewAgent(rep, &cfg, &http.Client{}, zeroLogger)
 
 	agt.Run()

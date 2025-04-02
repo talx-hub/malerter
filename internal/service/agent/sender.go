@@ -104,6 +104,7 @@ func (s *Sender) retry(r *http.Request, c *http.Client, count int) error {
 
 	response, err := c.Do(r)
 	if err != nil && errors.Is(err, syscall.ECONNREFUSED) {
+		s.log.Info().Msg("connection refused, trying to retry send request...")
 		time.Sleep((time.Duration(count*2 + 1)) * time.Second) // count: 0 1 2 -> seconds: 1 3 5.
 		return s.retry(r, c, count+1)
 	}

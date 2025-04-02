@@ -97,8 +97,8 @@ func TestNewHTTPHandler(t *testing.T) {
 		},
 		{
 			name: "simple constructor test #2",
-			args: args{service: server.NewMetricsDumper(memory.New(lg))},
-			want: &HTTPHandler{server.NewMetricsDumper(memory.New(lg)), lg},
+			args: args{service: server.NewMetricsDumper(memory.New(lg, nil))},
+			want: &HTTPHandler{server.NewMetricsDumper(memory.New(lg, nil)), lg},
 		},
 	}
 	for _, tt := range tests {
@@ -155,7 +155,7 @@ func TestHTTPHandler_DumpMetric(t *testing.T) {
 		},
 	}
 	lg, _ := logger.New(constants.LogLevelDefault)
-	rep := memory.New(lg)
+	rep := memory.New(lg, nil)
 	srvce := server.NewMetricsDumper(rep)
 	handler := NewHTTPHandler(srvce, lg).DumpMetric
 
@@ -204,7 +204,7 @@ func TestHTTPHandler_GetMetric(t *testing.T) {
 	m1, _ := model.NewMetric().FromValues("mainQuestion", model.MetricTypeCounter, int64(42))
 	m2, _ := model.NewMetric().FromValues("pi", model.MetricTypeGauge, 3.14)
 	lg, _ := logger.New(constants.LogLevelDefault)
-	repository := memory.New(lg)
+	repository := memory.New(lg, nil)
 	_ = repository.Add(context.TODO(), m1)
 	_ = repository.Add(context.TODO(), m2)
 
@@ -322,7 +322,7 @@ func TestHTTPHandler_DumpMetricJSON(t *testing.T) {
 	}
 
 	lg, _ := logger.New(constants.LogLevelDefault)
-	repository := memory.New(lg)
+	repository := memory.New(lg, nil)
 	dumper := server.NewMetricsDumper(repository)
 	handler := NewHTTPHandler(dumper, lg)
 
@@ -389,7 +389,7 @@ func TestHTTPHandler_GetMetricJSON(t *testing.T) {
 	}
 
 	lg, _ := logger.New(constants.LogLevelDefault)
-	repository := memory.New(lg)
+	repository := memory.New(lg, nil)
 	m1, _ := model.NewMetric().FromValues("m42", model.MetricTypeCounter, int64(42))
 	m2, _ := model.NewMetric().FromValues("pi", model.MetricTypeGauge, 3.14)
 	_ = repository.Add(context.TODO(), m1)
@@ -429,7 +429,7 @@ func TestHTTPHandler_GetAll(t *testing.T) {
 	}
 
 	lg, _ := logger.New(constants.LogLevelDefault)
-	repository := memory.New(lg)
+	repository := memory.New(lg, nil)
 	m1, _ := model.NewMetric().FromValues("m42", model.MetricTypeCounter, int64(42))
 	_ = repository.Add(context.TODO(), m1)
 

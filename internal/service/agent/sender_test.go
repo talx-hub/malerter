@@ -16,7 +16,7 @@ import (
 func TestGet(t *testing.T) {
 	log, err := logger.New(constants.LogLevelDefault)
 	require.NoError(t, err)
-	storage := memory.New(log)
+	storage := memory.New(log, nil)
 	m1, _ := model.NewMetric().FromValues("m42", model.MetricTypeCounter, int64(42))
 	m2, _ := model.NewMetric().FromValues("pi", model.MetricTypeGauge, 3.14)
 	_ = storage.Add(context.TODO(), m1)
@@ -31,7 +31,7 @@ func TestGet(t *testing.T) {
 func TestConvertToJSONs(t *testing.T) {
 	log, err := logger.New(constants.LogLevelDefault)
 	require.NoError(t, err)
-	storage := memory.New(log)
+	storage := memory.New(log, nil)
 	sender := Sender{storage: storage, host: "", log: log}
 
 	tests := []struct {

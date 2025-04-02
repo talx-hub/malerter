@@ -25,7 +25,7 @@ func TestCollect(t *testing.T) {
 func TestStore(t *testing.T) {
 	log, err := logger.New(constants.LogLevelDefault)
 	require.NoError(t, err)
-	storage := memory.New(log)
+	storage := memory.New(log, nil)
 	poller := Poller{storage: storage, log: log}
 	metrics := collect()
 	poller.store(metrics)
