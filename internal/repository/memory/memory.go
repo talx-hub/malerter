@@ -9,18 +9,21 @@ import (
 	"github.com/talx-hub/malerter/internal/customerror"
 	"github.com/talx-hub/malerter/internal/logger"
 	"github.com/talx-hub/malerter/internal/model"
+	"github.com/talx-hub/malerter/internal/utils/queue"
 )
 
 type Memory struct {
-	log  *logger.ZeroLogger
-	data map[string]model.Metric
-	m    sync.RWMutex
+	log    *logger.ZeroLogger
+	buffer *queue.Queue[model.Metric]
+	data   map[string]model.Metric
+	m      sync.RWMutex
 }
 
-func New(log *logger.ZeroLogger) *Memory {
+func New(log *logger.ZeroLogger, buf *queue.Queue[model.Metric]) *Memory {
 	return &Memory{
-		log:  log,
-		data: make(map[string]model.Metric),
+		log:    log,
+		buffer: buf,
+		data:   make(map[string]model.Metric),
 	}
 }
 
@@ -39,6 +42,9 @@ func (r *Memory) Add(_ context.Context, metric model.Metric) error {
 		r.data[dummyKey] = n
 	} else {
 		r.data[dummyKey] = metric
+	}
+	if r.buffer != nil && !r.buffer.IsClosed() {
+		r.buffer.Push(metric)
 	}
 	return nil
 }
@@ -79,5 +85,8 @@ func (r *Memory) Ping(_ context.Context) error {
 }
 
 func (r *Memory) Clear() {
+	r.m.Lock()
+	defer r.m.Unlock()
+
 	r.data = make(map[string]model.Metric)
 }

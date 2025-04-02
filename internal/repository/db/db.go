@@ -20,14 +20,20 @@ import (
 	"github.com/talx-hub/malerter/internal/customerror"
 	"github.com/talx-hub/malerter/internal/logger"
 	"github.com/talx-hub/malerter/internal/model"
+	"github.com/talx-hub/malerter/internal/utils/queue"
 )
 
 type DB struct {
-	pool *pgxpool.Pool
-	log  *logger.ZeroLogger
+	pool   *pgxpool.Pool
+	log    *logger.ZeroLogger
+	buffer *queue.Queue[model.Metric]
 }
 
-func New(ctx context.Context, dsn string, log *logger.ZeroLogger,
+func New(
+	ctx context.Context,
+	dsn string,
+	log *logger.ZeroLogger,
+	buf *queue.Queue[model.Metric],
 ) (*DB, error) {
 	if err := runMigrations(dsn); err != nil {
 		return nil, fmt.Errorf("failed to run DB migrations: %w", err)
@@ -37,8 +43,9 @@ func New(ctx context.Context, dsn string, log *logger.ZeroLogger,
 		return nil, fmt.Errorf("failed to init DB pool: %w", err)
 	}
 	return &DB{
-		pool: pool,
-		log:  log,
+		pool:   pool,
+		log:    log,
+		buffer: buf,
 	}, nil
 }
 
@@ -128,6 +135,9 @@ func (db *DB) Add(ctx context.Context, m model.Metric) error {
 	if err := push(ctx, m, db.pool); err != nil {
 		return fmt.Errorf("failed to add the metric %s: %w", m.String(), err)
 	}
+	if db.buffer != nil && !db.buffer.IsClosed() {
+		db.buffer.Push(m)
+	}
 
 	return nil
 }
@@ -148,6 +158,9 @@ func (db *DB) Batch(ctx context.Context, batch []model.Metric) error {
 	for _, m := range batch {
 		err = push(ctx, m, tx)
 		if err == nil {
+			if db.buffer != nil && !db.buffer.IsClosed() {
+				db.buffer.Push(m)
+			}
 			continue
 		}
 
@@ -284,14 +297,14 @@ func try(count int, dbMethod Method) (any, error) {
 	}
 
 	const maxAttemptCount = 3
-	if count < maxAttemptCount {
-		var pgErr *pgconn.PgError
-		if errors.As(err, &pgErr) && pgerrcode.IsConnectionException(pgErr.Code) {
-			time.Sleep((time.Duration(count*2 + 1)) * time.Second) // count: 0 1 2 -> seconds: 1 3 5.
-			return try(count+1, dbMethod)
-		}
-		return nil, fmt.Errorf(
-			"on attempt #%d error occurred: %w", count, err)
+	if count >= maxAttemptCount {
+		return nil, errors.New("DB connection error")
 	}
-	return nil, errors.New("DB connection error")
+	var pgErr *pgconn.PgError
+	if errors.As(err, &pgErr) && pgerrcode.IsConnectionException(pgErr.Code) {
+		time.Sleep((time.Duration(count*2 + 1)) * time.Second) // count: 0 1 2 -> seconds: 1 3 5.
+		return try(count+1, dbMethod)
+	}
+	return nil, fmt.Errorf(
+		"on attempt #%d error occurred: %w", count, err)
 }
