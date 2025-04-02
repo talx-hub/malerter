@@ -298,7 +298,7 @@ func try(count int, dbMethod Method) (any, error) {
 
 	const maxAttemptCount = 3
 	if count >= maxAttemptCount {
-		return nil, errors.New("DB connection error")
+		return nil, errors.New("DB connection error. All attempt to retry are out")
 	}
 	var pgErr *pgconn.PgError
 	if errors.As(err, &pgErr) && pgerrcode.IsConnectionException(pgErr.Code) {

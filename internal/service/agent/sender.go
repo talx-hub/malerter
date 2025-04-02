@@ -77,16 +77,9 @@ func (s *Sender) batch(batch string) {
 	}
 	request.Header.Set(constants.KeyContentType, constants.ContentTypeJSON)
 	request.Header.Set(constants.KeyContentEncoding, "gzip")
-	response, err := s.client.Do(request)
-	if err != nil && !errors.Is(err, syscall.ECONNREFUSED) {
+	response, err := s.try(request, 0)
+	if err != nil {
 		s.log.Error().Err(err).Msgf(unableFormat, batch, s.host)
-		return
-	}
-	if err != nil && errors.Is(err, syscall.ECONNREFUSED) {
-		err = s.retry(request, s.client, 0)
-		if err != nil {
-			s.log.Error().Err(err).Msgf(unableFormat, batch, s.host)
-		}
 		return
 	}
 
@@ -96,21 +89,21 @@ func (s *Sender) batch(batch string) {
 	}
 }
 
-func (s *Sender) retry(r *http.Request, c *http.Client, count int) error {
-	const maxAttemptCount = 4
-	if count == maxAttemptCount {
-		return errors.New("all attempts to retry request are out")
+func (s *Sender) try(r *http.Request, count int) (*http.Response, error) {
+	response, err := s.client.Do(r)
+	if err == nil {
+		return response, nil
 	}
 
-	response, err := c.Do(r)
-	if err != nil && errors.Is(err, syscall.ECONNREFUSED) {
+	const maxAttemptCount = 3
+	if count >= maxAttemptCount {
+		return nil, errors.New("all attempts to retry request are out")
+	}
+	if errors.Is(err, syscall.ECONNREFUSED) {
 		s.log.Info().Msg("connection refused, trying to retry send request...")
 		time.Sleep((time.Duration(count*2 + 1)) * time.Second) // count: 0 1 2 -> seconds: 1 3 5.
-		return s.retry(r, c, count+1)
+		return s.try(r, count+1)
 	}
-	err = response.Body.Close()
-	if err != nil {
-		s.log.Fatal().Err(err).Msg("unable to close the body")
-	}
-	return nil
+	return nil, fmt.Errorf(
+		"on attempt #%d error occurred: %w", count, err)
 }
