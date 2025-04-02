@@ -7,6 +7,7 @@ import (
 	"github.com/talx-hub/malerter/internal/config/server"
 	"github.com/talx-hub/malerter/internal/logger"
 	"github.com/talx-hub/malerter/internal/model"
+	"github.com/talx-hub/malerter/internal/utils/queue"
 )
 
 type Storage interface {
@@ -16,6 +17,7 @@ type Storage interface {
 
 type Manager struct {
 	log            *logger.ZeroLogger
+	buffer         *queue.Queue[model.Metric]
 	storage        Storage
 	filename       string
 	backupInterval time.Duration
@@ -24,19 +26,32 @@ type Manager struct {
 
 func New(
 	config *server.Builder,
+	buffer *queue.Queue[model.Metric],
 	storage Storage,
 	log *logger.ZeroLogger,
 ) *Manager {
+	if log == nil {
+		return nil
+	}
 	if config == nil {
-		log.Error().Msg("unable to load Backup service: config is nil")
+		log.Error().Msg("backup service: config is nil")
+		return nil
+	}
+	if buffer == nil {
+		log.Error().Msg("backup service: buffer is nil")
+		return nil
+	}
+	if storage == nil {
+		log.Error().Msg("backup service: storage is nil")
 		return nil
 	}
 
 	return &Manager{
-		backupInterval: config.StoreInterval,
-		storage:        storage,
 		log:            log,
+		buffer:         buffer,
+		storage:        storage,
 		filename:       config.FileStoragePath,
+		backupInterval: config.StoreInterval,
 		needRestore:    config.Restore,
 	}
 }
@@ -46,23 +61,36 @@ func (b *Manager) Run(ctx context.Context) {
 		b.restore(ctx)
 	}
 
-	ticker := time.NewTicker(b.backupInterval)
+	var ticker *time.Ticker
+	if b.backupInterval != 0 {
+		ticker = time.NewTicker(b.backupInterval)
+	}
+
 	b.log.Info().Msg("START backup SERVICE")
 	for {
+		// можно ли в default делать только b.backup()
+		// а отдельным case как-то проверять b.backupInterval != 0
+		// если условие выполняется, то блокируюсь до срабатывания ticker
+		// и затем fallthrough в default??
 		select {
 		case <-ctx.Done():
 			b.log.Info().Msg("SHUTDOWN backup SERVICE...")
-			b.backup(ctx)
+			b.backup()
 			return
 		default:
-			<-ticker.C
-			b.backup(ctx)
+			if b.backupInterval != 0 {
+				<-ticker.C
+			}
+			b.backup()
 		}
 	}
 }
 
 func (b *Manager) restore(ctx context.Context) {
 	b.log.Info().Msg("start RESTORE metrics from backup...")
+	b.buffer.Close()
+	defer b.buffer.Open()
+
 	r, err := newRestorer(b.filename)
 	if err != nil {
 		b.log.Error().Err(err).Msg("unable to open backup Restorer")
@@ -87,7 +115,7 @@ func (b *Manager) restore(ctx context.Context) {
 	b.log.Info().Msg("backup RESTORE successful!")
 }
 
-func (b *Manager) backup(ctx context.Context) {
+func (b *Manager) backup() {
 	b.log.Info().Msg("start metrics backup...")
 	p, err := newProducer(b.filename)
 	if err != nil {
@@ -100,9 +128,12 @@ func (b *Manager) backup(ctx context.Context) {
 		}
 	}()
 
-	metrics, err := b.storage.Get(ctx)
-	if err != nil {
-		b.log.Error().Err(err).Msg("get metrics from storage failed")
+	var metrics []model.Metric
+	for b.buffer.Len() > 0 {
+		metrics = append(metrics, b.buffer.Pop())
+	}
+	if len(metrics) == 0 {
+		b.log.Info().Msg("no metrics to backup")
 		return
 	}
 

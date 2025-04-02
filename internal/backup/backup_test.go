@@ -13,6 +13,7 @@ import (
 	"github.com/talx-hub/malerter/internal/logger"
 	"github.com/talx-hub/malerter/internal/model"
 	"github.com/talx-hub/malerter/internal/repository/memory"
+	"github.com/talx-hub/malerter/internal/utils/queue"
 )
 
 const (
@@ -28,25 +29,24 @@ func TestBackupRestore(t *testing.T) {
 	log, err := logger.New(constants.LogLevelDefault)
 	require.NoError(t, err)
 
-	rep1 := memory.New(log)
+	tunnel := queue.New[model.Metric]()
+	rep1 := memory.New(log, &tunnel)
 	m1, _ := model.NewMetric().FromValues("mainQuestion", model.MetricTypeCounter, int64(42))
 	m2, _ := model.NewMetric().FromValues("pi", model.MetricTypeGauge, 3.14)
 	_ = rep1.Add(context.TODO(), m1)
 	_ = rep1.Add(context.TODO(), m2)
 	ms1, _ := rep1.Get(context.TODO())
 
-	bk1 := New(&cfg, rep1, log)
+	bk1 := New(&cfg, &tunnel, rep1, log)
 	require.NotNil(t, bk1)
-	ctx1, cancel1 := context.WithTimeout(context.Background(), time.Second*1)
-	defer cancel1()
-	bk1.backup(ctx1)
+	bk1.backup()
 
-	rep2 := memory.New(log)
-	bk2 := New(&cfg, rep2, log)
+	rep2 := memory.New(log, nil)
+	bk2 := New(&cfg, &tunnel, rep2, log)
 	require.NotNil(t, bk2)
-	ctx2, cancel2 := context.WithTimeout(context.Background(), 1*time.Second)
-	defer cancel2()
-	bk2.restore(ctx2)
+	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
+	defer cancel()
+	bk2.restore(ctx)
 
 	ms2, _ := rep2.Get(context.TODO())
 	assert.ElementsMatch(t, ms1, ms2)
@@ -54,14 +54,9 @@ func TestBackupRestore(t *testing.T) {
 
 func TestRun(t *testing.T) {
 	const (
-		numberOfLoops = 2
-		metricCount   = 2
-	)
-
-	const (
-		fromPrevTest        = 2
-		backupInLoop        = numberOfLoops * metricCount
-		backupWhileShutdown = 2
+		fromPrevTest  = 2
+		backupInLoop  = 2
+		numberOfLoops = 5
 	)
 
 	cfg := server.Builder{
@@ -73,14 +68,22 @@ func TestRun(t *testing.T) {
 	log, err := logger.New(constants.LogLevelDefault)
 	require.NoError(t, err)
 
-	rep := memory.New(log)
-	bk := New(&cfg, rep, log)
+	tunnel := queue.New[model.Metric]()
+	rep := memory.New(log, &tunnel)
+	bk := New(&cfg, &tunnel, rep, log)
 	require.NotNil(t, bk)
 
 	timeout := numberOfLoops * cfg.StoreInterval
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
-	bk.Run(ctx)
+	go bk.Run(ctx)
+
+	m1, _ := model.NewMetric().FromValues("zero", model.MetricTypeCounter, int64(0))
+	m2, _ := model.NewMetric().FromValues("e", model.MetricTypeGauge, 2.72)
+	_ = rep.Add(context.TODO(), m1)
+	time.Sleep(cfg.StoreInterval)
+	time.Sleep(cfg.StoreInterval)
+	_ = rep.Add(context.TODO(), m2)
 
 	<-ctx.Done()
 	r, err := newRestorer(backupFileName)
@@ -92,5 +95,5 @@ func TestRun(t *testing.T) {
 	ms, err := r.read()
 	require.NoError(t, err)
 
-	assert.Equal(t, fromPrevTest+backupInLoop+backupWhileShutdown, len(ms))
+	assert.Equal(t, fromPrevTest+backupInLoop, len(ms))
 }
