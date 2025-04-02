@@ -25,7 +25,7 @@ func setupServices(t *testing.T) *httptest.Server {
 	zeroLogger, err := logger.New(cfg.LogLevel)
 	require.NoError(t, err)
 
-	rep := memory.New(zeroLogger)
+	rep := memory.New(zeroLogger, nil)
 	require.NotNil(t, rep)
 	ts := httptest.NewServer(metricRouter(rep, zeroLogger))
 

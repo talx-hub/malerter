@@ -19,9 +19,11 @@ import (
 	serverCfg "github.com/talx-hub/malerter/internal/config/server"
 	"github.com/talx-hub/malerter/internal/constants"
 	"github.com/talx-hub/malerter/internal/logger"
+	"github.com/talx-hub/malerter/internal/model"
 	"github.com/talx-hub/malerter/internal/repository/db"
 	"github.com/talx-hub/malerter/internal/repository/memory"
 	"github.com/talx-hub/malerter/internal/service/server"
+	"github.com/talx-hub/malerter/internal/utils/queue"
 )
 
 func main() {
@@ -38,10 +40,16 @@ func main() {
 	}
 
 	var storage server.Storage
-	database, err := metricDB(context.Background(), cfg.DatabaseDSN, zeroLogger)
+	buffer := queue.New[model.Metric]()
+	defer buffer.Close()
+	database, err := metricDB(
+		context.Background(),
+		cfg.DatabaseDSN,
+		zeroLogger,
+		&buffer)
 	if err != nil {
 		zeroLogger.Warn().Err(err).Msg("store metrics in memory")
-		storage = memory.New(zeroLogger)
+		storage = memory.New(zeroLogger, &buffer)
 	} else {
 		defer func() {
 			if err = database.Close(); err != nil {
@@ -53,8 +61,11 @@ func main() {
 
 	ctxBackup, cancelBackup := context.WithCancel(context.Background())
 	defer cancelBackup()
-	if bk := backup.New(&cfg, storage, zeroLogger); bk != nil {
-		bk.Run(ctxBackup)
+	if bk := backup.New(&cfg, &buffer, storage, zeroLogger); bk != nil {
+		go bk.Run(ctxBackup)
+	} else {
+		zeroLogger.Warn().Msg("unable to load backup service")
+		buffer.Close()
 	}
 
 	zeroLogger.Info().
@@ -85,14 +96,6 @@ func metricRouter(
 	dumper := server.NewMetricsDumper(repo)
 	handler := handlers.NewHTTPHandler(dumper, loggr)
 
-	var getHandler = handler.GetMetric
-	var getAllHandler = handler.GetAll
-	var getJSONHandler = handler.GetMetricJSON
-	var pingDBHandler = handler.Ping
-	var updateHandler = handler.DumpMetric
-	var updateJSONHandler = handler.DumpMetricJSON
-	var batchHandler = handler.DumpMetricList
-
 	router := chi.NewRouter()
 	router.Use(
 		middlewares.Logging(loggr),
@@ -100,30 +103,26 @@ func metricRouter(
 	)
 
 	router.Route("/", func(r chi.Router) {
-		r.Get("/", getAllHandler)
+		r.Get("/", handler.GetAll)
 		r.Route("/value", func(r chi.Router) {
-			r.Group(func(r chi.Router) {
-				r.Use(middleware.AllowContentType(constants.ContentTypeJSON))
-				r.Post("/", getJSONHandler)
-			})
-			r.Get("/{type}/{name}", getHandler)
+			r.
+				With(middleware.AllowContentType(constants.ContentTypeJSON)).
+				Post("/", handler.GetMetricJSON)
+			r.Get("/{type}/{name}", handler.GetMetric)
 		})
 		r.Route("/update", func(r chi.Router) {
-			r.Group(func(r chi.Router) {
-				r.Use(middleware.AllowContentType(constants.ContentTypeJSON))
-				r.Post("/", updateJSONHandler)
-			})
-			r.Post("/", updateJSONHandler)
-			r.Post("/{type}/{name}/{val}", updateHandler)
+			r.
+				With(middleware.AllowContentType(constants.ContentTypeJSON)).
+				Post("/", handler.DumpMetricJSON)
+			r.Post("/{type}/{name}/{val}", handler.DumpMetric)
 		})
 		r.Route("/ping", func(r chi.Router) {
-			r.Get("/", pingDBHandler)
+			r.Get("/", handler.Ping)
 		})
 		r.Route("/updates", func(r chi.Router) {
-			r.Group(func(r chi.Router) {
-				r.Use(middleware.AllowContentType(constants.ContentTypeJSON))
-				r.Post("/", batchHandler)
-			})
+			r.
+				With(middleware.AllowContentType(constants.ContentTypeJSON)).
+				Post("/", handler.DumpMetricList)
 		})
 	})
 
@@ -134,12 +133,13 @@ func metricDB(
 	ctx context.Context,
 	dsn string,
 	loggr *logger.ZeroLogger,
+	buffer *queue.Queue[model.Metric],
 ) (*db.DB, error) {
 	if len(dsn) == 0 {
 		return nil, errors.New("DB DSN is empty")
 	}
 
-	database, err := db.New(ctx, dsn, loggr)
+	database, err := db.New(ctx, dsn, loggr, buffer)
 	if err != nil {
 		return nil, fmt.Errorf("unable to create DB instance: %w", err)
 	}
@@ -152,6 +152,8 @@ func idleShutdown(
 	loggr *logger.ZeroLogger,
 	cancelBackup context.CancelFunc,
 ) {
+	defer close(channel)
+
 	sigint := make(chan os.Signal, 1)
 	signal.Notify(sigint, os.Interrupt)
 	<-sigint
@@ -165,6 +167,4 @@ func idleShutdown(
 	}
 
 	cancelBackup()
-
-	close(channel)
 }
