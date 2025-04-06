@@ -44,7 +44,7 @@ func Logging(log *logger.ZeroLogger) func(http.Handler) http.Handler {
 		logFn := func(w http.ResponseWriter, r *http.Request) {
 			start := time.Now()
 
-			responseData := &responseData{}
+			responseData := &responseData{status: http.StatusOK}
 			lw := loggingResponseWriter{
 				w:            w,
 				responseData: responseData,
