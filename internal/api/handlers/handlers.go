@@ -268,6 +268,7 @@ func (h *HTTPHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 	_, err = w.Write([]byte(page))
 	if err != nil {
 		h.log.Error().Err(err).Msg("failed to write response")
+		http.Error(w, "failed to write response", http.StatusInternalServerError)
 	}
 }
 

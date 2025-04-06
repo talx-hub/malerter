@@ -36,6 +36,23 @@ func (w *SigningWriter) Write(body []byte) (int, error) {
 	return n, nil
 }
 
+func WriteSignature(key string) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		var writeSignature func(w http.ResponseWriter, r *http.Request)
+		if key == constants.NoSecret {
+			writeSignature = func(w http.ResponseWriter, r *http.Request) {
+				next.ServeHTTP(w, r)
+			}
+		}
+
+		writeSignature = func(w http.ResponseWriter, r *http.Request) {
+			signingWriter := NewSigningWriter(w, key)
+			next.ServeHTTP(signingWriter, r)
+		}
+		return http.HandlerFunc(writeSignature)
+	}
+}
+
 func CheckSignature(key string) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		var checkFunc func(w http.ResponseWriter, r *http.Request)
@@ -55,8 +72,7 @@ func CheckSignature(key string) func(http.Handler) http.Handler {
 			}
 			r.Body = io.NopCloser(bytes.NewBuffer(body))
 
-			signingWriter := NewSigningWriter(w, key)
-			next.ServeHTTP(signingWriter, r)
+			next.ServeHTTP(w, r)
 		}
 		return http.HandlerFunc(checkFunc)
 	}
