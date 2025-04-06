@@ -1,9 +1,12 @@
 package constants
 
+import "time"
+
 const (
 	KeyContentType     = "Content-Type"
 	KeyContentEncoding = "Content-Encoding"
 	KeyAcceptEncoding  = "Accept-Encoding"
+	KeyHashSHA256      = "HashSHA256"
 )
 
 const (
@@ -17,4 +20,6 @@ const (
 	LogLevelDefault       = "Info"
 )
 
-const Timeout = 2
+const TimeoutShutdown = 2 * time.Second
+
+const NoSecret = ""
