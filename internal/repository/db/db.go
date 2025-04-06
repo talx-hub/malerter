@@ -149,7 +149,7 @@ func (db *DB) Batch(ctx context.Context, batch []model.Metric) error {
 	}
 	defer func() {
 		err := tx.Rollback(ctx)
-		if err != nil {
+		if err != nil && !errors.Is(err, pgx.ErrTxClosed) {
 			db.log.
 				Err(err).
 				Msg("rollback failed")
