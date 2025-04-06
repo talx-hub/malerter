@@ -14,7 +14,6 @@ import (
 type SigningWriter struct {
 	http.ResponseWriter
 	key string
-	sig string
 }
 
 func NewSigningWriter(w http.ResponseWriter, key string) *SigningWriter {
@@ -68,20 +67,9 @@ func checkSignature(key string, r *http.Request) ([]byte, error) {
 	if err != nil {
 		return nil, fmt.Errorf("body error: %w", err)
 	}
-	if len(body) == 0 {
-		fmt.Println("no body")
-		return body, nil
-	}
 
 	sig := r.Header.Get(constants.KeyHashSHA256)
-	if sig == "" {
-		fmt.Println("no sig")
-		return nil, errors.New("no signature detected")
-	}
-
-	fmt.Println("got sign:", sig)
 	hash := signature.Hash(body, key)
-	fmt.Println("hash:", hash)
 	if hash != sig {
 		return nil, errors.New("wrong signature detected")
 	}
