@@ -11,10 +11,11 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/talx-hub/malerter/internal/compressor"
 	"github.com/talx-hub/malerter/internal/constants"
 	"github.com/talx-hub/malerter/internal/logger"
 	"github.com/talx-hub/malerter/internal/model"
+	"github.com/talx-hub/malerter/internal/utils/compressor"
+	"github.com/talx-hub/malerter/internal/utils/signature"
 )
 
 type Sender struct {
@@ -22,6 +23,7 @@ type Sender struct {
 	storage  Storage
 	log      *logger.ZeroLogger
 	host     string
+	secret   string
 	compress bool
 }
 
@@ -74,6 +76,11 @@ func (s *Sender) batch(batch string) {
 	if err != nil {
 		s.log.Error().Err(err).Msgf(unableFormat, batch, s.host)
 		return
+	}
+
+	if s.secret != constants.NoSecret {
+		sign := signature.Hash([]byte(batch), s.secret)
+		request.Header.Set(constants.KeyHashSHA256, sign)
 	}
 	request.Header.Set(constants.KeyContentType, constants.ContentTypeJSON)
 	request.Header.Set(constants.KeyContentEncoding, "gzip")

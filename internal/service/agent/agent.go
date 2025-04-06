@@ -39,6 +39,7 @@ func NewAgent(
 			client:   client,
 			compress: true,
 			log:      log,
+			secret:   cfg.Secret,
 		},
 	}
 }
