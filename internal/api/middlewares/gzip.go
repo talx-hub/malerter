@@ -11,14 +11,14 @@ import (
 	"github.com/talx-hub/malerter/internal/logger"
 )
 
-type Writer struct {
+type GzipWriter struct {
 	http.ResponseWriter
 	compressor    *gzip.Writer
 	wasCompressed bool
 }
 
-func NewWriter(w http.ResponseWriter) *Writer {
-	return &Writer{
+func NewGzipWriter(w http.ResponseWriter) *GzipWriter {
+	return &GzipWriter{
 		ResponseWriter: w,
 		compressor:     gzip.NewWriter(w),
 		wasCompressed:  false,
@@ -31,16 +31,18 @@ func needCompress(contentType string) bool {
 	return isHTML || isJSON
 }
 
-func (w *Writer) Write(rawData []byte) (int, error) {
+func (w *GzipWriter) Write(rawData []byte) (int, error) {
 	contentType := w.ResponseWriter.Header().Get(constants.KeyContentType)
 	if needCompress(contentType) {
 		w.wasCompressed = true
+		w.ResponseWriter.Header().Set(constants.KeyContentEncoding, "gzip")
 		n, err := w.compressor.Write(rawData)
 		if err != nil {
 			return n, fmt.Errorf("unable to compress data: %w", err)
 		}
 		return n, nil
 	}
+
 	n, err := w.ResponseWriter.Write(rawData)
 	if err != nil {
 		return n, fmt.Errorf("unable to write response: %w", err)
@@ -48,21 +50,7 @@ func (w *Writer) Write(rawData []byte) (int, error) {
 	return n, nil
 }
 
-func (w *Writer) WriteHeader(statusCode int) {
-	contentType := w.ResponseWriter.Header().Get(constants.KeyContentType)
-	if isOK(statusCode) && needCompress(contentType) {
-		w.ResponseWriter.Header().Set(constants.KeyContentEncoding, "gzip")
-	}
-	w.ResponseWriter.WriteHeader(statusCode)
-}
-
-func isOK(statusCode int) bool {
-	const codeOKStart = 200
-	const codeOKEnd = 299
-	return statusCode >= codeOKStart && statusCode <= codeOKEnd
-}
-
-func (w *Writer) Close() error {
+func (w *GzipWriter) Close() error {
 	if w.wasCompressed {
 		err := w.compressor.Close()
 		if err != nil {
@@ -79,7 +67,7 @@ func Gzip(logg *logger.ZeroLogger) func(http.Handler) http.Handler {
 			acceptEncoding := r.Header.Get(constants.KeyAcceptEncoding)
 			supportsGzip := strings.Contains(acceptEncoding, "gzip")
 			if supportsGzip {
-				compressor := NewWriter(w)
+				compressor := NewGzipWriter(w)
 				resultWriter = compressor
 				defer func() {
 					if err := compressor.Close(); err != nil {
@@ -130,8 +118,8 @@ func NewReader(r io.ReadCloser) (*Reader, error) {
 	}, nil
 }
 
-func (r *Reader) Read(compressedData []byte) (int, error) {
-	n, err := r.decompressor.Read(compressedData)
+func (r *Reader) Read(dstDecompressed []byte) (int, error) {
+	n, err := r.decompressor.Read(dstDecompressed)
 	if err != nil {
 		return n, fmt.Errorf("decompressor read error: %w", err)
 	}
@@ -140,10 +128,9 @@ func (r *Reader) Read(compressedData []byte) (int, error) {
 
 func (r *Reader) Close() error {
 	if err := r.ReadCloser.Close(); err != nil {
-		return fmt.Errorf("failed to clore decompressor reader: %w", err)
+		return fmt.Errorf("failed to close decompressor reader: %w", err)
 	}
-	err := r.decompressor.Close()
-	if err != nil {
+	if err := r.decompressor.Close(); err != nil {
 		return fmt.Errorf("failed to close decompressor: %w", err)
 	}
 	return nil

@@ -140,7 +140,6 @@ func (h *HTTPHandler) DumpMetricJSON(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set(constants.KeyContentType, constants.ContentTypeJSON)
-	w.WriteHeader(http.StatusOK)
 	if err = json.NewEncoder(w).Encode(&metric); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -209,7 +208,6 @@ func (h *HTTPHandler) GetMetric(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set(constants.KeyContentType, constants.ContentTypeText)
-	w.WriteHeader(http.StatusOK)
 	valueStr := fmt.Sprintf("%v", metric.ActualValue())
 	_, err = w.Write([]byte(valueStr))
 	if err != nil {
@@ -243,7 +241,6 @@ func (h *HTTPHandler) GetMetricJSON(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set(constants.KeyContentType, constants.ContentTypeJSON)
-	w.WriteHeader(http.StatusOK)
 	if err = json.NewEncoder(w).Encode(&metric); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -268,7 +265,6 @@ func (h *HTTPHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 	}
 
 	page := createMetricsPage(m)
-	w.WriteHeader(http.StatusOK)
 	_, err = w.Write([]byte(page))
 	if err != nil {
 		h.log.Error().Err(err).Msg("failed to write response")

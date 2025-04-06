@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
-	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
@@ -73,11 +72,12 @@ func main() {
 		Dur(`"backup interval"`, cfg.StoreInterval).
 		Bool(`"restore backup"`, cfg.Restore).
 		Str(`"backup path"`, cfg.FileStoragePath).
+		Bool(`"signature check"'`, cfg.Secret != constants.NoSecret).
 		Str(`dsn`, cfg.DatabaseDSN).
 		Msg("Starting server")
 	srv := http.Server{
 		Addr:    cfg.RootAddress,
-		Handler: metricRouter(storage, zeroLogger),
+		Handler: metricRouter(storage, zeroLogger, cfg.Secret),
 	}
 	idleConnectionsClosed := make(chan struct{})
 	go idleShutdown(&srv, idleConnectionsClosed, zeroLogger, cancelBackup)
@@ -92,15 +92,14 @@ func main() {
 func metricRouter(
 	repo server.Storage,
 	loggr *logger.ZeroLogger,
+	secret string,
 ) chi.Router {
 	dumper := server.NewMetricsDumper(repo)
 	handler := handlers.NewHTTPHandler(dumper, loggr)
 
 	router := chi.NewRouter()
-	router.Use(
-		middlewares.Logging(loggr),
-		middlewares.Gzip(loggr),
-	)
+	router.Use(middlewares.Logging(loggr))
+	router.Use(middlewares.Gzip(loggr))
 
 	router.Route("/", func(r chi.Router) {
 		r.Get("/", handler.GetAll)
@@ -122,6 +121,7 @@ func metricRouter(
 		r.Route("/updates", func(r chi.Router) {
 			r.
 				With(middleware.AllowContentType(constants.ContentTypeJSON)).
+				With(middlewares.CheckSignature(secret)).
 				Post("/", handler.DumpMetricList)
 		})
 	})
@@ -160,7 +160,7 @@ func idleShutdown(
 
 	loggr.Info().Msg("shutdown signal received. Exiting...")
 	ctxServer, cancelSrv := context.WithTimeout(
-		context.Background(), constants.Timeout*time.Second)
+		context.Background(), constants.TimeoutShutdown)
 	defer cancelSrv()
 	if err := s.Shutdown(ctxServer); err != nil {
 		loggr.Error().Err(err).Msg("error during HTTP server Shutdown")
