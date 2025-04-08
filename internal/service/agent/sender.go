@@ -79,7 +79,7 @@ func (s *Sender) batch(batch string) {
 	}
 
 	if s.secret != constants.NoSecret {
-		sign := signature.Hash([]byte(batch), s.secret)
+		sign := signature.Hash(body.Bytes(), s.secret)
 		request.Header.Set(constants.KeyHashSHA256, sign)
 	}
 	request.Header.Set(constants.KeyContentType, constants.ContentTypeJSON)
