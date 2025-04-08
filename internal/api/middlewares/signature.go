@@ -43,6 +43,7 @@ func WriteSignature(key string) func(http.Handler) http.Handler {
 			writeSignature = func(w http.ResponseWriter, r *http.Request) {
 				next.ServeHTTP(w, r)
 			}
+			return http.HandlerFunc(writeSignature)
 		}
 
 		writeSignature = func(w http.ResponseWriter, r *http.Request) {

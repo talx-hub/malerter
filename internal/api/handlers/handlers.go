@@ -269,6 +269,7 @@ func (h *HTTPHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		h.log.Error().Err(err).Msg("failed to write response")
 		http.Error(w, "failed to write response", http.StatusInternalServerError)
+		return
 	}
 }
 
