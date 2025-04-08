@@ -2,6 +2,7 @@ package backup
 
 import (
 	"context"
+	"os"
 	"testing"
 	"time"
 
@@ -21,6 +22,8 @@ const (
 )
 
 func TestBackupRestore(t *testing.T) {
+	_ = os.Remove(backupFileName)
+
 	cfg := server.Builder{
 		FileStoragePath: backupFileName,
 		StoreInterval:   3600,
