@@ -2,6 +2,7 @@ package middlewares
 
 import (
 	"compress/gzip"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -121,6 +122,12 @@ func NewReader(r io.ReadCloser) (*Reader, error) {
 func (r *Reader) Read(dstDecompressed []byte) (int, error) {
 	n, err := r.decompressor.Read(dstDecompressed)
 	if err != nil {
+		// странное! Если не добавить эту проверку и не возвращать io.EOF не обернутый,
+		// то зацикливаемся когда где-то будем вызывать io.ReadAll
+		if errors.Is(err, io.EOF) {
+			return n, io.EOF
+		}
+
 		return n, fmt.Errorf("decompressor read error: %w", err)
 	}
 	return n, nil

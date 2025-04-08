@@ -95,6 +95,8 @@ func checkSignature(key string, r *http.Request) ([]byte, error) {
 }
 
 func getBody(r *http.Request) (b []byte, err error) {
+	// из-за этого io.ReadAll в распаковывающем обработчике повылезала куча ошибок
+	// может и здесь надо было делать через кастомный Read???
 	b, err = io.ReadAll(r.Body)
 	if err != nil {
 		return nil, fmt.Errorf("body read error: %w", err)
