@@ -81,7 +81,7 @@ func Gzip(logg *logger.ZeroLogger) func(http.Handler) http.Handler {
 			contentEncoding := r.Header.Get(constants.KeyContentEncoding)
 			sendsGzip := strings.Contains(contentEncoding, "gzip")
 			if sendsGzip {
-				decompressor, err := NewReader(r.Body)
+				decompressor, err := NewGzipReader(r.Body)
 				if err != nil {
 					w.WriteHeader(http.StatusInternalServerError)
 					return
@@ -101,25 +101,25 @@ func Gzip(logg *logger.ZeroLogger) func(http.Handler) http.Handler {
 	}
 }
 
-type Reader struct {
+type GzipReader struct {
 	io.ReadCloser
 	decompressor *gzip.Reader
 }
 
-func NewReader(r io.ReadCloser) (*Reader, error) {
+func NewGzipReader(r io.ReadCloser) (*GzipReader, error) {
 	decompressor, err := gzip.NewReader(r)
 	if err != nil {
 		return nil,
 			fmt.Errorf("failed to construct reader for decompressor: %w", err)
 	}
 
-	return &Reader{
+	return &GzipReader{
 		ReadCloser:   r,
 		decompressor: decompressor,
 	}, nil
 }
 
-func (r *Reader) Read(dstDecompressed []byte) (int, error) {
+func (r *GzipReader) Read(dstDecompressed []byte) (int, error) {
 	n, err := r.decompressor.Read(dstDecompressed)
 	if err != nil {
 		// странное! Если не добавить эту проверку и не возвращать io.EOF не обернутый,
@@ -133,7 +133,7 @@ func (r *Reader) Read(dstDecompressed []byte) (int, error) {
 	return n, nil
 }
 
-func (r *Reader) Close() error {
+func (r *GzipReader) Close() error {
 	if err := r.ReadCloser.Close(); err != nil {
 		return fmt.Errorf("failed to close decompressor reader: %w", err)
 	}
