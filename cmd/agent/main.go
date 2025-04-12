@@ -2,15 +2,13 @@ package main
 
 import (
 	"context"
-	"log"
-	"net/http"
-	"os"
-	"os/signal"
-
 	agentCfg "github.com/talx-hub/malerter/internal/config/agent"
 	"github.com/talx-hub/malerter/internal/logger"
 	"github.com/talx-hub/malerter/internal/repository/memory"
 	"github.com/talx-hub/malerter/internal/service/agent"
+	"github.com/talx-hub/malerter/internal/utils/shutdown"
+	"log"
+	"net/http"
 )
 
 // TODO: сделать клиент модульным:
@@ -38,24 +36,20 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	idleAgentShutdown := make(chan struct{})
-	go idleShutdown(idleAgentShutdown, zeroLogger, cancel)
+	idleCh := make(chan struct{})
+	go shutdown.IdleShutdown(
+		idleCh,
+		zeroLogger,
+		func(args ...any) error {
+			return shutdownAgent(cancel)
+		},
+	)
 	agt.Run(ctx)
 
-	<-idleAgentShutdown
+	<-idleCh
 }
 
-func idleShutdown(
-	ch chan struct{},
-	log *logger.ZeroLogger,
-	cancelAgent context.CancelFunc,
-) {
-	defer close(ch)
-
-	sigint := make(chan os.Signal, 1)
-	signal.Notify(sigint, os.Interrupt)
-	<-sigint
-
-	log.Info().Msg("shutdown signal received. Exiting...")
+func shutdownAgent(cancelAgent context.CancelFunc) error {
 	cancelAgent()
+	return nil
 }

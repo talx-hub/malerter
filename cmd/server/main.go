@@ -4,13 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log"
-	"net/http"
-	"os"
-	"os/signal"
-
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+	"github.com/talx-hub/malerter/internal/utils/shutdown"
+	"log"
+	"net/http"
 
 	"github.com/talx-hub/malerter/internal/api/handlers"
 	"github.com/talx-hub/malerter/internal/api/middlewares"
@@ -79,8 +77,15 @@ func main() {
 		Addr:    cfg.RootAddress,
 		Handler: metricRouter(storage, zeroLogger, cfg.Secret),
 	}
+
 	idleConnectionsClosed := make(chan struct{})
-	go idleShutdown(&srv, idleConnectionsClosed, zeroLogger, cancelBackup)
+	go shutdown.IdleShutdown(
+		idleConnectionsClosed,
+		zeroLogger,
+		func(args ...any) error {
+			return shutdownServer(&srv, cancelBackup)
+		},
+	)
 
 	if err = srv.ListenAndServe(); !errors.Is(err, http.ErrServerClosed) {
 		zeroLogger.Fatal().
@@ -153,25 +158,13 @@ func metricDB(
 	return database, nil
 }
 
-func idleShutdown(
-	s *http.Server,
-	channel chan struct{},
-	loggr *logger.ZeroLogger,
-	cancelBackup context.CancelFunc,
-) {
-	defer close(channel)
-
-	sigint := make(chan os.Signal, 1)
-	signal.Notify(sigint, os.Interrupt)
-	<-sigint
-
-	loggr.Info().Msg("shutdown signal received. Exiting...")
+func shutdownServer(s *http.Server, cancelBackup context.CancelFunc) error {
 	ctxServer, cancelSrv := context.WithTimeout(
 		context.Background(), constants.TimeoutShutdown)
 	defer cancelSrv()
-	if err := s.Shutdown(ctxServer); err != nil {
-		loggr.Error().Err(err).Msg("error during HTTP server Shutdown")
-	}
 
+	err := s.Shutdown(ctxServer)
 	cancelBackup()
+
+	return err
 }
