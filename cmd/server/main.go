@@ -4,11 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/go-chi/chi/v5"
-	"github.com/go-chi/chi/v5/middleware"
-	"github.com/talx-hub/malerter/internal/utils/shutdown"
 	"log"
 	"net/http"
+
+	"github.com/go-chi/chi/v5"
+	"github.com/go-chi/chi/v5/middleware"
 
 	"github.com/talx-hub/malerter/internal/api/handlers"
 	"github.com/talx-hub/malerter/internal/api/middlewares"
@@ -21,6 +21,7 @@ import (
 	"github.com/talx-hub/malerter/internal/repository/memory"
 	"github.com/talx-hub/malerter/internal/service/server"
 	"github.com/talx-hub/malerter/internal/utils/queue"
+	"github.com/talx-hub/malerter/internal/utils/shutdown"
 )
 
 func main() {
@@ -166,5 +167,5 @@ func shutdownServer(s *http.Server, cancelBackup context.CancelFunc) error {
 	err := s.Shutdown(ctxServer)
 	cancelBackup()
 
-	return err
+	return fmt.Errorf("server shutdown failed: %w", err)
 }

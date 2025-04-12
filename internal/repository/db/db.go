@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"strings"
-	"time"
 
 	"github.com/golang-migrate/migrate/v4"
 	_ "github.com/golang-migrate/migrate/v4/database/postgres"
@@ -21,6 +20,7 @@ import (
 	"github.com/talx-hub/malerter/internal/logger"
 	"github.com/talx-hub/malerter/internal/model"
 	"github.com/talx-hub/malerter/internal/utils/queue"
+	"github.com/talx-hub/malerter/internal/utils/retry"
 )
 
 type DB struct {
@@ -281,30 +281,15 @@ func ping(ctx context.Context, pool *pgxpool.Pool) error {
 type Method func(args ...any) (any, error)
 
 func WithConnectionCheck(dbMethod Method) (any, error) {
-	data, err := try(0, dbMethod)
+	connectionPred := func(err error) bool {
+		var pgErr *pgconn.PgError
+		return errors.As(err, &pgErr) && pgerrcode.IsConnectionException(pgErr.Code)
+	}
+	data, err := retry.Try(retry.Callback(dbMethod), connectionPred, 0)
 	if err != nil {
 		return nil, fmt.Errorf(
 			"DB op failed: %w", err)
 	}
 
 	return data, nil
-}
-
-func try(count int, dbMethod Method) (any, error) {
-	data, err := dbMethod()
-	if err == nil {
-		return data, nil
-	}
-
-	const maxAttemptCount = 3
-	if count >= maxAttemptCount {
-		return nil, errors.New("DB connection error. All attempt to retry are out")
-	}
-	var pgErr *pgconn.PgError
-	if errors.As(err, &pgErr) && pgerrcode.IsConnectionException(pgErr.Code) {
-		time.Sleep((time.Duration(count*2 + 1)) * time.Second) // count: 0 1 2 -> seconds: 1 3 5.
-		return try(count+1, dbMethod)
-	}
-	return nil, fmt.Errorf(
-		"on attempt #%d error occurred: %w", count, err)
 }

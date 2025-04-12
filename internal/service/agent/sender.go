@@ -9,12 +9,12 @@ import (
 	"net/http"
 	"strings"
 	"syscall"
-	"time"
 
 	"github.com/talx-hub/malerter/internal/constants"
 	"github.com/talx-hub/malerter/internal/logger"
 	"github.com/talx-hub/malerter/internal/model"
 	"github.com/talx-hub/malerter/internal/utils/compressor"
+	"github.com/talx-hub/malerter/internal/utils/retry"
 	"github.com/talx-hub/malerter/internal/utils/signature"
 )
 
@@ -89,33 +89,25 @@ func (s *Sender) batch(batch string) {
 	}
 	request.Header.Set(constants.KeyContentType, constants.ContentTypeJSON)
 	request.Header.Set(constants.KeyContentEncoding, "gzip")
-	response, err := s.try(request, 0)
+
+	wrappedDo := func(args ...any) (any, error) {
+		response, e := s.client.Do(request)
+		if e != nil {
+			return nil, fmt.Errorf("request send failed: %w", e)
+		}
+
+		errBody := response.Body.Close()
+		if errBody != nil {
+			s.log.Fatal().Err(err).Msg("unable to close the body")
+		}
+		return nil, nil
+	}
+	connectionPred := func(err error) bool {
+		return errors.Is(err, syscall.ECONNREFUSED)
+	}
+	_, err = retry.Try(wrappedDo, connectionPred, 0)
 	if err != nil {
 		s.log.Error().Err(err).Msgf(unableFormat, batch, s.host)
 		return
 	}
-
-	err = response.Body.Close()
-	if err != nil {
-		s.log.Fatal().Err(err).Msg("unable to close the body")
-	}
-}
-
-func (s *Sender) try(r *http.Request, count int) (*http.Response, error) {
-	response, err := s.client.Do(r)
-	if err == nil {
-		return response, nil
-	}
-
-	const maxAttemptCount = 3
-	if count >= maxAttemptCount {
-		return nil, errors.New("all attempts to retry request are out")
-	}
-	if errors.Is(err, syscall.ECONNREFUSED) {
-		s.log.Info().Msg("connection refused, trying to retry send request...")
-		time.Sleep((time.Duration(count*2 + 1)) * time.Second) // count: 0 1 2 -> seconds: 1 3 5.
-		return s.try(r, count+1)
-	}
-	return nil, fmt.Errorf(
-		"on attempt #%d error occurred: %w", count, err)
 }

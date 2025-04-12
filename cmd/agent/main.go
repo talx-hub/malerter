@@ -2,13 +2,14 @@ package main
 
 import (
 	"context"
+	"log"
+	"net/http"
+
 	agentCfg "github.com/talx-hub/malerter/internal/config/agent"
 	"github.com/talx-hub/malerter/internal/logger"
 	"github.com/talx-hub/malerter/internal/repository/memory"
 	"github.com/talx-hub/malerter/internal/service/agent"
 	"github.com/talx-hub/malerter/internal/utils/shutdown"
-	"log"
-	"net/http"
 )
 
 // TODO: сделать клиент модульным:
