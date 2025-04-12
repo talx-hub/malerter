@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"log"
 	"net/http"
 
@@ -32,5 +33,5 @@ func main() {
 	rep := memory.New(zeroLogger, nil)
 	agt := agent.NewAgent(rep, &cfg, &http.Client{}, zeroLogger)
 
-	agt.Run()
+	agt.Run(context.TODO())
 }

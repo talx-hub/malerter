@@ -44,17 +44,18 @@ func NewAgent(
 	}
 }
 
-func (a *Agent) Run() {
-	var i = 1
-	var updateToSendRatio = int(a.config.ReportInterval / a.config.PollInterval)
+func (a *Agent) Run(ctx context.Context) {
+	pollTicker := time.NewTicker(a.config.PollInterval)
+	reportTicker := time.NewTicker(a.config.ReportInterval)
 	for {
-		a.poller.update()
-
-		if i%updateToSendRatio == 0 {
+		select {
+		case <-ctx.Done():
+			a.sender.log.Info().Msg("SHUTDOWN agent")
+			return
+		case <-pollTicker.C:
+			a.poller.update()
+		case <-reportTicker.C:
 			a.sender.send()
-			i = 0
 		}
-		i++
-		time.Sleep(a.config.PollInterval)
 	}
 }
