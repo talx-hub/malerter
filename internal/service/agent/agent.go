@@ -50,7 +50,6 @@ func (a *Agent) Run(ctx context.Context) {
 	for {
 		select {
 		case <-ctx.Done():
-			a.sender.log.Info().Msg("SHUTDOWN agent")
 			return
 		case <-pollTicker.C:
 			a.poller.update()

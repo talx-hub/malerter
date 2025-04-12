@@ -4,6 +4,8 @@ import (
 	"context"
 	"log"
 	"net/http"
+	"os"
+	"os/signal"
 
 	agentCfg "github.com/talx-hub/malerter/internal/config/agent"
 	"github.com/talx-hub/malerter/internal/logger"
@@ -33,5 +35,27 @@ func main() {
 	rep := memory.New(zeroLogger, nil)
 	agt := agent.NewAgent(rep, &cfg, &http.Client{}, zeroLogger)
 
-	agt.Run(context.TODO())
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	idleAgentShutdown := make(chan struct{})
+	go idleShutdown(idleAgentShutdown, zeroLogger, cancel)
+	agt.Run(ctx)
+
+	<-idleAgentShutdown
+}
+
+func idleShutdown(
+	ch chan struct{},
+	log *logger.ZeroLogger,
+	cancelAgent context.CancelFunc,
+) {
+	defer close(ch)
+
+	sigint := make(chan os.Signal, 1)
+	signal.Notify(sigint, os.Interrupt)
+	<-sigint
+
+	log.Info().Msg("shutdown signal received. Exiting...")
+	cancelAgent()
 }
