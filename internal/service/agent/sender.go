@@ -58,6 +58,7 @@ func (s *Sender) convertToJSONs(metrics []model.Metric) []string {
 }
 
 func (s *Sender) batch(batch string) {
+	const unableFormat = "unable to send json %s to %s"
 	var body *bytes.Buffer
 	var err error
 	if s.compress {
@@ -71,8 +72,12 @@ func (s *Sender) batch(batch string) {
 		body = bytes.NewBufferString(batch)
 	}
 
-	const unableFormat = "unable to send json %s to %s"
-	request, err := http.NewRequest(http.MethodPost, s.host+"/updates/", body)
+	ctx, cancel := context.WithTimeout(
+		context.Background(), constants.TimeoutAgentRequest)
+	defer cancel()
+
+	request, err := http.NewRequestWithContext(
+		ctx, http.MethodPost, s.host+"/updates/", body)
 	if err != nil {
 		s.log.Error().Err(err).Msgf(unableFormat, batch, s.host)
 		return

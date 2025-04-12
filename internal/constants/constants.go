@@ -21,5 +21,6 @@ const (
 )
 
 const TimeoutShutdown = 2 * time.Second
+const TimeoutAgentRequest = 3 * time.Second
 
 const NoSecret = ""
