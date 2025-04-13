@@ -2,14 +2,20 @@ package agent
 
 import (
 	"context"
+	"fmt"
 	"math/rand/v2"
 	"runtime"
+	"strconv"
+	"time"
+
+	"github.com/shirou/gopsutil/v4/cpu"
+	"github.com/shirou/gopsutil/v4/mem"
 
 	"github.com/talx-hub/malerter/internal/logger"
 	"github.com/talx-hub/malerter/internal/model"
 )
 
-const MetricCount = 29
+const runtimeMetricCount = 29
 
 const (
 	MetricAlloc         string = "Alloc"
@@ -43,21 +49,33 @@ const (
 	MetricPollCount     string = "PollCount"
 )
 
+const (
+	TotalMemory string = "TotalMemory"
+	FreeMemory  string = "FreeMemory"
+)
+
 type Poller struct {
 	storage Storage
 	log     *logger.ZeroLogger
 }
 
 func (p *Poller) update() {
-	metrics := collect()
-	p.store(metrics)
+	runtimeMetrics := collectRuntime()
+	p.store(runtimeMetrics)
+
+	psutilMetrics, err := collectPsutil()
+	if err != nil {
+		p.log.Error().Err(err).Msg("failed to collect psutil metrics")
+		return
+	}
+	p.store(psutilMetrics)
 }
 
-func collect() []model.Metric {
+func collectRuntime() []model.Metric {
 	var memStats runtime.MemStats
 	runtime.ReadMemStats(&memStats)
 	var randomValue = rand.Float64()
-	var m = make([]model.Metric, MetricCount)
+	var m = make([]model.Metric, runtimeMetricCount)
 
 	m[0], _ = model.NewMetric().FromValues(MetricAlloc, model.MetricTypeGauge, float64(memStats.Alloc))
 	m[1], _ = model.NewMetric().FromValues(MetricBuckHashSys, model.MetricTypeGauge, float64(memStats.BuckHashSys))
@@ -90,6 +108,40 @@ func collect() []model.Metric {
 	m[28], _ = model.NewMetric().FromValues(MetricPollCount, model.MetricTypeCounter, int64(1))
 
 	return m
+}
+
+func collectPsutil() ([]model.Metric, error) {
+	memory, err := mem.VirtualMemory()
+	if err != nil {
+		return nil,
+			fmt.Errorf("failed to collect memory utilization: %w", err)
+	}
+	totalMem := float64(memory.Total)
+	freeMem := float64(memory.Free)
+
+	totalMemMetric, _ := model.NewMetric().FromValues(TotalMemory, model.MetricTypeGauge, totalMem)
+	freeMemMetric, _ := model.NewMetric().FromValues(FreeMemory, model.MetricTypeGauge, freeMem)
+
+	const compareWithLastCall time.Duration = 0
+	const percpu = true
+	cpuUtil, err := cpu.Percent(compareWithLastCall, percpu)
+	if err != nil {
+		return nil,
+			fmt.Errorf("failed to collect CPU utilization: %w", err)
+	}
+
+	cpuUtilMetrics := make([]model.Metric, len(cpuUtil))
+	for i, v := range cpuUtil {
+		nameMetric := "CPUutilization" + strconv.Itoa(i+1)
+		m, _ := model.NewMetric().FromValues(nameMetric, model.MetricTypeGauge, v)
+		cpuUtilMetrics[i] = m
+	}
+
+	metrics := make([]model.Metric, 0)
+	metrics = append(metrics, totalMemMetric, freeMemMetric)
+	metrics = append(metrics, cpuUtilMetrics...)
+
+	return metrics, nil
 }
 
 func (p *Poller) store(metrics []model.Metric) {

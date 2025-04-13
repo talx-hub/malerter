@@ -13,9 +13,9 @@ import (
 )
 
 func TestCollect(t *testing.T) {
-	metrics := collect()
+	metrics := collectRuntime()
 	t.Run("collect runtime metrics", func(t *testing.T) {
-		require.Equal(t, len(metrics), MetricCount)
+		require.Equal(t, len(metrics), runtimeMetricCount)
 		for _, m := range metrics {
 			assert.NoError(t, m.CheckValid())
 		}
@@ -27,10 +27,10 @@ func TestStore(t *testing.T) {
 	require.NoError(t, err)
 	storage := memory.New(log, nil)
 	poller := Poller{storage: storage, log: log}
-	metrics := collect()
+	metrics := collectRuntime()
 	poller.store(metrics)
 	t.Run("store runtime metrics", func(t *testing.T) {
 		stored, _ := storage.Get(context.TODO())
-		assert.Len(t, stored, MetricCount)
+		assert.Len(t, stored, runtimeMetricCount)
 	})
 }
