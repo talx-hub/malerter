@@ -100,6 +100,7 @@ func (s *Sender) batch(batch string) {
 		if errBody != nil {
 			s.log.Fatal().Err(err).Msg("unable to close the body")
 		}
+		//nolint:nilnil // don't need any value from the func and have no error
 		return nil, nil
 	}
 	connectionPred := func(err error) bool {

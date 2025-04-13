@@ -278,14 +278,12 @@ func ping(ctx context.Context, pool *pgxpool.Pool) error {
 	return nil
 }
 
-type Method func(args ...any) (any, error)
-
-func WithConnectionCheck(dbMethod Method) (any, error) {
+func WithConnectionCheck(dbMethod retry.Callback) (any, error) {
 	connectionPred := func(err error) bool {
 		var pgErr *pgconn.PgError
 		return errors.As(err, &pgErr) && pgerrcode.IsConnectionException(pgErr.Code)
 	}
-	data, err := retry.Try(retry.Callback(dbMethod), connectionPred, 0)
+	data, err := retry.Try(dbMethod, connectionPred, 0)
 	if err != nil {
 		return nil, fmt.Errorf(
 			"DB op failed: %w", err)
