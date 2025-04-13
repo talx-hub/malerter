@@ -50,8 +50,8 @@ const (
 )
 
 const (
-	TotalMemory string = "TotalMemory"
-	FreeMemory  string = "FreeMemory"
+	MetricTotalMemory string = "TotalMemory"
+	MetricFreeMemory  string = "FreeMemory"
 )
 
 type Poller struct {
@@ -119,8 +119,8 @@ func collectPsutil() ([]model.Metric, error) {
 	totalMem := float64(memory.Total)
 	freeMem := float64(memory.Free)
 
-	totalMemMetric, _ := model.NewMetric().FromValues(TotalMemory, model.MetricTypeGauge, totalMem)
-	freeMemMetric, _ := model.NewMetric().FromValues(FreeMemory, model.MetricTypeGauge, freeMem)
+	totalMemMetric, _ := model.NewMetric().FromValues(MetricTotalMemory, model.MetricTypeGauge, totalMem)
+	freeMemMetric, _ := model.NewMetric().FromValues(MetricFreeMemory, model.MetricTypeGauge, freeMem)
 
 	const compareWithLastCall time.Duration = 0
 	const percpu = true

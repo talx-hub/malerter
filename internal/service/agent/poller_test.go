@@ -12,10 +12,22 @@ import (
 	"github.com/talx-hub/malerter/internal/repository/memory"
 )
 
-func TestCollect(t *testing.T) {
+func TestRuntimeCollect(t *testing.T) {
 	metrics := collectRuntime()
 	t.Run("collect runtime metrics", func(t *testing.T) {
 		require.Equal(t, len(metrics), runtimeMetricCount)
+		for _, m := range metrics {
+			assert.NoError(t, m.CheckValid())
+		}
+	})
+}
+
+func TestPsutilCollect(t *testing.T) {
+	metrics, err := collectPsutil()
+	require.NoError(t, err)
+
+	t.Run("collect psutil metrics", func(t *testing.T) {
+		require.GreaterOrEqual(t, len(metrics), 3)
 		for _, m := range metrics {
 			assert.NoError(t, m.CheckValid())
 		}
