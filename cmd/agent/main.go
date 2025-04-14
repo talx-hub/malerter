@@ -7,7 +7,6 @@ import (
 
 	agentCfg "github.com/talx-hub/malerter/internal/config/agent"
 	"github.com/talx-hub/malerter/internal/logger"
-	"github.com/talx-hub/malerter/internal/repository/memory"
 	"github.com/talx-hub/malerter/internal/service/agent"
 	"github.com/talx-hub/malerter/internal/utils/shutdown"
 )
@@ -31,8 +30,7 @@ func main() {
 	}
 
 	zeroLogger.Info().Msg("start agent")
-	rep := memory.New(zeroLogger, nil)
-	agt := agent.NewAgent(rep, &cfg, &http.Client{}, zeroLogger)
+	agt := agent.NewAgent(&cfg, &http.Client{}, zeroLogger)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()

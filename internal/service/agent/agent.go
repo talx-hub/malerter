@@ -10,31 +10,23 @@ import (
 	"github.com/talx-hub/malerter/internal/model"
 )
 
-type Storage interface {
-	Add(context.Context, model.Metric) error
-	Get(context.Context) ([]model.Metric, error)
-	Clear()
-}
-
 type Agent struct {
-	config  *agent.Builder
-	storage Storage
-	poller  Poller
-	sender  Sender
+	config *agent.Builder
+	poller Poller
+	sender Sender
 }
 
 func NewAgent(
-	storage Storage,
 	cfg *agent.Builder,
 	client *http.Client,
 	log *logger.ZeroLogger,
 ) *Agent {
+
 	return &Agent{
-		config:  cfg,
-		storage: storage,
-		poller:  Poller{storage: storage, log: log},
+		config: cfg,
+		poller: Poller{
+			log: log},
 		sender: Sender{
-			storage:  storage,
 			host:     "http://" + cfg.ServerAddress,
 			client:   client,
 			compress: true,
@@ -47,14 +39,26 @@ func NewAgent(
 func (a *Agent) Run(ctx context.Context) {
 	pollTicker := time.NewTicker(a.config.PollInterval)
 	reportTicker := time.NewTicker(a.config.ReportInterval)
+	jobs := makeJobsCh(a.config)
 	for {
 		select {
 		case <-ctx.Done():
+			close(jobs)
 			return
+
 		case <-pollTicker.C:
-			a.poller.update()
+			jobs <- a.poller.update()
+
 		case <-reportTicker.C:
-			a.sender.send()
+			go a.sender.send(jobs)
 		}
 	}
+}
+
+func makeJobsCh(cfg *agent.Builder) chan chan model.Metric {
+	const safetyFactor = 2
+	loopsCollected := int(cfg.ReportInterval / cfg.PollInterval)
+	chanCap := safetyFactor * loopsCollected
+
+	return make(chan chan model.Metric, chanCap)
 }
