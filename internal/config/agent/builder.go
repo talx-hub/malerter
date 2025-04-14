@@ -15,6 +15,7 @@ import (
 const (
 	HostDefault           = "localhost:8080"
 	PoolIntervalDefault   = 2
+	RateLimitDefault      = 3
 	ReportIntervalDefault = 10
 )
 
@@ -22,6 +23,7 @@ const (
 	EnvHost           = "ADDRESS"
 	EnvSecretKey      = "KEY"
 	EnvPollInterval   = "POLL_INTERVAL"
+	EnvRateLimit      = "RATE_LIMIT"
 	EnvReportInterval = "REPORT_INTERVAL"
 )
 
@@ -35,14 +37,17 @@ type Builder struct {
 	LogLevel       string
 	Secret         string
 	ServerAddress  string
+	RateLimit      int
 	ReportInterval time.Duration
 	PollInterval   time.Duration
 }
 
 func (b *Builder) LoadFromFlags() config.Builder {
-	flag.StringVar(&b.LogLevel, "l", constants.LogLevelDefault, "server log level")
+	flag.StringVar(&b.LogLevel, "ll", constants.LogLevelDefault, "server log level")
 	flag.StringVar(&b.ServerAddress, "a", HostDefault, "alert-host address")
 	flag.StringVar(&b.Secret, "k", constants.NoSecret, "secret key")
+
+	flag.IntVar(&b.RateLimit, "l", RateLimitDefault, "outgoing requests count")
 
 	var pi int64
 	flag.Int64Var(&pi, "p", PoolIntervalDefault, "interval in seconds of polling and collecting metrics")
@@ -60,6 +65,13 @@ func (b *Builder) LoadFromFlags() config.Builder {
 func (b *Builder) LoadFromEnv() config.Builder {
 	if addr, found := os.LookupEnv(EnvHost); found {
 		b.ServerAddress = addr
+	}
+	if rateLimitStr, found := os.LookupEnv(EnvRateLimit); found {
+		rateLimit, err := strconv.Atoi(rateLimitStr)
+		if err != nil {
+			log.Fatal(err)
+		}
+		b.RateLimit = rateLimit
 	}
 	if pi, found := os.LookupEnv(EnvPollInterval); found {
 		piInt, err := strconv.Atoi(pi)

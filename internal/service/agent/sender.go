@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"sync"
 	"syscall"
 
 	"github.com/talx-hub/malerter/internal/constants"
@@ -26,9 +27,22 @@ type Sender struct {
 	compress bool
 }
 
-func (s *Sender) send(jobs <-chan chan model.Metric) {
-	for range len(jobs) {
-		j := <-jobs
+func (s *Sender) send(jobs <-chan chan model.Metric, m *sync.Mutex) {
+	for {
+		m.Lock()
+		jobCount := len(jobs)
+		if jobCount == 0 {
+			m.Unlock()
+			return
+		}
+
+		j, ok := <-jobs
+		if !ok {
+			m.Unlock()
+			return
+		}
+		m.Unlock()
+
 		batch := join(s.toJSONs(j))
 		s.batch(batch)
 	}

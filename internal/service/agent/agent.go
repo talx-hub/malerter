@@ -3,6 +3,7 @@ package agent
 import (
 	"context"
 	"net/http"
+	"sync"
 	"time"
 
 	"github.com/talx-hub/malerter/internal/config/agent"
@@ -40,6 +41,7 @@ func (a *Agent) Run(ctx context.Context) {
 	pollTicker := time.NewTicker(a.config.PollInterval)
 	reportTicker := time.NewTicker(a.config.ReportInterval)
 	jobs := makeJobsCh(a.config)
+	var m sync.Mutex
 	for {
 		select {
 		case <-ctx.Done():
@@ -47,10 +49,14 @@ func (a *Agent) Run(ctx context.Context) {
 			return
 
 		case <-pollTicker.C:
+			m.Lock()
 			jobs <- a.poller.update()
+			m.Unlock()
 
 		case <-reportTicker.C:
-			go a.sender.send(jobs)
+			for range a.config.RateLimit {
+				go a.sender.send(jobs, &m)
+			}
 		}
 	}
 }
