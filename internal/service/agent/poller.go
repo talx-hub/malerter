@@ -1,11 +1,11 @@
 package agent
 
 import (
-	"context"
 	"fmt"
 	"math/rand/v2"
 	"runtime"
 	"strconv"
+	"sync"
 	"time"
 
 	"github.com/shirou/gopsutil/v4/cpu"
@@ -55,20 +55,44 @@ const (
 )
 
 type Poller struct {
-	storage Storage
-	log     *logger.ZeroLogger
+	log *logger.ZeroLogger
 }
 
-func (p *Poller) update() {
-	runtimeMetrics := collectRuntime()
-	p.store(runtimeMetrics)
+func (p *Poller) update() chan model.Metric {
+	const safetyFactor = 2
+	const psutilApproxMetricCount = 30
+	chanCap := safetyFactor * (psutilApproxMetricCount + runtimeMetricCount)
+	metricCh := make(chan model.Metric, chanCap)
+	defer close(metricCh)
 
-	psutilMetrics, err := collectPsutil()
-	if err != nil {
-		p.log.Error().Err(err).Msg("failed to collect psutil metrics")
-		return
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		runtimeMetrics := collectRuntime()
+		push(metricCh, runtimeMetrics)
+
+	}()
+
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		psutilMetrics, err := collectPsutil()
+		if err != nil {
+			p.log.Error().Err(err).Msg("failed to collect psutil metrics")
+			return
+		}
+		push(metricCh, psutilMetrics)
+	}()
+
+	wg.Wait()
+	return metricCh
+}
+
+func push(ch chan<- model.Metric, metrics []model.Metric) {
+	for _, m := range metrics {
+		ch <- m
 	}
-	p.store(psutilMetrics)
 }
 
 func collectRuntime() []model.Metric {
@@ -142,12 +166,4 @@ func collectPsutil() ([]model.Metric, error) {
 	metrics = append(metrics, cpuUtilMetrics...)
 
 	return metrics, nil
-}
-
-func (p *Poller) store(metrics []model.Metric) {
-	for _, m := range metrics {
-		if p.storage.Add(context.TODO(), m) != nil {
-			p.log.Error().Msg("error during storing of metric")
-		}
-	}
 }
