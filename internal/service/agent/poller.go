@@ -71,7 +71,6 @@ func (p *Poller) update() chan model.Metric {
 		defer wg.Done()
 		runtimeMetrics := collectRuntime()
 		push(metricCh, runtimeMetrics)
-
 	}()
 
 	wg.Add(1)

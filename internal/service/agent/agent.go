@@ -22,7 +22,6 @@ func NewAgent(
 	client *http.Client,
 	log *logger.ZeroLogger,
 ) *Agent {
-
 	return &Agent{
 		config: cfg,
 		poller: Poller{
@@ -47,12 +46,10 @@ func (a *Agent) Run(ctx context.Context) {
 		case <-ctx.Done():
 			close(jobs)
 			return
-
 		case <-pollTicker.C:
 			m.Lock()
 			jobs <- a.poller.update()
 			m.Unlock()
-
 		case <-reportTicker.C:
 			for range a.config.RateLimit {
 				go a.sender.send(jobs, &m)
