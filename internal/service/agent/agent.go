@@ -47,8 +47,9 @@ func (a *Agent) Run(ctx context.Context) {
 			close(jobs)
 			return
 		case <-pollTicker.C:
+			temp := a.poller.update()
 			m.Lock()
-			jobs <- a.poller.update()
+			jobs <- temp
 			m.Unlock()
 		case <-reportTicker.C:
 			for range a.config.RateLimit {
