@@ -20,41 +20,45 @@ import (
 
 type Sender struct {
 	client   *http.Client
-	storage  Storage
 	log      *logger.ZeroLogger
 	host     string
 	secret   string
 	compress bool
 }
 
-func (s *Sender) send() {
-	metrics, _ := s.get()
-	jsons := s.convertToJSONs(metrics)
-	batch := "[" + strings.Join(jsons, ",") + "]"
-	s.batch(batch)
-	s.storage.Clear()
-}
-
-func (s *Sender) get() ([]model.Metric, error) {
-	metrics, err := s.storage.Get(context.TODO())
-	if err != nil {
-		return nil, fmt.Errorf("failed to get metrics from storage: %w", err)
+func (s *Sender) send(jobs <-chan chan model.Metric) {
+	for range len(jobs) {
+		j := <-jobs
+		batch := join(s.toJSONs(j))
+		s.batch(batch)
 	}
-	return metrics, nil
 }
 
-func (s *Sender) convertToJSONs(metrics []model.Metric) []string {
-	jsons := make([]string, len(metrics))
-	for i, m := range metrics {
-		mJSON, err := json.Marshal(m)
-		if err != nil {
-			s.log.Error().Err(err).
-				Msgf("unable to convert metric %s to JSON", m.String())
-			continue
+func (s *Sender) toJSONs(ch <-chan model.Metric) chan string {
+	jsons := make(chan string)
+
+	go func() {
+		defer close(jsons)
+		for m := range ch {
+			mJSON, err := json.Marshal(m)
+			if err != nil {
+				s.log.Error().Err(err).
+					Msgf("unable to convert metric %s to JSON", m.String())
+				continue
+			}
+			jsons <- string(mJSON)
 		}
-		jsons[i] = string(mJSON)
-	}
+	}()
+
 	return jsons
+}
+
+func join(ch <-chan string) string {
+	jsons := make([]string, 0)
+	for j := range ch {
+		jsons = append(jsons, j)
+	}
+	return "[" + strings.Join(jsons, ",") + "]"
 }
 
 func (s *Sender) batch(batch string) {
