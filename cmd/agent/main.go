@@ -11,13 +11,6 @@ import (
 	"github.com/talx-hub/malerter/internal/utils/shutdown"
 )
 
-// TODO: сделать клиент модульным:
-//		+ модуль сбора метрик
-//		+ модуль отправки метрик
-//		+ первый модуль собирает метрики
-//		? затем оповещает модуль отпраки, что данные готовы
-//		? но как сделать нотификацию???
-
 func main() {
 	// TODO: тут какие-то кошмары с указателями(см. config/agent/builder/.Build())
 	cfg, ok := agentCfg.NewDirector().Build().(agentCfg.Builder)
