@@ -164,8 +164,9 @@ func shutdownServer(s *http.Server, cancelBackup context.CancelFunc) error {
 		context.Background(), constants.TimeoutShutdown)
 	defer cancelSrv()
 
-	err := s.Shutdown(ctxServer)
+	if err := s.Shutdown(ctxServer); err != nil {
+		return fmt.Errorf("server shutdown failed: %w", err)
+	}
 	cancelBackup()
-
-	return fmt.Errorf("server shutdown failed: %w", err)
+	return nil
 }
