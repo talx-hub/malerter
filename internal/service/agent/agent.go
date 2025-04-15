@@ -41,10 +41,12 @@ func (a *Agent) Run(ctx context.Context) {
 	reportTicker := time.NewTicker(a.config.ReportInterval)
 	jobs := makeJobsCh(a.config)
 	var m sync.Mutex
+	var wg sync.WaitGroup
 	for {
 		select {
 		case <-ctx.Done():
 			close(jobs)
+			wg.Wait()
 			return
 		case <-pollTicker.C:
 			temp := a.poller.update()
@@ -53,7 +55,8 @@ func (a *Agent) Run(ctx context.Context) {
 			m.Unlock()
 		case <-reportTicker.C:
 			for range a.config.RateLimit {
-				go a.sender.send(jobs, &m)
+				wg.Add(1)
+				go a.sender.send(jobs, &m, &wg)
 			}
 		}
 	}

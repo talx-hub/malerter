@@ -27,7 +27,11 @@ type Sender struct {
 	compress bool
 }
 
-func (s *Sender) send(jobs <-chan chan model.Metric, m *sync.Mutex) {
+func (s *Sender) send(
+	jobs <-chan chan model.Metric, m *sync.Mutex, wg *sync.WaitGroup,
+) {
+	defer wg.Done()
+
 	for {
 		m.Lock()
 		jobCount := len(jobs)
