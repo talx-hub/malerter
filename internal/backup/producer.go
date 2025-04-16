@@ -10,49 +10,59 @@ import (
 	"github.com/talx-hub/malerter/internal/model"
 )
 
-type Producer struct {
+type producer struct {
 	writer *bufio.Writer
 	file   *os.File
 }
 
-func NewProducer(filename string) (*Producer, error) {
+func newProducer(filename string) (*producer, error) {
 	file, err := os.OpenFile(
 		filename,
 		os.O_WRONLY|os.O_CREATE|os.O_APPEND,
 		constants.PermissionFilePrivate)
 	if err != nil {
-		return nil, fmt.Errorf("unable to open backup file %s: %w", filename, err)
+		return nil,
+			fmt.Errorf("unable to open backup file %s: %w", filename, err)
 	}
 
-	return &Producer{
+	return &producer{
 		file:   file,
 		writer: bufio.NewWriter(file),
 	}, nil
 }
 
-func (p *Producer) WriteMetric(metric model.Metric) error {
-	data, err := json.Marshal(&metric)
-	if err != nil {
-		return fmt.Errorf("unable marshal metric: %w", err)
+func (p *producer) writeMetric(metric model.Metric) error {
+	jsonEncoder := json.NewEncoder(p.writer)
+	if err := jsonEncoder.Encode(&metric); err != nil {
+		return fmt.Errorf("unable to backup metric: %w", err)
 	}
 
-	if _, err := p.writer.Write(data); err != nil {
-		return fmt.Errorf("unable to write backup: %w", err)
-	}
+	return nil
+}
 
-	if err := p.writer.WriteByte('\n'); err != nil {
-		return fmt.Errorf("unable to write string: %w", err)
+func (p *producer) write(metrics []model.Metric) error {
+	errCount := 0
+	for _, m := range metrics {
+		if err := p.writeMetric(m); err != nil {
+			errCount++
+		}
 	}
+	if errCount == 0 {
+		return nil
+	}
+	return fmt.Errorf("failed to write %d metrics", errCount)
+}
 
+func (p *producer) flush() error {
 	if err := p.writer.Flush(); err != nil {
 		return fmt.Errorf("unable to flush backup: %w", err)
 	}
 	return nil
 }
 
-func (p *Producer) Close() error {
+func (p *producer) close() error {
 	if err := p.file.Close(); err != nil {
-		return fmt.Errorf("unable to close backup file error: %w", p.file.Close())
+		return fmt.Errorf("unable to close backup file: %w", err)
 	}
 	return nil
 }

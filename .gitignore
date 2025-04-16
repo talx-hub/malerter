@@ -11,7 +11,7 @@
 # Output of the go coverage tool, specifically when used with LiteIDE
 *.out
 
-# Baked up files
+# Bakup files
 *.bk
 
 # golangci-lint reports and cache

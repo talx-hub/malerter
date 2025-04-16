@@ -1,15 +1,17 @@
-package api
+package handlers
 
 import (
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
+
+	"github.com/go-chi/chi/v5"
 
 	"github.com/talx-hub/malerter/internal/constants"
 	"github.com/talx-hub/malerter/internal/customerror"
+	"github.com/talx-hub/malerter/internal/logger"
 	"github.com/talx-hub/malerter/internal/model"
 	"github.com/talx-hub/malerter/internal/repository/db"
 	"github.com/talx-hub/malerter/internal/service"
@@ -21,10 +23,11 @@ const (
 
 type HTTPHandler struct {
 	service service.Service
+	log     *logger.ZeroLogger
 }
 
-func NewHTTPHandler(s service.Service) *HTTPHandler {
-	return &HTTPHandler{service: s}
+func NewHTTPHandler(s service.Service, log *logger.ZeroLogger) *HTTPHandler {
+	return &HTTPHandler{service: s, log: log}
 }
 
 func getStatusFromError(err error) int {
@@ -55,7 +58,7 @@ func extractJSON(body io.Reader) (model.Metric, error) {
 	return *m, nil
 }
 
-func extractJSONs(body io.Reader) ([]model.Metric, error) {
+func (h *HTTPHandler) extractJSONs(body io.Reader) ([]model.Metric, error) {
 	var metrics []model.Metric
 	if err := json.NewDecoder(body).Decode(&metrics); err != nil {
 		return nil,
@@ -65,6 +68,7 @@ func extractJSONs(body io.Reader) ([]model.Metric, error) {
 	validList := make([]model.Metric, 0)
 	for _, m := range metrics {
 		if err := m.CheckValid(); err != nil || m.IsEmpty() {
+			h.log.Error().Err(err).Msg("decoded metric is invalid")
 			continue
 		}
 		validList = append(validList, m)
@@ -73,7 +77,7 @@ func extractJSONs(body io.Reader) ([]model.Metric, error) {
 }
 
 func (h *HTTPHandler) DumpMetricList(w http.ResponseWriter, r *http.Request) {
-	metrics, err := extractJSONs(r.Body)
+	metrics, err := h.extractJSONs(r.Body)
 	if err != nil {
 		st := getStatusFromError(err)
 		http.Error(w, err.Error(), st)
@@ -127,7 +131,7 @@ func (h *HTTPHandler) DumpMetricJSON(w http.ResponseWriter, r *http.Request) {
 	}
 	metric, ok := m.(model.Metric)
 	if !ok {
-		log.Printf("failed to convert any to model.Metric")
+		h.log.Error().Msg("failed to convert 'any' to model.Metric")
 		http.Error(
 			w,
 			"failed to convert find result",
@@ -136,7 +140,6 @@ func (h *HTTPHandler) DumpMetricJSON(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set(constants.KeyContentType, constants.ContentTypeJSON)
-	w.WriteHeader(http.StatusOK)
 	if err = json.NewEncoder(w).Encode(&metric); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -144,7 +147,11 @@ func (h *HTTPHandler) DumpMetricJSON(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *HTTPHandler) DumpMetric(w http.ResponseWriter, r *http.Request) {
-	metric, err := model.NewMetric().FromURL(r.URL.Path)
+	mName := chi.URLParam(r, "name")
+	mType := chi.URLParam(r, "type")
+	mValue := chi.URLParam(r, "val")
+	metric, err := model.NewMetric().FromValues(
+		mName, model.MetricType(mType), mValue)
 	if err != nil {
 		st := getStatusFromError(err)
 		http.Error(w, fmt.Sprintf(errMsgPattern, r.URL.Path, err.Error()), st)
@@ -174,14 +181,16 @@ func (h *HTTPHandler) DumpMetric(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *HTTPHandler) GetMetric(w http.ResponseWriter, r *http.Request) {
-	metric, err := model.NewMetric().FromURL(r.URL.Path)
+	mName := chi.URLParam(r, "name")
+	mType := chi.URLParam(r, "type")
+	metric, err := model.NewMetric().FromValues(
+		mName, model.MetricType(mType), "0")
 	if err != nil {
 		st := getStatusFromError(err)
 		http.Error(w, fmt.Sprintf(errMsgPattern, r.URL.Path, err.Error()), st)
 		return
 	}
-
-	dummyKey := metric.Type.String() + " " + metric.Name
+	dummyKey := mType + " " + mName
 	wrappedFind := func(args ...any) (any, error) {
 		return h.service.Find(r.Context(), dummyKey)
 	}
@@ -193,17 +202,16 @@ func (h *HTTPHandler) GetMetric(w http.ResponseWriter, r *http.Request) {
 	}
 	metric, ok := m.(model.Metric)
 	if !ok {
-		log.Printf("failed to convert any to model.Metric")
+		h.log.Error().Msg("failed to convert 'any' to model.Metric")
 		http.Error(w, "failed to convert 'find' result", http.StatusInternalServerError)
 		return
 	}
 
 	w.Header().Set(constants.KeyContentType, constants.ContentTypeText)
-	w.WriteHeader(http.StatusOK)
 	valueStr := fmt.Sprintf("%v", metric.ActualValue())
 	_, err = w.Write([]byte(valueStr))
 	if err != nil {
-		log.Printf("failed to write response: %v", err)
+		h.log.Error().Err(err).Msg("failed to write response")
 	}
 }
 
@@ -227,13 +235,12 @@ func (h *HTTPHandler) GetMetricJSON(w http.ResponseWriter, r *http.Request) {
 	}
 	metric, ok := m.(model.Metric)
 	if !ok {
-		log.Printf("failed to convert any to model.Metric")
+		h.log.Error().Msg("failed to convert 'any' to model.Metric")
 		http.Error(w, "failed to convert 'find' result", http.StatusInternalServerError)
 		return
 	}
 
 	w.Header().Set(constants.KeyContentType, constants.ContentTypeJSON)
-	w.WriteHeader(http.StatusOK)
 	if err = json.NewEncoder(w).Encode(&metric); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -252,16 +259,17 @@ func (h *HTTPHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 	}
 	m, ok := metrics.([]model.Metric)
 	if !ok {
-		log.Printf("failed to convert any to []model.Metric")
-		http.Error(w, "failed to convert 'get' result", http.StatusInternalServerError)
+		h.log.Error().Msg("failed to convert 'any' to []model.Metric")
+		http.Error(w, "failed to convert 'GetAll' result", http.StatusInternalServerError)
 		return
 	}
 
 	page := createMetricsPage(m)
-	w.WriteHeader(http.StatusOK)
 	_, err = w.Write([]byte(page))
 	if err != nil {
-		log.Printf("failed to write response: %v", err)
+		h.log.Error().Err(err).Msg("failed to write response")
+		http.Error(w, "failed to write response", http.StatusInternalServerError)
+		return
 	}
 }
 

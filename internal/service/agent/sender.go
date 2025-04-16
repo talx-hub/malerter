@@ -6,105 +6,131 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log"
 	"net/http"
 	"strings"
+	"sync"
 	"syscall"
-	"time"
 
-	"github.com/talx-hub/malerter/internal/compressor/gzip"
 	"github.com/talx-hub/malerter/internal/constants"
+	"github.com/talx-hub/malerter/internal/logger"
 	"github.com/talx-hub/malerter/internal/model"
+	"github.com/talx-hub/malerter/internal/utils/compressor"
+	"github.com/talx-hub/malerter/internal/utils/retry"
+	"github.com/talx-hub/malerter/internal/utils/signature"
 )
 
 type Sender struct {
 	client   *http.Client
-	storage  Storage
+	log      *logger.ZeroLogger
 	host     string
+	secret   string
 	compress bool
 }
 
-func (s *Sender) send() {
-	metrics, _ := s.get()
-	jsons := convertToJSONs(metrics)
-	batch := "[" + strings.Join(jsons, ",") + "]"
-	s.batch(batch)
-	s.storage.Clear()
-}
+func (s *Sender) send(
+	jobs <-chan chan model.Metric, m *sync.Mutex, wg *sync.WaitGroup,
+) {
+	defer wg.Done()
 
-func (s *Sender) get() ([]model.Metric, error) {
-	metrics, err := s.storage.Get(context.TODO())
-	if err != nil {
-		return nil, fmt.Errorf("failed to get metrics from storage: %w", err)
-	}
-	return metrics, nil
-}
-
-func convertToJSONs(metrics []model.Metric) []string {
-	jsons := make([]string, len(metrics))
-	for i, m := range metrics {
-		mJSON, err := json.Marshal(m)
-		if err != nil {
-			log.Printf("unable to convert metric %s to JSON: %v", m.String(), err)
-			continue
+	for {
+		m.Lock()
+		jobCount := len(jobs)
+		if jobCount == 0 {
+			m.Unlock()
+			return
 		}
-		jsons[i] = string(mJSON)
+
+		j, ok := <-jobs
+		if !ok {
+			m.Unlock()
+			return
+		}
+		m.Unlock()
+
+		batch := join(s.toJSONs(j))
+		s.batch(batch)
 	}
+}
+
+func (s *Sender) toJSONs(ch <-chan model.Metric) chan string {
+	jsons := make(chan string)
+
+	go func() {
+		defer close(jsons)
+		for m := range ch {
+			mJSON, err := json.Marshal(m)
+			if err != nil {
+				s.log.Error().Err(err).
+					Msgf("unable to convert metric %s to JSON", m.String())
+				continue
+			}
+			jsons <- string(mJSON)
+		}
+	}()
+
 	return jsons
 }
 
+func join(ch <-chan string) string {
+	jsons := make([]string, 0)
+	for j := range ch {
+		jsons = append(jsons, j)
+	}
+	return "[" + strings.Join(jsons, ",") + "]"
+}
+
 func (s *Sender) batch(batch string) {
+	const unableFormat = "unable to send json %s to %s"
 	var body *bytes.Buffer
 	var err error
 	if s.compress {
-		body, err = gzip.Compress([]byte(batch))
+		body, err = compressor.Compress([]byte(batch))
 		if err != nil {
-			log.Printf("unable to compress json %s: %v", batch, err)
+			s.log.Error().Err(err).
+				Msgf("unable to compress json %s", batch)
 			return
 		}
 	} else {
 		body = bytes.NewBufferString(batch)
 	}
-	request, err := http.NewRequest(http.MethodPost, s.host+"/updates/", body)
+
+	ctx, cancel := context.WithTimeout(
+		context.Background(), constants.TimeoutAgentRequest)
+	defer cancel()
+
+	request, err := http.NewRequestWithContext(
+		ctx, http.MethodPost, s.host+"/updates/", body)
 	if err != nil {
-		log.Printf("unable to send json %s to %s: %v", batch, s.host, err)
+		s.log.Error().Err(err).Msgf(unableFormat, batch, s.host)
 		return
+	}
+
+	if s.secret != constants.NoSecret {
+		sign := signature.Hash(body.Bytes(), s.secret)
+		request.Header.Set(constants.KeyHashSHA256, sign)
 	}
 	request.Header.Set(constants.KeyContentType, constants.ContentTypeJSON)
 	request.Header.Set(constants.KeyContentEncoding, "gzip")
-	response, err := s.client.Do(request)
-	if err != nil && !errors.Is(err, syscall.ECONNREFUSED) {
-		log.Printf("unable to send json %s to %s: %v", batch, s.host, err)
-		return
-	}
-	if err != nil && errors.Is(err, syscall.ECONNREFUSED) {
-		err = retry(request, s.client, 0)
-		if err != nil {
-			log.Println(err)
+
+	wrappedDo := func(args ...any) (any, error) {
+		response, e := s.client.Do(request)
+		if e != nil {
+			return nil, fmt.Errorf("request send failed: %w", e)
 		}
+
+		errBody := response.Body.Close()
+		if errBody != nil {
+			s.log.Fatal().Err(err).Msg("unable to close the body")
+		}
+		//nolint:nilnil // don't need any value from the func and have no error
+		return nil, nil
+	}
+	connectionPred := func(err error) bool {
+		return errors.Is(err, syscall.ECONNREFUSED)
+	}
+	_, err = retry.Try(wrappedDo, connectionPred, 0)
+	if err != nil {
+		s.log.Error().Err(err).Msgf(unableFormat, batch, s.host)
 		return
 	}
-
-	err = response.Body.Close()
-	if err != nil {
-		log.Fatalf("unable to close the body: %v", err)
-	}
-}
-
-func retry(r *http.Request, c *http.Client, count int) error {
-	const maxAttemptCount = 4
-	if count == maxAttemptCount {
-		return errors.New("all attempts to retry request are out")
-	}
-
-	response, err := c.Do(r)
-	if err != nil && errors.Is(err, syscall.ECONNREFUSED) {
-		time.Sleep((time.Duration(count*2 + 1)) * time.Second) // count: 0 1 2 -> seconds: 1 3 5.
-		return retry(r, c, count+1)
-	}
-	err = response.Body.Close()
-	if err != nil {
-		log.Fatalf("unable to close the body: %v", err)
-	}
-	return nil
 }

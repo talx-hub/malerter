@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"strings"
-	"time"
 
 	"github.com/golang-migrate/migrate/v4"
 	_ "github.com/golang-migrate/migrate/v4/database/postgres"
@@ -16,17 +15,25 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 	_ "github.com/jackc/pgx/v5/stdlib"
+
 	"github.com/talx-hub/malerter/internal/customerror"
-	"github.com/talx-hub/malerter/internal/logger/zerologger"
+	"github.com/talx-hub/malerter/internal/logger"
 	"github.com/talx-hub/malerter/internal/model"
+	"github.com/talx-hub/malerter/internal/utils/queue"
+	"github.com/talx-hub/malerter/internal/utils/retry"
 )
 
 type DB struct {
-	pool *pgxpool.Pool
-	log  *zerologger.ZeroLogger
+	pool   *pgxpool.Pool
+	log    *logger.ZeroLogger
+	buffer *queue.Queue[model.Metric]
 }
 
-func New(ctx context.Context, dsn string, logger *zerologger.ZeroLogger,
+func New(
+	ctx context.Context,
+	dsn string,
+	log *logger.ZeroLogger,
+	buf *queue.Queue[model.Metric],
 ) (*DB, error) {
 	if err := runMigrations(dsn); err != nil {
 		return nil, fmt.Errorf("failed to run DB migrations: %w", err)
@@ -36,8 +43,9 @@ func New(ctx context.Context, dsn string, logger *zerologger.ZeroLogger,
 		return nil, fmt.Errorf("failed to init DB pool: %w", err)
 	}
 	return &DB{
-		pool: pool,
-		log:  logger,
+		pool:   pool,
+		log:    log,
+		buffer: buf,
 	}, nil
 }
 
@@ -127,6 +135,9 @@ func (db *DB) Add(ctx context.Context, m model.Metric) error {
 	if err := push(ctx, m, db.pool); err != nil {
 		return fmt.Errorf("failed to add the metric %s: %w", m.String(), err)
 	}
+	if db.buffer != nil && !db.buffer.IsClosed() {
+		db.buffer.Push(m)
+	}
 
 	return nil
 }
@@ -138,7 +149,7 @@ func (db *DB) Batch(ctx context.Context, batch []model.Metric) error {
 	}
 	defer func() {
 		err := tx.Rollback(ctx)
-		if err != nil {
+		if err != nil && !errors.Is(err, pgx.ErrTxClosed) {
 			db.log.
 				Err(err).
 				Msg("rollback failed")
@@ -147,6 +158,9 @@ func (db *DB) Batch(ctx context.Context, batch []model.Metric) error {
 	for _, m := range batch {
 		err = push(ctx, m, tx)
 		if err == nil {
+			if db.buffer != nil && !db.buffer.IsClosed() {
+				db.buffer.Push(m)
+			}
 			continue
 		}
 
@@ -238,7 +252,7 @@ func fromRow(row pgx.Row) (*model.Metric, error) {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil,
 				&customerror.NotFoundError{
-					Message: "metric not found: %s" + metric.String(),
+					Info: "metric not found: %s" + metric.String(),
 				}
 		}
 		return nil, fmt.Errorf("failed to scan a response row: %w", err)
@@ -264,35 +278,15 @@ func ping(ctx context.Context, pool *pgxpool.Pool) error {
 	return nil
 }
 
-type Data interface{}
-
-type Method func(args ...any) (any, error)
-
-func WithConnectionCheck(dbMethod Method) (any, error) {
-	data, err := try(0, dbMethod)
-	if err != nil {
-		return nil, fmt.Errorf(
-			"request failed: %w", err)
-	}
-
-	return data, nil
-}
-
-func try(count int, dbMethod Method) (any, error) {
-	const maxAttemptCount = 3
-	if count > maxAttemptCount {
-		return nil, errors.New("all attempts to try are out")
-	}
-
-	data, err := dbMethod()
-	if err != nil {
+func WithConnectionCheck(dbMethod retry.Callback) (any, error) {
+	connectionPred := func(err error) bool {
 		var pgErr *pgconn.PgError
-		if errors.As(err, &pgErr) && pgerrcode.IsConnectionException(pgErr.Code) {
-			time.Sleep((time.Duration(count*2 + 1)) * time.Second) // count: 0 1 2 -> seconds: 1 3 5.
-			return try(count+1, dbMethod)
-		}
+		return errors.As(err, &pgErr) && pgerrcode.IsConnectionException(pgErr.Code)
+	}
+	data, err := retry.Try(dbMethod, connectionPred, 0)
+	if err != nil {
 		return nil, fmt.Errorf(
-			"on attempt #%d error occurred: %w", count, err)
+			"DB op failed: %w", err)
 	}
 
 	return data, nil

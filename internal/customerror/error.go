@@ -1,11 +1,11 @@
 package customerror
 
 type NotFoundError struct {
-	Message string
+	Info string
 }
 
 func (e *NotFoundError) Error() string {
-	return "not found: " + e.Message
+	return "not found: " + e.Info
 }
 
 type InvalidArgumentError struct {

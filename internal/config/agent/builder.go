@@ -9,18 +9,22 @@ import (
 	"time"
 
 	"github.com/talx-hub/malerter/internal/config"
+	"github.com/talx-hub/malerter/internal/constants"
 )
 
 const (
 	HostDefault           = "localhost:8080"
-	ReportIntervalDefault = 10
 	PoolIntervalDefault   = 2
+	RateLimitDefault      = 3
+	ReportIntervalDefault = 10
 )
 
 const (
 	EnvHost           = "ADDRESS"
-	EnvReportInterval = "REPORT_INTERVAL"
+	EnvSecretKey      = "KEY"
 	EnvPollInterval   = "POLL_INTERVAL"
+	EnvRateLimit      = "RATE_LIMIT"
+	EnvReportInterval = "REPORT_INTERVAL"
 )
 
 func NewDirector() *config.Director {
@@ -30,19 +34,27 @@ func NewDirector() *config.Director {
 }
 
 type Builder struct {
+	LogLevel       string
+	Secret         string
 	ServerAddress  string
+	RateLimit      int
 	ReportInterval time.Duration
 	PollInterval   time.Duration
 }
 
 func (b *Builder) LoadFromFlags() config.Builder {
+	flag.StringVar(&b.LogLevel, "ll", constants.LogLevelDefault, "server log level")
 	flag.StringVar(&b.ServerAddress, "a", HostDefault, "alert-host address")
+	flag.StringVar(&b.Secret, "k", constants.NoSecret, "secret key")
+
+	flag.IntVar(&b.RateLimit, "l", RateLimitDefault, "outgoing requests count")
+
+	var pi int64
+	flag.Int64Var(&pi, "p", PoolIntervalDefault, "interval in seconds of polling and collecting metrics")
 
 	var ri int64
 	flag.Int64Var(&ri, "r", ReportIntervalDefault, "interval in seconds of sending metrics to alert server")
 
-	var pi int64
-	flag.Int64Var(&pi, "p", PoolIntervalDefault, "interval in seconds of polling and collecting metrics")
 	flag.Parse()
 
 	b.ReportInterval = time.Duration(ri) * time.Second
@@ -54,12 +66,12 @@ func (b *Builder) LoadFromEnv() config.Builder {
 	if addr, found := os.LookupEnv(EnvHost); found {
 		b.ServerAddress = addr
 	}
-	if ri, found := os.LookupEnv(EnvReportInterval); found {
-		riInt, err := strconv.Atoi(ri)
+	if rateLimitStr, found := os.LookupEnv(EnvRateLimit); found {
+		rateLimit, err := strconv.Atoi(rateLimitStr)
 		if err != nil {
 			log.Fatal(err)
 		}
-		b.ReportInterval = time.Duration(riInt) * time.Second
+		b.RateLimit = rateLimit
 	}
 	if pi, found := os.LookupEnv(EnvPollInterval); found {
 		piInt, err := strconv.Atoi(pi)
@@ -67,6 +79,16 @@ func (b *Builder) LoadFromEnv() config.Builder {
 			log.Fatal(err)
 		}
 		b.PollInterval = time.Duration(piInt) * time.Second
+	}
+	if ri, found := os.LookupEnv(EnvReportInterval); found {
+		riInt, err := strconv.Atoi(ri)
+		if err != nil {
+			log.Fatal(err)
+		}
+		b.ReportInterval = time.Duration(riInt) * time.Second
+	}
+	if secret, found := os.LookupEnv(EnvSecretKey); found {
+		b.Secret = secret
 	}
 	return b
 }

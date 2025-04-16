@@ -2,92 +2,149 @@ package backup
 
 import (
 	"context"
-	"errors"
-	"io"
-	"log"
-	"net/http"
 	"time"
 
 	"github.com/talx-hub/malerter/internal/config/server"
+	"github.com/talx-hub/malerter/internal/logger"
 	"github.com/talx-hub/malerter/internal/model"
+	"github.com/talx-hub/malerter/internal/utils/queue"
 )
 
 type Storage interface {
-	Add(context.Context, model.Metric) error
+	Batch(context.Context, []model.Metric) error
 	Get(context.Context) ([]model.Metric, error)
 }
 
-type File struct {
-	lastBackup     time.Time
+type Manager struct {
+	log            *logger.ZeroLogger
+	buffer         *queue.Queue[model.Metric]
 	storage        Storage
-	producer       Producer
-	restorer       Restorer
+	filename       string
 	backupInterval time.Duration
+	needRestore    bool
 }
 
-func New(config *server.Builder, storage Storage) (*File, error) {
+func New(
+	config *server.Builder,
+	buffer *queue.Queue[model.Metric],
+	storage Storage,
+	log *logger.ZeroLogger,
+) *Manager {
+	if log == nil {
+		return nil
+	}
 	if config == nil {
-		return nil, errors.New("config is nil")
+		log.Error().Msg("backup service: config is nil")
+		return nil
 	}
-	p, err := NewProducer(config.FileStoragePath)
-	if err != nil {
-		return nil, err
+	if buffer == nil {
+		log.Error().Msg("backup service: buffer is nil")
+		return nil
 	}
-	r, err := NewRestorer(config.FileStoragePath)
-	if err != nil {
-		return nil, err
+	if storage == nil {
+		log.Error().Msg("backup service: storage is nil")
+		return nil
 	}
 
-	return &File{
-		producer:       *p,
-		restorer:       *r,
-		backupInterval: config.StoreInterval,
-		lastBackup:     time.Now().UTC(),
+	return &Manager{
+		log:            log,
+		buffer:         buffer,
 		storage:        storage,
-	}, nil
+		filename:       config.FileStoragePath,
+		backupInterval: config.StoreInterval,
+		needRestore:    config.Restore,
+	}
 }
 
-func (b *File) Restore() {
+func (b *Manager) Run(ctx context.Context) {
+	if b.needRestore {
+		b.restore(ctx)
+	}
+
+	var ticker *time.Ticker
+	if b.backupInterval != 0 {
+		ticker = time.NewTicker(b.backupInterval)
+	}
+
+	b.log.Info().Msg("START backup SERVICE")
 	for {
-		metric, err := b.restorer.ReadMetric()
-		if err != nil {
-			if errors.Is(err, io.EOF) {
-				break
+		// можно ли в default делать только b.backup()
+		// а отдельным case как-то проверять b.backupInterval != 0
+		// если условие выполняется, то блокируюсь до срабатывания ticker
+		// и затем fallthrough в default??
+		select {
+		case <-ctx.Done():
+			b.log.Info().Msg("SHUTDOWN backup SERVICE...")
+			b.backup()
+			return
+		default:
+			if b.backupInterval != 0 {
+				<-ticker.C
 			}
-			log.Printf("unable to restore metric: %v", err)
-		}
-		err = b.storage.Add(context.TODO(), *metric)
-		if err != nil {
-			log.Printf("unable to store metric, during backup restore: %v", err)
+			b.backup()
 		}
 	}
 }
 
-func (b *File) Backup() {
-	metrics, _ := b.storage.Get(context.TODO())
-	for _, m := range metrics {
-		if err := b.producer.WriteMetric(m); err != nil {
-			log.Printf("unable to backup metric: %v\n", err)
-		}
+func (b *Manager) restore(ctx context.Context) {
+	b.log.Info().Msg("start RESTORE metrics from backup...")
+	b.buffer.Close()
+	defer b.buffer.Open()
+
+	r, err := newRestorer(b.filename)
+	if err != nil {
+		b.log.Error().Err(err).Msg("unable to open backup Restorer")
+		return
 	}
+	defer func() {
+		if err := r.close(); err != nil {
+			b.log.Error().Err(err).Msg("close backup failed")
+		}
+	}()
+
+	metrics, err := r.read()
+	if err != nil {
+		b.log.Error().Err(err).Msg("read backup failed")
+		return
+	}
+	err = b.storage.Batch(ctx, metrics)
+	if err != nil {
+		b.log.Error().Err(err).Msg("write backup batch failed")
+		return
+	}
+	b.log.Info().Msg("backup RESTORE successful!")
 }
 
-func (b *File) Middleware(h http.HandlerFunc) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		h.ServeHTTP(w, r)
-		now := time.Now().UTC()
-		if now.Sub(b.lastBackup) >= b.backupInterval {
-			b.Backup()
+func (b *Manager) backup() {
+	b.log.Info().Msg("start metrics backup...")
+	p, err := newProducer(b.filename)
+	if err != nil {
+		b.log.Error().Err(err).Msg("unable to open backup Producer")
+		return
+	}
+	defer func() {
+		if err := p.close(); err != nil {
+			b.log.Error().Err(err).Msg("close backup failed")
 		}
-	}
-}
+	}()
 
-func (b *File) Close() error {
-	if err := b.producer.Close(); err != nil {
-		return err
+	var metrics []model.Metric
+	for b.buffer.Len() > 0 {
+		metrics = append(metrics, b.buffer.Pop())
 	}
-	if err := b.restorer.Close(); err != nil {
-		return err
+	if len(metrics) == 0 {
+		b.log.Info().Msg("no metrics to backup")
+		return
 	}
-	return nil
+
+	if err = p.write(metrics); err != nil {
+		b.log.Error().Err(err).Msg("write metrics to file failed")
+		return
+	}
+
+	if err = p.flush(); err != nil {
+		b.log.Error().Err(err).Msg("flush metrics to backup failed")
+		return
+	}
+	b.log.Info().Msg("metrics backup successful!")
 }

@@ -18,7 +18,7 @@ jobs:
 
   metricstest:
     runs-on: ubuntu-latest
-    container: golang:1.22
+    container: golang:1.24
     needs: branchtest
 
     services:
@@ -201,9 +201,6 @@ jobs:
             -source-path=.
 
       - name: "Code increment #14"
-        if: |
-          github.ref == 'refs/heads/main' ||
-          github.head_ref == 'iter14'
         run: |
           SERVER_PORT=$(random unused-port)
           ADDRESS="localhost:${SERVER_PORT}"
@@ -217,8 +214,5 @@ jobs:
             -source-path=.
 
       - name: "Code increment #14 (race detection)"
-        if: |
-          github.ref == 'refs/heads/main' ||
-          github.head_ref == 'iter14'
         run: |
           go test -v -race ./...

@@ -4,21 +4,26 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log"
 	"sync"
 
 	"github.com/talx-hub/malerter/internal/customerror"
+	"github.com/talx-hub/malerter/internal/logger"
 	"github.com/talx-hub/malerter/internal/model"
+	"github.com/talx-hub/malerter/internal/utils/queue"
 )
 
 type Memory struct {
-	data map[string]model.Metric
-	m    sync.RWMutex
+	log    *logger.ZeroLogger
+	buffer *queue.Queue[model.Metric]
+	data   map[string]model.Metric
+	m      sync.RWMutex
 }
 
-func New() *Memory {
+func New(log *logger.ZeroLogger, buf *queue.Queue[model.Metric]) *Memory {
 	return &Memory{
-		data: make(map[string]model.Metric),
+		log:    log,
+		buffer: buf,
+		data:   make(map[string]model.Metric),
 	}
 }
 
@@ -38,13 +43,16 @@ func (r *Memory) Add(_ context.Context, metric model.Metric) error {
 	} else {
 		r.data[dummyKey] = metric
 	}
+	if r.buffer != nil && !r.buffer.IsClosed() {
+		r.buffer.Push(metric)
+	}
 	return nil
 }
 
 func (r *Memory) Batch(ctx context.Context, batch []model.Metric) error {
 	for _, m := range batch {
 		if err := r.Add(ctx, m); err != nil {
-			log.Printf("failed to update batch metric: %v", err)
+			r.log.Error().Err(err).Msg("failed to update batch metric")
 		}
 	}
 	return nil
@@ -77,5 +85,8 @@ func (r *Memory) Ping(_ context.Context) error {
 }
 
 func (r *Memory) Clear() {
+	r.m.Lock()
+	defer r.m.Unlock()
+
 	r.data = make(map[string]model.Metric)
 }
