@@ -48,11 +48,7 @@ func main() {
 		zeroLogger.Warn().Err(err).Msg("store metrics in memory")
 		storage = memory.New(zeroLogger, &buffer)
 	} else {
-		defer func() {
-			if err = database.Close(); err != nil {
-				zeroLogger.Error().Err(err).Msg("unable to close DB")
-			}
-		}()
+		defer database.Close()
 		storage = database
 	}
 

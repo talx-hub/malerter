@@ -262,9 +262,8 @@ func fromRow(row pgx.Row) (*model.Metric, error) {
 	return &metric, nil
 }
 
-func (db *DB) Close() error {
+func (db *DB) Close() {
 	db.pool.Close()
-	return nil
 }
 
 func (db *DB) Ping(ctx context.Context) error {
