@@ -79,6 +79,7 @@ func (h *HTTPHandler) extractJSONs(body io.Reader) ([]model.Metric, error) {
 func (h *HTTPHandler) DumpMetricList(w http.ResponseWriter, r *http.Request) {
 	metrics, err := h.extractJSONs(r.Body)
 	if err != nil {
+		h.log.Error().Err(err).Msg("failed to extract metrics from JSON")
 		st := getStatusFromError(err)
 		http.Error(w, err.Error(), st)
 		return
@@ -88,6 +89,7 @@ func (h *HTTPHandler) DumpMetricList(w http.ResponseWriter, r *http.Request) {
 		return nil, h.service.Batch(r.Context(), metrics)
 	}
 	if _, err = db.WithConnectionCheck(wrappedBatch); err != nil {
+		h.log.Error().Err(err).Msg("failed to dump metrics in repo")
 		st := getStatusFromError(err)
 		http.Error(w, err.Error(), st)
 		return

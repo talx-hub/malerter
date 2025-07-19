@@ -340,6 +340,46 @@ func TestHTTPHandler_DumpMetricJSON(t *testing.T) {
 	}
 }
 
+func TestHTTPHandler_DumpMetricList(t *testing.T) {
+	tests := []struct {
+		name         string
+		body         string
+		expectedCode int
+	}{
+		{
+			name: "batch",
+			body: `[ 
+{"id":"pi", "type":"gauge", "value":3}, 
+{"id":"m42","type":"counter", "delta":42}]`,
+			expectedCode: http.StatusOK,
+		},
+		{
+			name:         "empty batch",
+			body:         ``,
+			expectedCode: http.StatusInternalServerError,
+		},
+	}
+
+	lg, _ := logger.New(constants.LogLevelDefault)
+	repository := memory.New(lg, nil)
+	dumper := server.NewMetricsDumper(repository)
+	handler := NewHTTPHandler(dumper, lg)
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			resp, _ := testRequest(t,
+				handler.DumpMetricList,
+				http.MethodPost, "/updates",
+				constants.ContentTypeJSON,
+				&test.body)
+			assert.Equal(t, test.expectedCode, resp.StatusCode)
+			if err := resp.Body.Close(); err != nil {
+				log.Fatal(err)
+			}
+		})
+	}
+}
+
 func TestHTTPHandler_GetMetricJSON(t *testing.T) {
 	tests := []struct {
 		method       string
