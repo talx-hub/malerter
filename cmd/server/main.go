@@ -26,8 +26,6 @@ import (
 )
 
 func main() {
-	// TODO: тут какие-то кошмары с указателями
-	// (см. config/server/builder/.Build())... разобраться
 	cfg, ok := serverCfg.NewDirector().Build().(serverCfg.Builder)
 	if !ok {
 		log.Fatal("unable to load server serverCfg")

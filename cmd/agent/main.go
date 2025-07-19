@@ -12,7 +12,6 @@ import (
 )
 
 func main() {
-	// TODO: тут какие-то кошмары с указателями(см. config/agent/builder/.Build())
 	cfg, ok := agentCfg.NewDirector().Build().(agentCfg.Builder)
 	if !ok {
 		log.Fatal("unable to load agent config")
