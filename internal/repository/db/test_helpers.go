@@ -104,7 +104,9 @@ func benchmark[T any](
 	}
 }
 
-func fillDB(b *testing.B, db *DB, container *pgcontainer.PGContainer) {
+func fillDB(b *testing.B, db *DB, container **pgcontainer.PGContainer) {
+	b.Helper()
+
 	adapterForAdd := func(ctx context.Context, val model.Metric) error {
 		return db.Add(ctx, val)
 	}
@@ -138,7 +140,7 @@ func getMetricGenerator() func() model.Metric {
 func getBatchGenerator() func() []model.Metric {
 	return func() []model.Metric {
 		prefix := "long-prefix-for-metric"
-		delta := int64(5)
+		delta := int64(1)
 		return []model.Metric{
 			{Name: prefix + "m1", Type: model.MetricTypeGauge, Value: new(float64)},
 			{Name: prefix + "m2", Type: model.MetricTypeGauge, Value: new(float64)},

@@ -26,16 +26,17 @@ func TestCompress(t *testing.T) {
 	req, err := http.NewRequest(
 		http.MethodPost, srv.URL, strings.NewReader(testBody))
 	require.NoError(t, err)
-	req.Header.Set(constants.KeyAcceptEncoding, "gzip")
+	req.Header.Set(constants.KeyAcceptEncoding, constants.EncodingGzip)
 
 	resp, _ := http.DefaultClient.Do(req)
 
 	contentEncoding := resp.Header.Get(constants.KeyContentEncoding)
-	require.True(t, strings.Contains(contentEncoding, "gzip"))
+	require.True(t, strings.Contains(contentEncoding, constants.EncodingGzip))
 
 	var buf []byte
 	decompressor, _ := gzip.NewReader(resp.Body)
 	_, err = decompressor.Read(buf)
+	require.NoError(t, err)
 	d, err := io.ReadAll(decompressor)
 	require.NoError(t, err)
 	require.Equal(t, testBody, string(d))
@@ -54,7 +55,7 @@ func TestDecompress(t *testing.T) {
 	require.NoError(t, err)
 	req, err := http.NewRequest(http.MethodPost, srv.URL, buf)
 	require.NoError(t, err)
-	req.Header.Set(constants.KeyContentEncoding, "gzip")
+	req.Header.Set(constants.KeyContentEncoding, constants.EncodingGzip)
 
 	resp, _ := http.DefaultClient.Do(req)
 
@@ -78,18 +79,19 @@ func BenchmarkCompress(b *testing.B) {
 		req, err := http.NewRequest(
 			http.MethodPost, srv.URL, strings.NewReader(testBody))
 		require.NoError(b, err)
-		req.Header.Set(constants.KeyAcceptEncoding, "gzip")
+		req.Header.Set(constants.KeyAcceptEncoding, constants.EncodingGzip)
 
 		b.StartTimer()
 		resp, _ := http.DefaultClient.Do(req)
 		b.StopTimer()
 
 		contentEncoding := resp.Header.Get(constants.KeyContentEncoding)
-		require.True(b, strings.Contains(contentEncoding, "gzip"))
+		require.True(b, strings.Contains(contentEncoding, constants.EncodingGzip))
 
 		var buf []byte
 		decompressor, _ := gzip.NewReader(resp.Body)
 		_, err = decompressor.Read(buf)
+		require.NoError(b, err)
 		d, err := io.ReadAll(decompressor)
 		require.NoError(b, err)
 		require.Equal(b, testBody, string(d))
@@ -112,7 +114,7 @@ func BenchmarkDecompress(b *testing.B) {
 		require.NoError(b, err)
 		req, err := http.NewRequest(http.MethodPost, srv.URL, buf)
 		require.NoError(b, err)
-		req.Header.Set(constants.KeyContentEncoding, "gzip")
+		req.Header.Set(constants.KeyContentEncoding, constants.EncodingGzip)
 
 		b.StartTimer()
 		resp, _ := http.DefaultClient.Do(req)

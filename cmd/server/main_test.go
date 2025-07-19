@@ -48,7 +48,7 @@ func TestMetricRouter(t *testing.T) {
 		{
 			method: http.MethodGet, url: "/",
 			statusWant:      http.StatusOK,
-			encoding:        "gzip",
+			encoding:        constants.EncodingGzip,
 			contentTypeWant: constants.ContentTypeHTML,
 		},
 		{

@@ -15,6 +15,8 @@ const (
 	ContentTypeText = "text/plain"
 )
 
+const EncodingGzip = "gzip"
+
 const (
 	PermissionFilePrivate = 0o600
 	LogLevelDefault       = "Info"

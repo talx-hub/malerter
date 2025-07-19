@@ -137,10 +137,10 @@ func metricRouter(
 		})
 		r.Route("/debug/pprof", func(r chi.Router) {
 			r.HandleFunc("/", pprof.Index)
-			r.HandleFunc("cmdline", pprof.Cmdline)
-			r.HandleFunc("profile", pprof.Profile)
-			r.HandleFunc("symbol", pprof.Symbol)
-			r.HandleFunc("trace", pprof.Trace)
+			r.HandleFunc("/cmdline", pprof.Cmdline)
+			r.HandleFunc("/profile", pprof.Profile)
+			r.HandleFunc("/symbol", pprof.Symbol)
+			r.HandleFunc("/trace", pprof.Trace)
 
 			for _, p := range []string{
 				"allocs", "block", "goroutine", "heap", "mutex", "threadcreate",

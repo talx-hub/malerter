@@ -36,7 +36,7 @@ func (w *GzipWriter) Write(rawData []byte) (int, error) {
 	contentType := w.ResponseWriter.Header().Get(constants.KeyContentType)
 	if needCompress(contentType) {
 		w.wasCompressed = true
-		w.ResponseWriter.Header().Set(constants.KeyContentEncoding, "gzip")
+		w.ResponseWriter.Header().Set(constants.KeyContentEncoding, constants.EncodingGzip)
 		n, err := w.compressor.Write(rawData)
 		if err != nil {
 			return n, fmt.Errorf("unable to compress data: %w", err)
@@ -65,7 +65,7 @@ func Decompress(logg *logger.ZeroLogger) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		gzipDecompress := func(w http.ResponseWriter, r *http.Request) {
 			contentEncoding := r.Header.Get(constants.KeyContentEncoding)
-			sendsGzip := strings.Contains(contentEncoding, "gzip")
+			sendsGzip := strings.Contains(contentEncoding, constants.EncodingGzip)
 			if sendsGzip {
 				decompressor, err := NewGzipReader(r.Body)
 				if err != nil {
@@ -91,7 +91,7 @@ func Compress(logg *logger.ZeroLogger) func(http.Handler) http.Handler {
 		gzipCompressor := func(w http.ResponseWriter, r *http.Request) {
 			resultWriter := w
 			acceptEncoding := r.Header.Get(constants.KeyAcceptEncoding)
-			supportsGzip := strings.Contains(acceptEncoding, "gzip")
+			supportsGzip := strings.Contains(acceptEncoding, constants.EncodingGzip)
 			if supportsGzip {
 				compressor := NewGzipWriter(w)
 				resultWriter = compressor

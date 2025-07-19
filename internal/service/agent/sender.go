@@ -110,7 +110,7 @@ func (s *Sender) batch(batch string) {
 		request.Header.Set(constants.KeyHashSHA256, sign)
 	}
 	request.Header.Set(constants.KeyContentType, constants.ContentTypeJSON)
-	request.Header.Set(constants.KeyContentEncoding, "gzip")
+	request.Header.Set(constants.KeyContentEncoding, constants.EncodingGzip)
 
 	wrappedDo := func(args ...any) (any, error) {
 		response, e := s.client.Do(request)
