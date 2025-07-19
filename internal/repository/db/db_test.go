@@ -211,7 +211,7 @@ func BenchmarkDB_Add_only_new_metrics(b *testing.B) {
 		b.StopTimer()
 		return err
 	}
-	benchmark(b, adapter, getMetricGenerator(), pg)
+	benchmark(b, adapter, getMetricGenerator(), &pg)
 }
 
 func BenchmarkDB_Add_update_metrics(b *testing.B) {
@@ -225,7 +225,7 @@ func BenchmarkDB_Add_update_metrics(b *testing.B) {
 		}
 	}()
 
-	fillDB(b, db, pg)
+	fillDB(b, db, &pg)
 	b.StopTimer()
 	b.ResetTimer()
 
@@ -235,7 +235,7 @@ func BenchmarkDB_Add_update_metrics(b *testing.B) {
 		b.StopTimer()
 		return err
 	}
-	benchmark(b, adapter, getMetricGenerator(), pg)
+	benchmark(b, adapter, getMetricGenerator(), &pg)
 }
 
 func BenchmarkDB_Batch(b *testing.B) {
@@ -257,7 +257,7 @@ func BenchmarkDB_Batch(b *testing.B) {
 		b.StopTimer()
 		return err
 	}
-	benchmark(b, adapter, getBatchGenerator(), pg)
+	benchmark(b, adapter, getBatchGenerator(), &pg)
 }
 
 func BenchmarkDB_Find(b *testing.B) {
@@ -270,7 +270,7 @@ func BenchmarkDB_Find(b *testing.B) {
 			pg.Close()
 		}
 	}()
-	fillDB(b, db, pg)
+	fillDB(b, db, &pg)
 
 	freshGenerate := getMetricGenerator()
 	adapter := func(ctx context.Context, m model.Metric) error {
@@ -285,7 +285,7 @@ func BenchmarkDB_Find(b *testing.B) {
 	b.StopTimer()
 	b.ResetTimer()
 
-	benchmark(b, adapter, getMetricGenerator(), pg)
+	benchmark(b, adapter, getMetricGenerator(), &pg)
 }
 
 func BenchmarkDB_Get(b *testing.B) {
@@ -298,7 +298,7 @@ func BenchmarkDB_Get(b *testing.B) {
 			pg.Close()
 		}
 	}()
-	fillDB(b, db, pg)
+	fillDB(b, db, &pg)
 
 	adapter := func(ctx context.Context, m model.Metric) error {
 		b.StartTimer()
@@ -309,5 +309,5 @@ func BenchmarkDB_Get(b *testing.B) {
 	b.StopTimer()
 	b.ResetTimer()
 
-	benchmark(b, adapter, getMetricGenerator(), pg)
+	benchmark(b, adapter, getMetricGenerator(), &pg)
 }

@@ -77,14 +77,14 @@ func benchmark[T any](
 	b *testing.B,
 	dbMethodAdapter func(context.Context, T) error,
 	generator func() T,
-	pg *pgcontainer.PGContainer,
+	pg **pgcontainer.PGContainer,
 ) {
 	b.Helper()
 
 	log, err := logger.New(constants.LogLevelDefault)
 	require.NoError(b, err)
-	if pg == nil {
-		pg, err = initContainer(log)
+	if pg != nil && *pg == nil {
+		*pg, err = initContainer(log)
 		require.NoError(b, err)
 	}
 
