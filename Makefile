@@ -92,13 +92,13 @@ iter10:
 	  -binary-path=./bin/server \
 	  -server-port=$(SERVER_PORT) \
 	  -source-path=. \
-      -database-dsn='postgres://godevops:godevops@localhost:5432/godevops_alerts?sslmode=disable'
+      -database-dsn='postgres://gopher_alerts:gopher_alerts@localhost:5432/gopher_alerts?sslmode=disable'
 	./bin/metricstest -test.run=^TestIteration10B$$ \
 	  -agent-binary-path=./bin/agent \
 	  -binary-path=./bin/server \
 	  -server-port=$(SERVER_PORT) \
 	  -source-path=. \
-      -database-dsn='postgres://godevops:godevops@localhost:5432/godevops_alerts?sslmode=disable'
+      -database-dsn='postgres://gopher_alerts:gopher_alerts@localhost:5432/gopher_alerts?sslmode=disable'
 
 .PHONY : iter11
 iter11:
@@ -107,7 +107,7 @@ iter11:
 	  -binary-path=./bin/server \
 	  -server-port=$(SERVER_PORT) \
 	  -source-path=. \
-      -database-dsn='postgres://godevops:godevops@localhost:5432/godevops_alerts?sslmode=disable'
+      -database-dsn='postgres://gopher_alerts:gopher_alerts@localhost:5432/gopher_alerts?sslmode=disable'
 
 .PHONY : iter12
 iter12:
@@ -116,7 +116,7 @@ iter12:
 	  -binary-path=./bin/server \
 	  -server-port=$(SERVER_PORT) \
 	  -source-path=. \
-      -database-dsn='postgres://godevops:godevops@localhost:5432/godevops_alerts?sslmode=disable'
+      -database-dsn='postgres://gopher_alerts:gopher_alerts@localhost:5432/gopher_alerts?sslmode=disable'
 
 .PHONY : iter13
 iter13:
@@ -125,7 +125,7 @@ iter13:
 	  -binary-path=./bin/server \
 	  -server-port=$(SERVER_PORT) \
 	  -source-path=. \
-      -database-dsn='postgres://godevops:godevops@localhost:5432/godevops_alerts?sslmode=disable'
+      -database-dsn='postgres://gopher_alerts:gopher_alerts@localhost:5432/gopher_alerts?sslmode=disable'
 
 .PHONY : iter14
 iter14:
@@ -134,5 +134,5 @@ iter14:
 	  -binary-path=./bin/server \
 	  -server-port=$(SERVER_PORT) \
 	  -source-path=. \
-      -database-dsn='postgres://godevops:godevops@localhost:5432/godevops_alerts?sslmode=disable' \
+      -database-dsn='postgres://gopher_alerts:gopher_alerts@localhost:5432/gopher_alerts?sslmode=disable' \
       -key="super-secret-key"

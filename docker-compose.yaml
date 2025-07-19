@@ -1,0 +1,31 @@
+services:
+  database:
+    container_name: gopher_alerts
+    image: postgres:${POSTGRES_TAG}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U gopher_alerts -d gopher_alerts"]
+      interval: 5s
+      retries: 3
+      timeout: 5s
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: "Password"
+      POSTGRES_DB: postgres
+      POSTGRES_DATA: "/var/lib/postgresql/data"
+    volumes:
+      - "./db/init:/docker-entrypoint-initdb.d"
+      - "gopheralerts-volume:/var/lib/postgresql/data"
+    ports:
+      - "5432:5432"
+    networks:
+      - gopheralerts-network
+    restart: always
+
+volumes:
+  gopheralerts-volume:
+    name: gopheralerts-volume
+
+networks:
+  gopheralerts-network:
+    driver: bridge
+    name: gopheralerts-network
