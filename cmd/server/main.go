@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"net/http/pprof"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
@@ -136,6 +137,19 @@ func metricRouter(
 				With(middlewares.CheckSignature(secret)).
 				With(middlewares.Gzip(loggr)).
 				Post("/", handler.DumpMetricList)
+		})
+		r.Route("/debug/pprof", func(r chi.Router) {
+			r.HandleFunc("/", pprof.Index)
+			r.HandleFunc("cmdline", pprof.Cmdline)
+			r.HandleFunc("profile", pprof.Profile)
+			r.HandleFunc("symbol", pprof.Symbol)
+			r.HandleFunc("trace", pprof.Trace)
+
+			for _, p := range []string{
+				"allocs", "block", "goroutine", "heap", "mutex", "threadcreate",
+			} {
+				r.HandleFunc("/"+p, pprof.Handler(p).ServeHTTP)
+			}
 		})
 	})
 
