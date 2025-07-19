@@ -39,7 +39,7 @@ func (h *gzipStubHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 type sigStubHandler struct {
 }
 
-func (h *sigStubHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+func (h *sigStubHandler) ServeHTTP(w http.ResponseWriter, _ *http.Request) {
 	_, err := w.Write([]byte(testBody))
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
