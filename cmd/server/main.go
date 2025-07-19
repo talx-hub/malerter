@@ -108,13 +108,14 @@ func metricRouter(
 	router.Route("/", func(r chi.Router) {
 		r.
 			With(middlewares.WriteSignature(secret)).
-			With(middlewares.Gzip(loggr)).
+			With(middlewares.Compress(loggr)).
 			Get("/", handler.GetAll)
 		r.Route("/value", func(r chi.Router) {
 			r.
 				With(middleware.AllowContentType(constants.ContentTypeJSON)).
 				With(middlewares.WriteSignature(secret)).
-				With(middlewares.Gzip(loggr)).
+				With(middlewares.Decompress(loggr)).
+				With(middlewares.Compress(loggr)).
 				Post("/", handler.GetMetricJSON)
 			r.Get("/{type}/{name}", handler.GetMetric)
 		})
@@ -122,7 +123,8 @@ func metricRouter(
 			r.
 				With(middleware.AllowContentType(constants.ContentTypeJSON)).
 				With(middlewares.WriteSignature(secret)).
-				With(middlewares.Gzip(loggr)).
+				With(middlewares.Decompress(loggr)).
+				With(middlewares.Compress(loggr)).
 				Post("/", handler.DumpMetricJSON)
 			r.Post("/{type}/{name}/{val}", handler.DumpMetric)
 		})
@@ -133,7 +135,8 @@ func metricRouter(
 			r.
 				With(middleware.AllowContentType(constants.ContentTypeJSON)).
 				With(middlewares.CheckSignature(secret)).
-				With(middlewares.Gzip(loggr)).
+				With(middlewares.Decompress(loggr)).
+				With(middlewares.Compress(loggr)).
 				Post("/", handler.DumpMetricList)
 		})
 		r.Route("/debug/pprof", func(r chi.Router) {
