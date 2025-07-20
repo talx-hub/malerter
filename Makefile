@@ -17,6 +17,27 @@ agent:
 test:
 	go test ./... -race -coverprofile=cover.out -covermode=atomic
 
+.PHONY : run-agent
+run-agent: build-all
+	./bin/agent -k='super-secret-key'
+
+.PHONY : run-server
+run-server: build-all
+	./bin/server -d='postgres://gopher_alerts:gopher_alerts@localhost:5432/gopher_alerts?sslmode=disable' -k='super-secret-key' -i=60
+
+cpu.pprof:
+	curl -sk -v http://localhost:8080/debug/pprof/profile?seconds=30 > profiles/cpu.pprof
+
+heap.pprof:
+	curl -sk -v http://localhost:8080/debug/pprof/heap > profiles/heap.pprof
+
+allocs.pprof:
+	curl -sk -v http://localhost:8080/debug/pprof/allocs > profiles/allocs.pprof
+
+.PHONY : diffpprof
+diffpprof:
+	go tool pprof -top -diff_base=profiles/base_heap.pprof profiles/result_heap.pprof
+
 .PHONY : clean
 clean:
 	-rm ./bin/agent 2>/dev/null
