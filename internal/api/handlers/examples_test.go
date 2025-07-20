@@ -74,6 +74,7 @@ func ExampleHTTPHandler_DumpMetricList_success() {
 	w := httptest.NewRecorder()
 
 	handler.DumpMetricList(w, req)
+	_ = w.Result().Body.Close()
 
 	fmt.Println("Status code:", w.Result().StatusCode)
 
@@ -92,6 +93,7 @@ func ExampleHTTPHandler_DumpMetricList_invalidJSON() {
 	w := httptest.NewRecorder()
 
 	handler.DumpMetricList(w, req)
+	_ = w.Result().Body.Close()
 
 	fmt.Println("Status code:", w.Result().StatusCode)
 
@@ -113,6 +115,7 @@ func ExampleHTTPHandler_DumpMetricList_invalidMetric() {
 	w := httptest.NewRecorder()
 
 	handler.DumpMetricList(w, req)
+	_ = w.Result().Body.Close()
 
 	fmt.Println("Status code:", w.Result().StatusCode)
 
@@ -135,6 +138,7 @@ func ExampleHTTPHandler_DumpMetricList_storageFailure() {
 	w := httptest.NewRecorder()
 
 	handler.DumpMetricList(w, req)
+	_ = w.Result().Body.Close()
 
 	fmt.Println("Status code:", w.Result().StatusCode)
 
@@ -159,6 +163,7 @@ func ExampleHTTPHandler_DumpMetricJSON_success() {
 	w := httptest.NewRecorder()
 
 	handler.DumpMetricJSON(w, req)
+	_ = w.Result().Body.Close()
 
 	fmt.Println("Status code:", w.Result().StatusCode)
 
@@ -177,6 +182,7 @@ func ExampleHTTPHandler_DumpMetricJSON_invalidJSON() {
 	w := httptest.NewRecorder()
 
 	handler.DumpMetricJSON(w, req)
+	_ = w.Result().Body.Close()
 
 	fmt.Println("Status code:", w.Result().StatusCode)
 
@@ -201,6 +207,7 @@ func ExampleHTTPHandler_DumpMetricJSON_invalidMetric() {
 	w := httptest.NewRecorder()
 
 	handler.DumpMetricJSON(w, req)
+	_ = w.Result().Body.Close()
 
 	fmt.Println("Status code:", w.Result().StatusCode)
 
@@ -221,6 +228,7 @@ func ExampleHTTPHandler_DumpMetricJSON_emptyMetric() {
 	w := httptest.NewRecorder()
 
 	handler.DumpMetricJSON(w, req)
+	_ = w.Result().Body.Close()
 
 	fmt.Println("Status code:", w.Result().StatusCode)
 
@@ -245,6 +253,7 @@ func ExampleHTTPHandler_DumpMetricJSON_storageAddError() {
 	w := httptest.NewRecorder()
 
 	handler.DumpMetricJSON(w, req)
+	_ = w.Result().Body.Close()
 
 	fmt.Println("Status code:", w.Result().StatusCode)
 
@@ -259,14 +268,19 @@ func ExampleHTTPHandler_DumpMetricJSON_findError() {
 	handler := handlers.NewHTTPHandler(st, log)
 
 	metric := model.Metric{
-		Name:  "m1",
-		Type:  model.MetricTypeGauge,
-		Value: new(float64),
+		Name:  "m2",
+		Type:  model.MetricTypeCounter,
+		Delta: new(int64),
 	}
 	body, _ := json.Marshal(metric)
 
 	req := httptest.NewRequest(http.MethodPost, "/update/", bytes.NewReader(body))
 	w := httptest.NewRecorder()
+	defer func() {
+		if err := w.Result().Body.Close(); err != nil {
+			log.Error().Err(err).Msg("fail to close")
+		}
+	}()
 
 	handler.DumpMetricJSON(w, req)
 
@@ -297,6 +311,7 @@ func ExampleHTTPHandler_GetMetricJSON_success() {
 	w := httptest.NewRecorder()
 
 	handler.GetMetricJSON(w, req)
+	_ = w.Result().Body.Close()
 
 	fmt.Println("Status code:", w.Result().StatusCode)
 
@@ -315,6 +330,7 @@ func ExampleHTTPHandler_GetMetricJSON_invalidJSON() {
 	w := httptest.NewRecorder()
 
 	handler.GetMetricJSON(w, req)
+	_ = w.Result().Body.Close()
 
 	fmt.Println("Status code:", w.Result().StatusCode)
 
@@ -338,6 +354,7 @@ func ExampleHTTPHandler_GetMetricJSON_notFound() {
 	w := httptest.NewRecorder()
 
 	handler.GetMetricJSON(w, req)
+	_ = w.Result().Body.Close()
 
 	fmt.Println("Status code:", w.Result().StatusCode)
 
@@ -360,6 +377,7 @@ func ExampleHTTPHandler_GetAll_success() {
 	w := httptest.NewRecorder()
 
 	handler.GetAll(w, req)
+	_ = w.Result().Body.Close()
 
 	fmt.Println("Status code:", w.Result().StatusCode)
 	fmt.Println("Content-Type:", w.Header().Get(constants.KeyContentType))
@@ -380,6 +398,7 @@ func ExampleHTTPHandler_GetAll_storageError() {
 	w := httptest.NewRecorder()
 
 	handler.GetAll(w, req)
+	_ = w.Result().Body.Close()
 
 	fmt.Println("Status code:", w.Result().StatusCode)
 
