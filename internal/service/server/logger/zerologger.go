@@ -2,6 +2,7 @@ package logger
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"time"
 
@@ -29,4 +30,11 @@ func New(logLevel string) (*ZeroLogger, error) {
 			Logger(),
 	}
 	return &logger, nil
+}
+
+// NewNopLogger возвращает логгер, который игнорирует все записи.
+// Полезен в тестах, когда логирование не требуется.
+func NewNopLogger() *ZeroLogger {
+	nopWriter := zerolog.New(io.Discard)
+	return &ZeroLogger{Logger: nopWriter}
 }
