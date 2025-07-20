@@ -76,6 +76,7 @@ iter01:
 .PHONY : iter02
 iter02:
 	./bin/metricstest -test.run=^TestIteration2A$$ -source-path=. -agent-binary-path=./bin/agent
+	./bin/metricstest -test.run=^TestIteration2B$$ -source-path=. -agent-binary-path=./bin/agent
 
 .PHONY : iter03
 iter03:
