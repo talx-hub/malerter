@@ -13,14 +13,13 @@ import (
 
 	"github.com/talx-hub/malerter/internal/api/handlers"
 	"github.com/talx-hub/malerter/internal/api/middlewares"
-	"github.com/talx-hub/malerter/internal/backup"
 	serverCfg "github.com/talx-hub/malerter/internal/config/server"
 	"github.com/talx-hub/malerter/internal/constants"
-	"github.com/talx-hub/malerter/internal/logger"
 	"github.com/talx-hub/malerter/internal/model"
 	"github.com/talx-hub/malerter/internal/repository/db"
 	"github.com/talx-hub/malerter/internal/repository/memory"
-	"github.com/talx-hub/malerter/internal/service/server"
+	"github.com/talx-hub/malerter/internal/service/server/backup"
+	"github.com/talx-hub/malerter/internal/service/server/logger"
 	"github.com/talx-hub/malerter/internal/utils/queue"
 	"github.com/talx-hub/malerter/internal/utils/shutdown"
 )
@@ -36,7 +35,7 @@ func main() {
 		log.Fatalf("unable to configure custom logger: %v", err)
 	}
 
-	var storage server.Storage
+	var storage handlers.Storage
 	buffer := queue.New[model.Metric]()
 	defer buffer.Close()
 	database, err := metricDB(
@@ -91,12 +90,11 @@ func main() {
 }
 
 func metricRouter(
-	repo server.Storage,
+	repo handlers.Storage,
 	loggr *logger.ZeroLogger,
 	secret string,
 ) chi.Router {
-	dumper := server.NewMetricsDumper(repo)
-	handler := handlers.NewHTTPHandler(dumper, loggr)
+	handler := handlers.NewHTTPHandler(repo, loggr)
 
 	router := chi.NewRouter()
 	router.Use(middlewares.Logging(loggr))

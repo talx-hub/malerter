@@ -12,8 +12,8 @@ import (
 	"syscall"
 
 	"github.com/talx-hub/malerter/internal/constants"
-	"github.com/talx-hub/malerter/internal/logger"
 	"github.com/talx-hub/malerter/internal/model"
+	"github.com/talx-hub/malerter/internal/service/server/logger"
 	"github.com/talx-hub/malerter/internal/utils/compressor"
 	"github.com/talx-hub/malerter/internal/utils/retry"
 	"github.com/talx-hub/malerter/internal/utils/signature"

@@ -12,8 +12,8 @@ import (
 
 	serverCfg "github.com/talx-hub/malerter/internal/config/server"
 	"github.com/talx-hub/malerter/internal/constants"
-	"github.com/talx-hub/malerter/internal/logger"
 	"github.com/talx-hub/malerter/internal/repository/memory"
+	"github.com/talx-hub/malerter/internal/service/server/logger"
 )
 
 func setupServices(t *testing.T) *httptest.Server {

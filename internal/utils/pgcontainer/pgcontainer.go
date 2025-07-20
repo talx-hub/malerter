@@ -13,7 +13,7 @@ import (
 	"github.com/ory/dockertest/v3"
 	"github.com/ory/dockertest/v3/docker"
 
-	"github.com/talx-hub/malerter/internal/logger"
+	"github.com/talx-hub/malerter/internal/service/server/logger"
 )
 
 const (

@@ -9,7 +9,7 @@ import (
 	"strings"
 
 	"github.com/talx-hub/malerter/internal/constants"
-	"github.com/talx-hub/malerter/internal/logger"
+	"github.com/talx-hub/malerter/internal/service/server/logger"
 )
 
 type GzipWriter struct {
