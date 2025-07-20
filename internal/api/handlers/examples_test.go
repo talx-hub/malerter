@@ -72,15 +72,16 @@ func ExampleHTTPHandler_DumpMetricList_success() {
 
 	req := httptest.NewRequest(http.MethodPost, "/updates/", bytes.NewReader(body))
 	w := httptest.NewRecorder()
+	handler.DumpMetricList(w, req)
+
+	result := w.Result()
 	defer func() {
-		if err := w.Result().Body.Close(); err != nil {
+		if err := result.Body.Close(); err != nil {
 			log := logger.NewNopLogger()
 			log.Error().Err(err).Msg("fail to close")
 		}
 	}()
-
-	handler.DumpMetricList(w, req)
-	fmt.Println("Status code:", w.Result().StatusCode)
+	fmt.Println("Status code:", result.StatusCode)
 
 	// Output:
 	// Status code: 200
@@ -95,16 +96,16 @@ func ExampleHTTPHandler_DumpMetricList_invalidJSON() {
 	body := []byte(`{ this is not valid JSON ]`)
 	req := httptest.NewRequest(http.MethodPost, "/updates/", bytes.NewReader(body))
 	w := httptest.NewRecorder()
+	handler.DumpMetricList(w, req)
+
+	result := w.Result()
 	defer func() {
-		if err := w.Result().Body.Close(); err != nil {
+		if err := result.Body.Close(); err != nil {
 			log := logger.NewNopLogger()
 			log.Error().Err(err).Msg("fail to close")
 		}
 	}()
-
-	handler.DumpMetricList(w, req)
-
-	fmt.Println("Status code:", w.Result().StatusCode)
+	fmt.Println("Status code:", result.StatusCode)
 
 	// Output:
 	// Status code: 500
@@ -122,16 +123,16 @@ func ExampleHTTPHandler_DumpMetricList_invalidMetric() {
 
 	req := httptest.NewRequest(http.MethodPost, "/updates/", bytes.NewReader(body))
 	w := httptest.NewRecorder()
+	handler.DumpMetricList(w, req)
+
+	result := w.Result()
 	defer func() {
-		if err := w.Result().Body.Close(); err != nil {
+		if err := result.Body.Close(); err != nil {
 			log := logger.NewNopLogger()
 			log.Error().Err(err).Msg("fail to close")
 		}
 	}()
-
-	handler.DumpMetricList(w, req)
-
-	fmt.Println("Status code:", w.Result().StatusCode)
+	fmt.Println("Status code:", result.StatusCode)
 
 	// Output:
 	// Status code: 200
@@ -150,15 +151,16 @@ func ExampleHTTPHandler_DumpMetricList_storageFailure() {
 
 	req := httptest.NewRequest(http.MethodPost, "/updates/", bytes.NewReader(body))
 	w := httptest.NewRecorder()
+	handler.DumpMetricList(w, req)
+
+	result := w.Result()
 	defer func() {
-		if err := w.Result().Body.Close(); err != nil {
+		if err := result.Body.Close(); err != nil {
 			log := logger.NewNopLogger()
 			log.Error().Err(err).Msg("fail to close")
 		}
 	}()
-
-	handler.DumpMetricList(w, req)
-	fmt.Println("Status code:", w.Result().StatusCode)
+	fmt.Println("Status code:", result.StatusCode)
 
 	// Output:
 	// Status code: 500
@@ -179,16 +181,16 @@ func ExampleHTTPHandler_DumpMetricJSON_success() {
 
 	req := httptest.NewRequest(http.MethodPost, "/update/", bytes.NewReader(body))
 	w := httptest.NewRecorder()
+	handler.DumpMetricJSON(w, req)
+
+	result := w.Result()
 	defer func() {
-		if err := w.Result().Body.Close(); err != nil {
+		if err := result.Body.Close(); err != nil {
 			log := logger.NewNopLogger()
 			log.Error().Err(err).Msg("fail to close")
 		}
 	}()
-
-	handler.DumpMetricJSON(w, req)
-
-	fmt.Println("Status code:", w.Result().StatusCode)
+	fmt.Println("Status code:", result.StatusCode)
 
 	// Output:
 	// Status code: 200
@@ -203,16 +205,16 @@ func ExampleHTTPHandler_DumpMetricJSON_invalidJSON() {
 	body := []byte(`{ invalid json ]`)
 	req := httptest.NewRequest(http.MethodPost, "/update/", bytes.NewReader(body))
 	w := httptest.NewRecorder()
+	handler.DumpMetricJSON(w, req)
+
+	result := w.Result()
 	defer func() {
-		if err := w.Result().Body.Close(); err != nil {
+		if err := result.Body.Close(); err != nil {
 			log := logger.NewNopLogger()
 			log.Error().Err(err).Msg("fail to close")
 		}
 	}()
-
-	handler.DumpMetricJSON(w, req)
-
-	fmt.Println("Status code:", w.Result().StatusCode)
+	fmt.Println("Status code:", result.StatusCode)
 
 	// Output:
 	// Status code: 500
@@ -233,16 +235,16 @@ func ExampleHTTPHandler_DumpMetricJSON_invalidMetric() {
 
 	req := httptest.NewRequest(http.MethodPost, "/update/", bytes.NewReader(body))
 	w := httptest.NewRecorder()
+	handler.DumpMetricJSON(w, req)
+
+	result := w.Result()
 	defer func() {
-		if err := w.Result().Body.Close(); err != nil {
+		if err := result.Body.Close(); err != nil {
 			log := logger.NewNopLogger()
 			log.Error().Err(err).Msg("fail to close")
 		}
 	}()
-
-	handler.DumpMetricJSON(w, req)
-
-	fmt.Println("Status code:", w.Result().StatusCode)
+	fmt.Println("Status code:", result.StatusCode)
 
 	// Output:
 	// Status code: 400
@@ -259,16 +261,16 @@ func ExampleHTTPHandler_DumpMetricJSON_emptyMetric() {
 
 	req := httptest.NewRequest(http.MethodPost, "/update/", bytes.NewReader(body))
 	w := httptest.NewRecorder()
+	handler.DumpMetricJSON(w, req)
+
+	result := w.Result()
 	defer func() {
-		if err := w.Result().Body.Close(); err != nil {
+		if err := result.Body.Close(); err != nil {
 			log := logger.NewNopLogger()
 			log.Error().Err(err).Msg("fail to close")
 		}
 	}()
-
-	handler.DumpMetricJSON(w, req)
-
-	fmt.Println("Status code:", w.Result().StatusCode)
+	fmt.Println("Status code:", result.StatusCode)
 
 	// Output:
 	// Status code: 400
@@ -289,15 +291,16 @@ func ExampleHTTPHandler_DumpMetricJSON_storageAddError() {
 
 	req := httptest.NewRequest(http.MethodPost, "/update/", bytes.NewReader(body))
 	w := httptest.NewRecorder()
+	handler.DumpMetricJSON(w, req)
+
+	result := w.Result()
 	defer func() {
-		if err := w.Result().Body.Close(); err != nil {
+		if err := result.Body.Close(); err != nil {
 			log := logger.NewNopLogger()
 			log.Error().Err(err).Msg("fail to close")
 		}
 	}()
-
-	handler.DumpMetricJSON(w, req)
-	fmt.Println("Status code:", w.Result().StatusCode)
+	fmt.Println("Status code:", result.StatusCode)
 
 	// Output:
 	// Status code: 404
@@ -318,15 +321,16 @@ func ExampleHTTPHandler_DumpMetricJSON_findError() {
 
 	req := httptest.NewRequest(http.MethodPost, "/update/", bytes.NewReader(body))
 	w := httptest.NewRecorder()
+	handler.DumpMetricJSON(w, req)
+
+	result := w.Result()
 	defer func() {
-		if err := w.Result().Body.Close(); err != nil {
+		if err := result.Body.Close(); err != nil {
 			log := logger.NewNopLogger()
 			log.Error().Err(err).Msg("fail to close")
 		}
 	}()
-
-	handler.DumpMetricJSON(w, req)
-	fmt.Println("Status code:", w.Result().StatusCode)
+	fmt.Println("Status code:", result.StatusCode)
 
 	// Output:
 	// Status code: 500
@@ -351,16 +355,16 @@ func ExampleHTTPHandler_GetMetricJSON_success() {
 	})
 	req := httptest.NewRequest(http.MethodPost, "/value/", bytes.NewReader(reqBody))
 	w := httptest.NewRecorder()
+	handler.GetMetricJSON(w, req)
+
+	result := w.Result()
 	defer func() {
-		if err := w.Result().Body.Close(); err != nil {
+		if err := result.Body.Close(); err != nil {
 			log := logger.NewNopLogger()
 			log.Error().Err(err).Msg("fail to close")
 		}
 	}()
-
-	handler.GetMetricJSON(w, req)
-
-	fmt.Println("Status code:", w.Result().StatusCode)
+	fmt.Println("Status code:", result.StatusCode)
 
 	// Output:
 	// Status code: 200
@@ -375,16 +379,16 @@ func ExampleHTTPHandler_GetMetricJSON_invalidJSON() {
 	body := []byte(`{ invalid json ]`)
 	req := httptest.NewRequest(http.MethodPost, "/value/", bytes.NewReader(body))
 	w := httptest.NewRecorder()
+	handler.GetMetricJSON(w, req)
+
+	result := w.Result()
 	defer func() {
-		if err := w.Result().Body.Close(); err != nil {
+		if err := result.Body.Close(); err != nil {
 			log := logger.NewNopLogger()
 			log.Error().Err(err).Msg("fail to close")
 		}
 	}()
-
-	handler.GetMetricJSON(w, req)
-
-	fmt.Println("Status code:", w.Result().StatusCode)
+	fmt.Println("Status code:", result.StatusCode)
 
 	// Output:
 	// Status code: 500
@@ -404,16 +408,16 @@ func ExampleHTTPHandler_GetMetricJSON_notFound() {
 	})
 	req := httptest.NewRequest(http.MethodPost, "/value/", bytes.NewReader(body))
 	w := httptest.NewRecorder()
+	handler.GetMetricJSON(w, req)
+
+	result := w.Result()
 	defer func() {
-		if err := w.Result().Body.Close(); err != nil {
+		if err := result.Body.Close(); err != nil {
 			log := logger.NewNopLogger()
 			log.Error().Err(err).Msg("fail to close")
 		}
 	}()
-
-	handler.GetMetricJSON(w, req)
-
-	fmt.Println("Status code:", w.Result().StatusCode)
+	fmt.Println("Status code:", result.StatusCode)
 
 	// Output:
 	// Status code: 404
@@ -432,16 +436,17 @@ func ExampleHTTPHandler_GetAll_success() {
 
 	req := httptest.NewRequest(http.MethodGet, "/", http.NoBody)
 	w := httptest.NewRecorder()
+	handler.GetAll(w, req)
+
+	result := w.Result()
 	defer func() {
-		if err := w.Result().Body.Close(); err != nil {
+		if err := result.Body.Close(); err != nil {
 			log := logger.NewNopLogger()
 			log.Error().Err(err).Msg("fail to close")
 		}
 	}()
 
-	handler.GetAll(w, req)
-
-	fmt.Println("Status code:", w.Result().StatusCode)
+	fmt.Println("Status code:", result.StatusCode)
 	fmt.Println("Content-Type:", w.Header().Get(constants.KeyContentType))
 
 	// Output:
@@ -458,15 +463,16 @@ func ExampleHTTPHandler_GetAll_storageError() {
 
 	req := httptest.NewRequest(http.MethodGet, "/", http.NoBody)
 	w := httptest.NewRecorder()
+	handler.GetAll(w, req)
+
+	result := w.Result()
 	defer func() {
-		if err := w.Result().Body.Close(); err != nil {
+		if err := result.Body.Close(); err != nil {
 			log := logger.NewNopLogger()
 			log.Error().Err(err).Msg("fail to close")
 		}
 	}()
-
-	handler.GetAll(w, req)
-	fmt.Println("Status code:", w.Result().StatusCode)
+	fmt.Println("Status code:", result.StatusCode)
 
 	// Output:
 	// Status code: 500
