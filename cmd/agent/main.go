@@ -6,9 +6,9 @@ import (
 	"net/http"
 
 	agentCfg "github.com/talx-hub/malerter/internal/config/agent"
+	"github.com/talx-hub/malerter/internal/logger"
 	"github.com/talx-hub/malerter/internal/service/agent"
-	"github.com/talx-hub/malerter/internal/service/server/logger"
-	"github.com/talx-hub/malerter/internal/utils/shutdown"
+	"github.com/talx-hub/malerter/pkg/shutdown"
 )
 
 func main() {

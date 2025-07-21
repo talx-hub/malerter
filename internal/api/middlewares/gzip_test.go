@@ -11,8 +11,8 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/talx-hub/malerter/internal/constants"
-	"github.com/talx-hub/malerter/internal/service/server/logger"
-	"github.com/talx-hub/malerter/internal/utils/compressor"
+	"github.com/talx-hub/malerter/internal/logger"
+	"github.com/talx-hub/malerter/pkg/compressor"
 )
 
 func TestCompress(t *testing.T) {

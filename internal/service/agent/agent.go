@@ -7,8 +7,8 @@ import (
 	"time"
 
 	"github.com/talx-hub/malerter/internal/config/agent"
+	"github.com/talx-hub/malerter/internal/logger"
 	"github.com/talx-hub/malerter/internal/model"
-	"github.com/talx-hub/malerter/internal/service/server/logger"
 )
 
 type Agent struct {

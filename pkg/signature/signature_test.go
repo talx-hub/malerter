@@ -3,7 +3,7 @@ package signature_test
 import (
 	"testing"
 
-	"github.com/talx-hub/malerter/internal/utils/signature"
+	"github.com/talx-hub/malerter/pkg/signature"
 )
 
 func TestHash(t *testing.T) {

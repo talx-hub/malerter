@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/talx-hub/malerter/internal/config/agent"
-	"github.com/talx-hub/malerter/internal/service/server/logger"
+	"github.com/talx-hub/malerter/internal/logger"
 )
 
 func TestMakeJobsCh(t *testing.T) {

@@ -8,7 +8,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/talx-hub/malerter/internal/utils/compressor"
+	"github.com/talx-hub/malerter/pkg/compressor"
 )
 
 func TestCompress(t *testing.T) {

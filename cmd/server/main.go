@@ -15,13 +15,13 @@ import (
 	"github.com/talx-hub/malerter/internal/api/middlewares"
 	serverCfg "github.com/talx-hub/malerter/internal/config/server"
 	"github.com/talx-hub/malerter/internal/constants"
+	"github.com/talx-hub/malerter/internal/logger"
 	"github.com/talx-hub/malerter/internal/model"
 	"github.com/talx-hub/malerter/internal/repository/db"
 	"github.com/talx-hub/malerter/internal/repository/memory"
 	"github.com/talx-hub/malerter/internal/service/server/backup"
-	"github.com/talx-hub/malerter/internal/service/server/logger"
-	"github.com/talx-hub/malerter/internal/utils/queue"
-	"github.com/talx-hub/malerter/internal/utils/shutdown"
+	"github.com/talx-hub/malerter/pkg/queue"
+	"github.com/talx-hub/malerter/pkg/shutdown"
 )
 
 func main() {

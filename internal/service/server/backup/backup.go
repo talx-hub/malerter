@@ -5,9 +5,9 @@ import (
 	"time"
 
 	"github.com/talx-hub/malerter/internal/config/server"
+	"github.com/talx-hub/malerter/internal/logger"
 	"github.com/talx-hub/malerter/internal/model"
-	"github.com/talx-hub/malerter/internal/service/server/logger"
-	"github.com/talx-hub/malerter/internal/utils/queue"
+	"github.com/talx-hub/malerter/pkg/queue"
 )
 
 type Storage interface {
