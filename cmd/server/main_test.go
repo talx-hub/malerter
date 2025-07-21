@@ -10,10 +10,12 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/talx-hub/malerter/internal/api/handlers"
 	serverCfg "github.com/talx-hub/malerter/internal/config/server"
 	"github.com/talx-hub/malerter/internal/constants"
 	"github.com/talx-hub/malerter/internal/logger"
 	"github.com/talx-hub/malerter/internal/repository/memory"
+	"github.com/talx-hub/malerter/internal/service/server/router"
 )
 
 func setupServices(t *testing.T) *httptest.Server {
@@ -27,7 +29,10 @@ func setupServices(t *testing.T) *httptest.Server {
 
 	rep := memory.New(zeroLogger, nil)
 	require.NotNil(t, rep)
-	ts := httptest.NewServer(metricRouter(rep, zeroLogger, constants.NoSecret))
+
+	chiRouter := router.New(zeroLogger, constants.NoSecret)
+	chiRouter.SetRouter(handlers.NewHTTPHandler(rep, zeroLogger))
+	ts := httptest.NewServer(chiRouter.GetRouter())
 
 	return ts
 }

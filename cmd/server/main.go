@@ -6,13 +6,8 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"net/http/pprof"
-
-	"github.com/go-chi/chi/v5"
-	"github.com/go-chi/chi/v5/middleware"
 
 	"github.com/talx-hub/malerter/internal/api/handlers"
-	"github.com/talx-hub/malerter/internal/api/middlewares"
 	serverCfg "github.com/talx-hub/malerter/internal/config/server"
 	"github.com/talx-hub/malerter/internal/constants"
 	"github.com/talx-hub/malerter/internal/logger"
@@ -20,6 +15,7 @@ import (
 	"github.com/talx-hub/malerter/internal/repository/db"
 	"github.com/talx-hub/malerter/internal/repository/memory"
 	"github.com/talx-hub/malerter/internal/service/server/backup"
+	"github.com/talx-hub/malerter/internal/service/server/router"
 	"github.com/talx-hub/malerter/pkg/queue"
 	"github.com/talx-hub/malerter/pkg/shutdown"
 )
@@ -68,9 +64,13 @@ func main() {
 		Bool(`"signature check"'`, cfg.Secret != constants.NoSecret).
 		Str(`dsn`, cfg.DatabaseDSN).
 		Msg("Starting server")
+
+	chiRouter := router.New(zeroLogger, cfg.Secret)
+	chiRouter.SetRouter(handlers.NewHTTPHandler(storage, zeroLogger))
+
 	srv := http.Server{
 		Addr:    cfg.RootAddress,
-		Handler: metricRouter(storage, zeroLogger, cfg.Secret),
+		Handler: chiRouter.GetRouter(),
 	}
 
 	idleConnectionsClosed := make(chan struct{})
@@ -87,68 +87,6 @@ func main() {
 			Err(err).Msg("error during HTTP server ListenAndServe")
 	}
 	<-idleConnectionsClosed
-}
-
-func metricRouter(
-	repo handlers.Storage,
-	loggr *logger.ZeroLogger,
-	secret string,
-) chi.Router {
-	handler := handlers.NewHTTPHandler(repo, loggr)
-
-	router := chi.NewRouter()
-	router.Use(middlewares.Logging(loggr))
-
-	router.Route("/", func(r chi.Router) {
-		r.
-			With(middlewares.WriteSignature(secret)).
-			With(middlewares.Compress(loggr)).
-			Get("/", handler.GetAll)
-		r.Route("/value", func(r chi.Router) {
-			r.
-				With(middleware.AllowContentType(constants.ContentTypeJSON)).
-				With(middlewares.WriteSignature(secret)).
-				With(middlewares.Decompress(loggr)).
-				With(middlewares.Compress(loggr)).
-				Post("/", handler.GetMetricJSON)
-			r.Get("/{type}/{name}", handler.GetMetric)
-		})
-		r.Route("/update", func(r chi.Router) {
-			r.
-				With(middleware.AllowContentType(constants.ContentTypeJSON)).
-				With(middlewares.WriteSignature(secret)).
-				With(middlewares.Decompress(loggr)).
-				With(middlewares.Compress(loggr)).
-				Post("/", handler.DumpMetricJSON)
-			r.Post("/{type}/{name}/{val}", handler.DumpMetric)
-		})
-		r.Route("/ping", func(r chi.Router) {
-			r.Get("/", handler.Ping)
-		})
-		r.Route("/updates", func(r chi.Router) {
-			r.
-				With(middleware.AllowContentType(constants.ContentTypeJSON)).
-				With(middlewares.CheckSignature(secret)).
-				With(middlewares.Decompress(loggr)).
-				With(middlewares.Compress(loggr)).
-				Post("/", handler.DumpMetricList)
-		})
-		r.Route("/debug/pprof", func(r chi.Router) {
-			r.HandleFunc("/", pprof.Index)
-			r.HandleFunc("/cmdline", pprof.Cmdline)
-			r.HandleFunc("/profile", pprof.Profile)
-			r.HandleFunc("/symbol", pprof.Symbol)
-			r.HandleFunc("/trace", pprof.Trace)
-
-			for _, p := range []string{
-				"allocs", "block", "goroutine", "heap", "mutex", "threadcreate",
-			} {
-				r.HandleFunc("/"+p, pprof.Handler(p).ServeHTTP)
-			}
-		})
-	})
-
-	return router
 }
 
 func metricDB(
