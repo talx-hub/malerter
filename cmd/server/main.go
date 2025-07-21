@@ -6,27 +6,25 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"net/http/pprof"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 
 	"github.com/talx-hub/malerter/internal/api/handlers"
 	"github.com/talx-hub/malerter/internal/api/middlewares"
-	"github.com/talx-hub/malerter/internal/backup"
 	serverCfg "github.com/talx-hub/malerter/internal/config/server"
 	"github.com/talx-hub/malerter/internal/constants"
-	"github.com/talx-hub/malerter/internal/logger"
 	"github.com/talx-hub/malerter/internal/model"
 	"github.com/talx-hub/malerter/internal/repository/db"
 	"github.com/talx-hub/malerter/internal/repository/memory"
-	"github.com/talx-hub/malerter/internal/service/server"
+	"github.com/talx-hub/malerter/internal/service/server/backup"
+	"github.com/talx-hub/malerter/internal/service/server/logger"
 	"github.com/talx-hub/malerter/internal/utils/queue"
 	"github.com/talx-hub/malerter/internal/utils/shutdown"
 )
 
 func main() {
-	// TODO: тут какие-то кошмары с указателями
-	// (см. config/server/builder/.Build())... разобраться
 	cfg, ok := serverCfg.NewDirector().Build().(serverCfg.Builder)
 	if !ok {
 		log.Fatal("unable to load server serverCfg")
@@ -37,7 +35,7 @@ func main() {
 		log.Fatalf("unable to configure custom logger: %v", err)
 	}
 
-	var storage server.Storage
+	var storage handlers.Storage
 	buffer := queue.New[model.Metric]()
 	defer buffer.Close()
 	database, err := metricDB(
@@ -49,11 +47,7 @@ func main() {
 		zeroLogger.Warn().Err(err).Msg("store metrics in memory")
 		storage = memory.New(zeroLogger, &buffer)
 	} else {
-		defer func() {
-			if err = database.Close(); err != nil {
-				zeroLogger.Error().Err(err).Msg("unable to close DB")
-			}
-		}()
+		defer database.Close()
 		storage = database
 	}
 
@@ -96,12 +90,11 @@ func main() {
 }
 
 func metricRouter(
-	repo server.Storage,
+	repo handlers.Storage,
 	loggr *logger.ZeroLogger,
 	secret string,
 ) chi.Router {
-	dumper := server.NewMetricsDumper(repo)
-	handler := handlers.NewHTTPHandler(dumper, loggr)
+	handler := handlers.NewHTTPHandler(repo, loggr)
 
 	router := chi.NewRouter()
 	router.Use(middlewares.Logging(loggr))
@@ -109,13 +102,14 @@ func metricRouter(
 	router.Route("/", func(r chi.Router) {
 		r.
 			With(middlewares.WriteSignature(secret)).
-			With(middlewares.Gzip(loggr)).
+			With(middlewares.Compress(loggr)).
 			Get("/", handler.GetAll)
 		r.Route("/value", func(r chi.Router) {
 			r.
 				With(middleware.AllowContentType(constants.ContentTypeJSON)).
 				With(middlewares.WriteSignature(secret)).
-				With(middlewares.Gzip(loggr)).
+				With(middlewares.Decompress(loggr)).
+				With(middlewares.Compress(loggr)).
 				Post("/", handler.GetMetricJSON)
 			r.Get("/{type}/{name}", handler.GetMetric)
 		})
@@ -123,7 +117,8 @@ func metricRouter(
 			r.
 				With(middleware.AllowContentType(constants.ContentTypeJSON)).
 				With(middlewares.WriteSignature(secret)).
-				With(middlewares.Gzip(loggr)).
+				With(middlewares.Decompress(loggr)).
+				With(middlewares.Compress(loggr)).
 				Post("/", handler.DumpMetricJSON)
 			r.Post("/{type}/{name}/{val}", handler.DumpMetric)
 		})
@@ -134,8 +129,22 @@ func metricRouter(
 			r.
 				With(middleware.AllowContentType(constants.ContentTypeJSON)).
 				With(middlewares.CheckSignature(secret)).
-				With(middlewares.Gzip(loggr)).
+				With(middlewares.Decompress(loggr)).
+				With(middlewares.Compress(loggr)).
 				Post("/", handler.DumpMetricList)
+		})
+		r.Route("/debug/pprof", func(r chi.Router) {
+			r.HandleFunc("/", pprof.Index)
+			r.HandleFunc("/cmdline", pprof.Cmdline)
+			r.HandleFunc("/profile", pprof.Profile)
+			r.HandleFunc("/symbol", pprof.Symbol)
+			r.HandleFunc("/trace", pprof.Trace)
+
+			for _, p := range []string{
+				"allocs", "block", "goroutine", "heap", "mutex", "threadcreate",
+			} {
+				r.HandleFunc("/"+p, pprof.Handler(p).ServeHTTP)
+			}
 		})
 	})
 

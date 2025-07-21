@@ -9,7 +9,7 @@ import (
 	"strings"
 
 	"github.com/talx-hub/malerter/internal/constants"
-	"github.com/talx-hub/malerter/internal/logger"
+	"github.com/talx-hub/malerter/internal/service/server/logger"
 )
 
 type GzipWriter struct {
@@ -36,7 +36,7 @@ func (w *GzipWriter) Write(rawData []byte) (int, error) {
 	contentType := w.ResponseWriter.Header().Get(constants.KeyContentType)
 	if needCompress(contentType) {
 		w.wasCompressed = true
-		w.ResponseWriter.Header().Set(constants.KeyContentEncoding, "gzip")
+		w.ResponseWriter.Header().Set(constants.KeyContentEncoding, constants.EncodingGzip)
 		n, err := w.compressor.Write(rawData)
 		if err != nil {
 			return n, fmt.Errorf("unable to compress data: %w", err)
@@ -61,12 +61,37 @@ func (w *GzipWriter) Close() error {
 	return nil
 }
 
-func Gzip(logg *logger.ZeroLogger) func(http.Handler) http.Handler {
+func Decompress(logg *logger.ZeroLogger) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
-		gzipFunc := func(w http.ResponseWriter, r *http.Request) {
+		gzipDecompress := func(w http.ResponseWriter, r *http.Request) {
+			contentEncoding := r.Header.Get(constants.KeyContentEncoding)
+			sendsGzip := strings.Contains(contentEncoding, constants.EncodingGzip)
+			if sendsGzip {
+				decompressor, err := NewGzipReader(r.Body)
+				if err != nil {
+					w.WriteHeader(http.StatusInternalServerError)
+					return
+				}
+				defer func() {
+					if err = decompressor.Close(); err != nil {
+						logg.Error().
+							Err(err).Msg("unable to close decompressing reader")
+					}
+				}()
+				r.Body = decompressor
+			}
+			next.ServeHTTP(w, r)
+		}
+		return http.HandlerFunc(gzipDecompress)
+	}
+}
+
+func Compress(logg *logger.ZeroLogger) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		gzipCompressor := func(w http.ResponseWriter, r *http.Request) {
 			resultWriter := w
 			acceptEncoding := r.Header.Get(constants.KeyAcceptEncoding)
-			supportsGzip := strings.Contains(acceptEncoding, "gzip")
+			supportsGzip := strings.Contains(acceptEncoding, constants.EncodingGzip)
 			if supportsGzip {
 				compressor := NewGzipWriter(w)
 				resultWriter = compressor
@@ -77,27 +102,9 @@ func Gzip(logg *logger.ZeroLogger) func(http.Handler) http.Handler {
 					}
 				}()
 			}
-
-			contentEncoding := r.Header.Get(constants.KeyContentEncoding)
-			sendsGzip := strings.Contains(contentEncoding, "gzip")
-			if sendsGzip {
-				decompressor, err := NewGzipReader(r.Body)
-				if err != nil {
-					w.WriteHeader(http.StatusInternalServerError)
-					return
-				}
-				r.Body = decompressor
-				defer func() {
-					if err = decompressor.Close(); err != nil {
-						logg.Error().
-							Err(err).Msg("unable to close decompressing reader")
-					}
-				}()
-			}
 			next.ServeHTTP(resultWriter, r)
 		}
-
-		return http.HandlerFunc(gzipFunc)
+		return http.HandlerFunc(gzipCompressor)
 	}
 }
 

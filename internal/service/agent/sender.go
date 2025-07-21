@@ -12,8 +12,8 @@ import (
 	"syscall"
 
 	"github.com/talx-hub/malerter/internal/constants"
-	"github.com/talx-hub/malerter/internal/logger"
 	"github.com/talx-hub/malerter/internal/model"
+	"github.com/talx-hub/malerter/internal/service/server/logger"
 	"github.com/talx-hub/malerter/internal/utils/compressor"
 	"github.com/talx-hub/malerter/internal/utils/retry"
 	"github.com/talx-hub/malerter/internal/utils/signature"
@@ -110,7 +110,7 @@ func (s *Sender) batch(batch string) {
 		request.Header.Set(constants.KeyHashSHA256, sign)
 	}
 	request.Header.Set(constants.KeyContentType, constants.ContentTypeJSON)
-	request.Header.Set(constants.KeyContentEncoding, "gzip")
+	request.Header.Set(constants.KeyContentEncoding, constants.EncodingGzip)
 
 	wrappedDo := func(args ...any) (any, error) {
 		response, e := s.client.Do(request)

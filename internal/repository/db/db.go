@@ -17,8 +17,8 @@ import (
 	_ "github.com/jackc/pgx/v5/stdlib"
 
 	"github.com/talx-hub/malerter/internal/customerror"
-	"github.com/talx-hub/malerter/internal/logger"
 	"github.com/talx-hub/malerter/internal/model"
+	"github.com/talx-hub/malerter/internal/service/server/logger"
 	"github.com/talx-hub/malerter/internal/utils/queue"
 	"github.com/talx-hub/malerter/internal/utils/retry"
 )
@@ -262,9 +262,8 @@ func fromRow(row pgx.Row) (*model.Metric, error) {
 	return &metric, nil
 }
 
-func (db *DB) Close() error {
+func (db *DB) Close() {
 	db.pool.Close()
-	return nil
 }
 
 func (db *DB) Ping(ctx context.Context) error {

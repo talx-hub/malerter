@@ -104,6 +104,5 @@ func (b *Builder) IsValid() (config.Builder, error) {
 }
 
 func (b *Builder) Build() config.Config {
-	// TODO: wtf?? почему вынужден возвращать значение?
 	return *b
 }

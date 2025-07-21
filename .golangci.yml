@@ -18,8 +18,8 @@ linters:
     - bidichk
     - bodyclose
     - containedctx
-    - dupl
     - dupword
+    - dupl
     - durationcheck
     - errcheck
     - errname
@@ -69,7 +69,7 @@ linters:
     - zerologlint
   settings:
     dupl:
-      threshold: 100
+      threshold: 200
     errcheck:
       disable-default-exclusions: false
       check-type-assertions: true

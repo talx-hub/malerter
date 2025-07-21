@@ -1,6 +1,9 @@
+// Package handlers предоставляет HTTP-обработчики для управления метриками.
+// Он включает реализацию REST API, поддерживающую JSON и URL-параметры для операций чтения и записи метрик.
 package handlers
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -11,23 +14,43 @@ import (
 
 	"github.com/talx-hub/malerter/internal/constants"
 	"github.com/talx-hub/malerter/internal/customerror"
-	"github.com/talx-hub/malerter/internal/logger"
 	"github.com/talx-hub/malerter/internal/model"
 	"github.com/talx-hub/malerter/internal/repository/db"
-	"github.com/talx-hub/malerter/internal/service"
+	"github.com/talx-hub/malerter/internal/service/server/logger"
 )
 
 const (
 	errMsgPattern = `%s fails: %s`
 )
 
+// Storage определяет интерфейс для операций с хранилищем метрик.
+type Storage interface {
+	// Add сохраняет одну метрику.
+	Add(ctx context.Context, metric model.Metric) error
+
+	// Batch сохраняет несколько метрик за одну операцию.
+	Batch(ctx context.Context, metrics []model.Metric) error
+
+	// Find возвращает метрику по ключу.
+	Find(ctx context.Context, key string) (model.Metric, error)
+
+	// Get возвращает все метрики.
+	Get(ctx context.Context) ([]model.Metric, error)
+
+	// Ping проверяет доступность хранилища.
+	Ping(ctx context.Context) error
+}
+
+// HTTPHandler реализует HTTP API для работы с метриками.
+// Он использует хранилище метрик и логгер для обработки запросов.
 type HTTPHandler struct {
-	service service.Service
+	storage Storage
 	log     *logger.ZeroLogger
 }
 
-func NewHTTPHandler(s service.Service, log *logger.ZeroLogger) *HTTPHandler {
-	return &HTTPHandler{service: s, log: log}
+// NewHTTPHandler создаёт новый экземпляр HTTPHandler.
+func NewHTTPHandler(s Storage, log *logger.ZeroLogger) *HTTPHandler {
+	return &HTTPHandler{storage: s, log: log}
 }
 
 func getStatusFromError(err error) int {
@@ -76,18 +99,23 @@ func (h *HTTPHandler) extractJSONs(body io.Reader) ([]model.Metric, error) {
 	return validList, nil
 }
 
+// DumpMetricList сохраняет список метрик, переданный в теле запроса в формате JSON.
+//
+// Пример запроса: POST /updates/.
 func (h *HTTPHandler) DumpMetricList(w http.ResponseWriter, r *http.Request) {
 	metrics, err := h.extractJSONs(r.Body)
 	if err != nil {
+		h.log.Error().Err(err).Msg("failed to extract metrics from JSON")
 		st := getStatusFromError(err)
 		http.Error(w, err.Error(), st)
 		return
 	}
 
 	wrappedBatch := func(args ...any) (any, error) {
-		return nil, h.service.Batch(r.Context(), metrics)
+		return nil, h.storage.Batch(r.Context(), metrics)
 	}
 	if _, err = db.WithConnectionCheck(wrappedBatch); err != nil {
+		h.log.Error().Err(err).Msg("failed to dump metrics in repo")
 		st := getStatusFromError(err)
 		http.Error(w, err.Error(), st)
 		return
@@ -96,6 +124,9 @@ func (h *HTTPHandler) DumpMetricList(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
+// DumpMetricJSON сохраняет метрику, переданную в теле запроса в формате JSON.
+//
+// Пример запроса: POST /update/.
 func (h *HTTPHandler) DumpMetricJSON(w http.ResponseWriter, r *http.Request) {
 	metric, err := extractJSON(r.Body)
 	if err != nil {
@@ -109,7 +140,7 @@ func (h *HTTPHandler) DumpMetricJSON(w http.ResponseWriter, r *http.Request) {
 	}
 
 	wrappedAdd := func(args ...any) (any, error) {
-		return nil, h.service.Add(r.Context(), metric)
+		return nil, h.storage.Add(r.Context(), metric)
 	}
 	_, err = db.WithConnectionCheck(wrappedAdd)
 	if err != nil {
@@ -122,7 +153,7 @@ func (h *HTTPHandler) DumpMetricJSON(w http.ResponseWriter, r *http.Request) {
 
 	dummyKey := metric.Type.String() + " " + metric.Name
 	wrappedFind := func(args ...any) (any, error) {
-		return h.service.Find(r.Context(), dummyKey)
+		return h.storage.Find(r.Context(), dummyKey)
 	}
 	m, err := db.WithConnectionCheck(wrappedFind)
 	if err != nil {
@@ -146,6 +177,9 @@ func (h *HTTPHandler) DumpMetricJSON(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// DumpMetric сохраняет метрику, переданную в виде URL-параметров.
+//
+// Пример запроса: POST /update/{type}/{name}/{value}.
 func (h *HTTPHandler) DumpMetric(w http.ResponseWriter, r *http.Request) {
 	mName := chi.URLParam(r, "name")
 	mType := chi.URLParam(r, "type")
@@ -166,7 +200,7 @@ func (h *HTTPHandler) DumpMetric(w http.ResponseWriter, r *http.Request) {
 	}
 
 	wrappedAdd := func(args ...any) (any, error) {
-		return nil, h.service.Add(r.Context(), metric)
+		return nil, h.storage.Add(r.Context(), metric)
 	}
 	_, err = db.WithConnectionCheck(wrappedAdd)
 	if err != nil {
@@ -180,6 +214,9 @@ func (h *HTTPHandler) DumpMetric(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
+// GetMetric возвращает значение метрики по имени и типу, переданным в URL.
+//
+// Пример запроса: GET /value/{type}/{name}.
 func (h *HTTPHandler) GetMetric(w http.ResponseWriter, r *http.Request) {
 	mName := chi.URLParam(r, "name")
 	mType := chi.URLParam(r, "type")
@@ -192,7 +229,7 @@ func (h *HTTPHandler) GetMetric(w http.ResponseWriter, r *http.Request) {
 	}
 	dummyKey := mType + " " + mName
 	wrappedFind := func(args ...any) (any, error) {
-		return h.service.Find(r.Context(), dummyKey)
+		return h.storage.Find(r.Context(), dummyKey)
 	}
 	m, err := db.WithConnectionCheck(wrappedFind)
 	if err != nil {
@@ -215,6 +252,9 @@ func (h *HTTPHandler) GetMetric(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// GetMetricJSON возвращает значение метрики, переданной в теле запроса в формате JSON.
+//
+// Пример запроса: POST /value/.
 func (h *HTTPHandler) GetMetricJSON(w http.ResponseWriter, r *http.Request) {
 	metric, err := extractJSON(r.Body)
 	if err != nil {
@@ -225,7 +265,7 @@ func (h *HTTPHandler) GetMetricJSON(w http.ResponseWriter, r *http.Request) {
 
 	dummyKey := metric.Type.String() + " " + metric.Name
 	wrappedFind := func(args ...any) (any, error) {
-		return h.service.Find(r.Context(), dummyKey)
+		return h.storage.Find(r.Context(), dummyKey)
 	}
 	m, err := db.WithConnectionCheck(wrappedFind)
 	if err != nil {
@@ -247,10 +287,13 @@ func (h *HTTPHandler) GetMetricJSON(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// GetAll возвращает все метрики в виде HTML-страницы.
+//
+// Пример запроса: GET /.
 func (h *HTTPHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set(constants.KeyContentType, constants.ContentTypeHTML)
 	wrappedGet := func(args ...any) (any, error) {
-		return h.service.Get(r.Context())
+		return h.storage.Get(r.Context())
 	}
 	metrics, err := db.WithConnectionCheck(wrappedGet)
 	if err != nil {
@@ -273,15 +316,18 @@ func (h *HTTPHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// Ping проверяет доступность хранилища.
+//
+// Пример запроса: GET /ping.
 func (h *HTTPHandler) Ping(w http.ResponseWriter, r *http.Request) {
-	if h.service == nil {
+	if h.storage == nil {
 		err := errors.New("the dumping service is not initialised")
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
 	wrappedPing := func(args ...any) (any, error) {
-		return nil, h.service.Ping(r.Context())
+		return nil, h.storage.Ping(r.Context())
 	}
 	_, err := db.WithConnectionCheck(wrappedPing)
 	if err != nil {

@@ -1,14 +1,19 @@
 package agent
 
 import (
+	"io"
+	"net/http"
+	"net/http/httptest"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/talx-hub/malerter/internal/constants"
-	"github.com/talx-hub/malerter/internal/logger"
 	"github.com/talx-hub/malerter/internal/model"
+	"github.com/talx-hub/malerter/internal/service/server/logger"
 )
 
 func TestToJSONs(t *testing.T) {
@@ -108,72 +113,110 @@ func TestJoin(t *testing.T) {
 	}
 }
 
-/*
-Func TestSend(t *testing.T) {
-	tests := []struct {
-		name    string
-		metrics []model.Metric
-		want    []string
-	}{
-		{
-			name:    "empty",
-			metrics: []model.Metric{},
-			want:    []string{},
-		},
-		{
-			name: "no error",
-			metrics: []model.Metric{
-				{
-					Delta: func(i int64) *int64 { return &i }(42),
-					Value: nil,
-					Type:  "counter",
-					Name:  "m42",
-				},
-				{
-					Delta: nil,
-					Value: func(i float64) *float64 { return &i }(3.14),
-					Type:  "gauge",
-					Name:  "pi",
-				},
-			},
-			want: []string{
-				`{"id":"m42","type":"counter","delta":42}`,
-				`{"id":"pi","type":"gauge","value":3.14}`,
-			},
-		},
+func newTestSender(serverURL string, secret string, compress bool) *Sender {
+	return &Sender{
+		client:   &http.Client{Timeout: 1 * time.Second},
+		log:      logger.NewNopLogger(),
+		host:     serverURL,
+		secret:   secret,
+		compress: compress,
 	}
-	// FIXME: эта городуха вообще норм? :DDD
-	storage := ""
-	testServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if body, err := io.ReadAll(r.Body); err != nil {
-			log.Println(err)
-		} else {
-			storage = string(body)
-		}
-		if err := r.Body.Close(); err != nil {
-			log.Println(err)
-		}
-	}))
-	defer testServer.Close()
+}
 
-	client := testServer.Client()
-	sender := Sender{
-		client:   client,
-		storage:  memory.New(),
-		host:     testServer.URL,
-		compress: false,
+func TestSender_toJSONs(t *testing.T) {
+	s := newTestSender("", "", false)
+	input := make(chan model.Metric, 2)
+	input <- model.Metric{Name: "test1", Type: model.MetricTypeGauge, Value: new(float64)}
+	input <- model.Metric{Name: "test2", Type: model.MetricTypeGauge, Value: new(float64)}
+	close(input)
+
+	out := s.toJSONs(input)
+	results := make([]string, 0)
+	for json := range out {
+		results = append(results, json)
 	}
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			for _, m := range test.metrics {
-				err := sender.storage.Add(context.TODO(), m)
-				require.NoError(t, err)
-			}
-			sender.send()
-			for _, str := range test.want {
-				assert.True(t, strings.Contains(storage, str))
-			}
-		})
-	}
-}.
-*/
+
+	assert.Len(t, results, 2)
+	assert.Contains(t, results[0], `"test1"`)
+	assert.Contains(t, results[1], `"test2"`)
+}
+
+func TestSender_batch_Success(t *testing.T) {
+	// Start mock server
+	var receivedBody []byte
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var err error
+		receivedBody, err = io.ReadAll(r.Body)
+		defer func() {
+			err = r.Body.Close()
+			require.NoError(t, err)
+		}()
+		assert.NoError(t, err)
+
+		assert.Equal(t, constants.ContentTypeJSON, r.Header.Get(constants.KeyContentType))
+	}))
+	defer ts.Close()
+
+	s := newTestSender(ts.URL, "", false)
+	s.batch(`[{"id":"1"}]`)
+
+	assert.Contains(t, string(receivedBody), `"id":"1"`)
+}
+
+func TestSender_batch_Compress(t *testing.T) {
+	// Server that checks gzip encoding
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, constants.EncodingGzip, r.Header.Get(constants.KeyContentEncoding))
+		_, err := io.ReadAll(r.Body)
+		defer func() {
+			err = r.Body.Close()
+			require.NoError(t, err)
+		}()
+		assert.NoError(t, err)
+	}))
+	defer ts.Close()
+
+	s := newTestSender(ts.URL, "", true)
+	s.batch(`[{"id":"2"}]`)
+}
+
+func TestSender_batch_Signature(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		sig := r.Header.Get(constants.KeyHashSHA256)
+		assert.NotEmpty(t, sig)
+	}))
+	defer ts.Close()
+
+	s := newTestSender(ts.URL, "super-secret", false)
+	s.batch(`[{"name":"metric"}]`)
+}
+
+func TestSender_batch_HTTPError(t *testing.T) {
+	s := newTestSender("http://localhost:9999", "", false) // Unused port to simulate error
+	s.batch(`[{"bad":"json"}]`)
+	// No panic/assert — we just check it doesn't crash
+}
+
+func TestSender_send(t *testing.T) {
+	var mu sync.Mutex
+	var wg sync.WaitGroup
+
+	chMetrics := make(chan model.Metric, 1)
+	chMetrics <- model.Metric{Name: "test2", Type: model.MetricTypeGauge, Value: new(float64)}
+	close(chMetrics)
+
+	chJobs := make(chan chan model.Metric, 1)
+	chJobs <- chMetrics
+	close(chJobs)
+
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = io.Copy(io.Discard, r.Body)
+	}))
+	defer ts.Close()
+
+	s := newTestSender(ts.URL, "", false)
+	wg.Add(1)
+	go s.send(chJobs, &mu, &wg)
+
+	wg.Wait()
+}

@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/talx-hub/malerter/internal/logger"
+	"github.com/talx-hub/malerter/internal/service/server/logger"
 )
 
 type (

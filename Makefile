@@ -17,6 +17,27 @@ agent:
 test:
 	go test ./... -race -coverprofile=cover.out -covermode=atomic
 
+.PHONY : run-agent
+run-agent: build-all
+	./bin/agent -k='super-secret-key'
+
+.PHONY : run-server
+run-server: build-all
+	./bin/server -d='postgres://gopher_alerts:gopher_alerts@localhost:5432/gopher_alerts?sslmode=disable' -k='super-secret-key' -i=60
+
+cpu.pprof:
+	curl -sk -v http://localhost:8080/debug/pprof/profile?seconds=30 > profiles/cpu.pprof
+
+heap.pprof:
+	curl -sk -v http://localhost:8080/debug/pprof/heap > profiles/heap.pprof
+
+allocs.pprof:
+	curl -sk -v http://localhost:8080/debug/pprof/allocs > profiles/allocs.pprof
+
+.PHONY : diffpprof
+diffpprof:
+	go tool pprof -top -diff_base=profiles/base_heap.pprof profiles/result_heap.pprof
+
 .PHONY : clean
 clean:
 	-rm ./bin/agent 2>/dev/null
@@ -55,6 +76,7 @@ iter01:
 .PHONY : iter02
 iter02:
 	./bin/metricstest -test.run=^TestIteration2A$$ -source-path=. -agent-binary-path=./bin/agent
+	./bin/metricstest -test.run=^TestIteration2B$$ -source-path=. -agent-binary-path=./bin/agent
 
 .PHONY : iter03
 iter03:
@@ -92,13 +114,13 @@ iter10:
 	  -binary-path=./bin/server \
 	  -server-port=$(SERVER_PORT) \
 	  -source-path=. \
-      -database-dsn='postgres://godevops:godevops@localhost:5432/godevops_alerts?sslmode=disable'
+      -database-dsn='postgres://gopher_alerts:gopher_alerts@localhost:5432/gopher_alerts?sslmode=disable'
 	./bin/metricstest -test.run=^TestIteration10B$$ \
 	  -agent-binary-path=./bin/agent \
 	  -binary-path=./bin/server \
 	  -server-port=$(SERVER_PORT) \
 	  -source-path=. \
-      -database-dsn='postgres://godevops:godevops@localhost:5432/godevops_alerts?sslmode=disable'
+      -database-dsn='postgres://gopher_alerts:gopher_alerts@localhost:5432/gopher_alerts?sslmode=disable'
 
 .PHONY : iter11
 iter11:
@@ -107,7 +129,7 @@ iter11:
 	  -binary-path=./bin/server \
 	  -server-port=$(SERVER_PORT) \
 	  -source-path=. \
-      -database-dsn='postgres://godevops:godevops@localhost:5432/godevops_alerts?sslmode=disable'
+      -database-dsn='postgres://gopher_alerts:gopher_alerts@localhost:5432/gopher_alerts?sslmode=disable'
 
 .PHONY : iter12
 iter12:
@@ -116,7 +138,7 @@ iter12:
 	  -binary-path=./bin/server \
 	  -server-port=$(SERVER_PORT) \
 	  -source-path=. \
-      -database-dsn='postgres://godevops:godevops@localhost:5432/godevops_alerts?sslmode=disable'
+      -database-dsn='postgres://gopher_alerts:gopher_alerts@localhost:5432/gopher_alerts?sslmode=disable'
 
 .PHONY : iter13
 iter13:
@@ -125,7 +147,7 @@ iter13:
 	  -binary-path=./bin/server \
 	  -server-port=$(SERVER_PORT) \
 	  -source-path=. \
-      -database-dsn='postgres://godevops:godevops@localhost:5432/godevops_alerts?sslmode=disable'
+      -database-dsn='postgres://gopher_alerts:gopher_alerts@localhost:5432/gopher_alerts?sslmode=disable'
 
 .PHONY : iter14
 iter14:
@@ -134,5 +156,5 @@ iter14:
 	  -binary-path=./bin/server \
 	  -server-port=$(SERVER_PORT) \
 	  -source-path=. \
-      -database-dsn='postgres://godevops:godevops@localhost:5432/godevops_alerts?sslmode=disable' \
+      -database-dsn='postgres://gopher_alerts:gopher_alerts@localhost:5432/gopher_alerts?sslmode=disable' \
       -key="super-secret-key"
