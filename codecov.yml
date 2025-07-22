@@ -11,4 +11,4 @@ coverage:
         threshold: 0%
   ignore:
     - "pkg/pgcontainer/*"
-    - "internal/repo/db/*"
+    - "internal/repository/db/*"
