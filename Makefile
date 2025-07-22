@@ -7,11 +7,23 @@ preproc: clean fmt lint test
 .PHONY : build-all
 build-all: server agent
 
+.PHONY : server
+BUILDINFO_SERVER_PATH=github.com/talx-hub/malerter/internal/service/server/buildinfo
+BUILD_FLAGS_SERVER=-X '$(BUILDINFO_SERVER_PATH).Version=1.0.0' \
+            -X '$(BUILDINFO_SERVER_PATH).Date=$(shell date -u +%Y-%m-%d)' \
+            -X '$(BUILDINFO_SERVER_PATH).Commit=$(shell git rev-parse HEAD)'
+
 server:
-	go build -o ./bin/server ./cmd/server/main.go
+	go build -ldflags="${BUILD_FLAGS_SERVER}" -o ./bin/server ./cmd/server/main.go
+
+.PHONY : agent
+BUILDINFO_AGENT_PATH=github.com/talx-hub/malerter/internal/service/agent/buildinfo
+BUILD_FLAGS_AGENT=-X '$(BUILDINFO_AGENT_PATH).Version=1.0.0' \
+            -X '$(BUILDINFO_AGENT_PATH).Date=$(shell date -u +%Y-%m-%d)' \
+            -X '$(BUILDINFO_AGENT_PATH).Commit=$(shell git rev-parse HEAD)'
 
 agent:
-	go build -o ./bin/agent ./cmd/agent/main.go
+	go build -ldflags="${BUILD_FLAGS_AGENT}" -o ./bin/agent ./cmd/agent/main.go
 
 .PHONY : test
 test:

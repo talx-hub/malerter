@@ -15,6 +15,7 @@ import (
 	"github.com/talx-hub/malerter/internal/repository/db"
 	"github.com/talx-hub/malerter/internal/repository/memory"
 	"github.com/talx-hub/malerter/internal/service/server/backup"
+	"github.com/talx-hub/malerter/internal/service/server/buildinfo"
 	"github.com/talx-hub/malerter/internal/service/server/router"
 	"github.com/talx-hub/malerter/pkg/queue"
 	"github.com/talx-hub/malerter/pkg/shutdown"
@@ -63,6 +64,9 @@ func main() {
 		Str(`"backup path"`, cfg.FileStoragePath).
 		Bool(`"signature check"'`, cfg.Secret != constants.NoSecret).
 		Str(`dsn`, cfg.DatabaseDSN).
+		Str("buildVersion", buildinfo.Version).
+		Str("buildCommit", buildinfo.Commit).
+		Str("buildDate", buildinfo.Date).
 		Msg("Starting server")
 
 	chiRouter := router.New(zeroLogger, cfg.Secret)
