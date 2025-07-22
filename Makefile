@@ -27,7 +27,8 @@ agent:
 
 .PHONY : test
 test:
-	go test ./... -race -coverprofile=cover.out -covermode=atomic
+	go test ./... -tags integration_tests -race -coverprofile=cover.out -covermode=atomic
+	grep -v "/pkg/pgcontainer/" cover.out > cover.filtered.out
 
 .PHONY : run-agent
 run-agent: build-all
@@ -59,7 +60,7 @@ clean:
 
 .PHONY : check-coverage
 check-coverage:
-	go tool cover -html cover.out
+	go tool cover -html cover.filtered.out
 
 .PHONY : fmt
 fmt:
