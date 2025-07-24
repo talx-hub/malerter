@@ -7,9 +7,9 @@ import (
 	"sync"
 
 	"github.com/talx-hub/malerter/internal/customerror"
+	"github.com/talx-hub/malerter/internal/logger"
 	"github.com/talx-hub/malerter/internal/model"
-	"github.com/talx-hub/malerter/internal/service/server/logger"
-	"github.com/talx-hub/malerter/internal/utils/queue"
+	"github.com/talx-hub/malerter/pkg/queue"
 )
 
 type Memory struct {

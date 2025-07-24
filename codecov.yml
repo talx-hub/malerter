@@ -1,6 +1,6 @@
 coverage:
   round: down
-  range: '40...100'
+  range: '55...100'
   status:
     patch:
       default:
@@ -9,3 +9,6 @@ coverage:
       default:
         target: auto
         threshold: 0%
+  ignore:
+    - "pkg/pgcontainer/*"
+    - "internal/repository/db/*"

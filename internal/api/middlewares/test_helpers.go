@@ -5,7 +5,7 @@ import (
 	"net/http"
 
 	"github.com/talx-hub/malerter/internal/constants"
-	"github.com/talx-hub/malerter/internal/service/server/logger"
+	"github.com/talx-hub/malerter/internal/logger"
 )
 
 const key = "very-secret-super-key"

@@ -14,9 +14,9 @@ import (
 
 	"github.com/talx-hub/malerter/internal/constants"
 	"github.com/talx-hub/malerter/internal/customerror"
+	"github.com/talx-hub/malerter/internal/logger"
 	"github.com/talx-hub/malerter/internal/model"
 	"github.com/talx-hub/malerter/internal/repository/db"
-	"github.com/talx-hub/malerter/internal/service/server/logger"
 )
 
 const (

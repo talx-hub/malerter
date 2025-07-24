@@ -6,9 +6,10 @@ import (
 	"net/http"
 
 	agentCfg "github.com/talx-hub/malerter/internal/config/agent"
+	"github.com/talx-hub/malerter/internal/logger"
 	"github.com/talx-hub/malerter/internal/service/agent"
-	"github.com/talx-hub/malerter/internal/service/server/logger"
-	"github.com/talx-hub/malerter/internal/utils/shutdown"
+	"github.com/talx-hub/malerter/internal/service/agent/buildinfo"
+	"github.com/talx-hub/malerter/pkg/shutdown"
 )
 
 func main() {
@@ -21,7 +22,11 @@ func main() {
 		log.Fatalf("unable to configure custom logger: %s", err.Error())
 	}
 
-	zeroLogger.Info().Msg("start agent")
+	zeroLogger.Info().
+		Str("buildVersion", buildinfo.Version).
+		Str("buildCommit", buildinfo.Commit).
+		Str("buildDate", buildinfo.Date).
+		Msg("Starting agent")
 	agt := agent.NewAgent(&cfg, &http.Client{}, zeroLogger)
 
 	ctx, cancel := context.WithCancel(context.Background())

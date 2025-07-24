@@ -8,7 +8,7 @@ import (
 	"net/http"
 
 	"github.com/talx-hub/malerter/internal/constants"
-	"github.com/talx-hub/malerter/internal/utils/signature"
+	"github.com/talx-hub/malerter/pkg/signature"
 )
 
 type SigningWriter struct {

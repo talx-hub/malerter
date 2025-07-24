@@ -7,7 +7,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/talx-hub/malerter/internal/constants"
-	"github.com/talx-hub/malerter/internal/service/server/logger"
+	"github.com/talx-hub/malerter/internal/logger"
 )
 
 func TestRuntimeCollect(t *testing.T) {

@@ -1,3 +1,19 @@
+// Package pgcontainer предоставляет вспомогательные средства для запуска PostgreSQL в Docker-контейнере
+// с помощью библиотеки dockertest. Этот пакет предназначен для использования в интеграционных тестах.
+//
+// Контейнер запускается с правами суперпользователя PostgreSQL, после чего автоматически создаётся
+// тестовая база данных и отдельный пользователь. Полученный DSN можно использовать для подключения
+// к изолированной среде тестирования.
+//
+// Использование:
+//
+//	c := pgcontainer.New(log)
+//	if err := c.RunContainer(); err != nil {
+//	    log.Fatal().Err(err).Msg("failed to run pg container")
+//	}
+//	defer c.Close()
+//
+//	db, err := sql.Open("pgx", c.GetDSN())
 package pgcontainer
 
 import (
@@ -13,18 +29,21 @@ import (
 	"github.com/ory/dockertest/v3"
 	"github.com/ory/dockertest/v3/docker"
 
-	"github.com/talx-hub/malerter/internal/service/server/logger"
+	"github.com/talx-hub/malerter/internal/logger"
 )
 
 const (
-	testDBName       = "test"
-	testUserName     = "test"
-	testUserPassword = "test"
+	testDBName       = "test" // Имя создаваемой тестовой базы
+	testUserName     = "test" // Имя пользователя для тестовой базы
+	testUserPassword = "test" // Пароль пользователя
 )
 
-const queryTimeOut = 5 * time.Second
-const retryTimeout = 10 * time.Second
+const (
+	queryTimeOut = 5 * time.Second  // Время ожидания SQL-запросов
+	retryTimeout = 10 * time.Second // Максимальное время ожидания запуска контейнера
+)
 
+// PGContainer управляет запуском, подключением и остановкой PostgreSQL-контейнера для тестирования.
 type PGContainer struct {
 	dockerPool  *dockertest.Pool
 	pgContainer *dockertest.Resource
@@ -32,16 +51,25 @@ type PGContainer struct {
 	dsn         string
 }
 
+// New создаёт и возвращает новую структуру PGContainer.
+//
+// Требует передать логгер, который будет использоваться для вывода ошибок.
 func New(log *logger.ZeroLogger) *PGContainer {
 	return &PGContainer{
 		log: log,
 	}
 }
 
+// GetDSN возвращает строку подключения к тестовой базе данных.
+//
+// Можно использовать её для подключения к базе через pgx или database/sql.
 func (c *PGContainer) GetDSN() string {
 	return c.dsn
 }
 
+// Close останавливает и удаляет PostgreSQL-контейнер, если он был запущен.
+//
+// Все ресурсы Docker очищаются через dockertest.Pool.Purge.
 func (c *PGContainer) Close() {
 	if c.pgContainer == nil {
 		return
@@ -53,6 +81,12 @@ func (c *PGContainer) Close() {
 	}
 }
 
+// RunContainer запускает PostgreSQL-контейнер, ожидает его готовности и создаёт тестовую БД.
+//
+// Также создаётся пользователь с правами доступа к тестовой базе.
+// Используется dockertest для управления Docker-контейнером и pgx для подключения к базе данных.
+//
+// Возвращает ошибку, если контейнер не удалось запустить, подключиться или создать БД.
 func (c *PGContainer) RunContainer() error {
 	var err error
 	c.dockerPool, err = dockertest.NewPool("")
@@ -106,6 +140,9 @@ func (c *PGContainer) RunContainer() error {
 	return nil
 }
 
+// loadImageFromEnv загружает тег образа PostgreSQL из файла .env.
+//
+// Имя переменной окружения: POSTGRES_TAG.
 func (c *PGContainer) loadImageFromEnv() string {
 	if err := godotenv.Load(".env"); err != nil {
 		c.log.Error().Err(err).
@@ -114,6 +151,9 @@ func (c *PGContainer) loadImageFromEnv() string {
 	return os.Getenv("POSTGRES_TAG")
 }
 
+// getSUConnection создаёт соединение от имени суперпользователя postgres.
+//
+// Используется для выполнения CREATE USER и CREATE DATABASE.
 func getSUConnection(hostPort string) (*pgx.Conn, error) {
 	dsn := fmt.Sprintf(
 		"postgres://%s:%s@%s/%s?sslmode=disable",
@@ -130,6 +170,8 @@ func getSUConnection(hostPort string) (*pgx.Conn, error) {
 	return conn, nil
 }
 
+// createTestDB создаёт тестовую базу данных и пользователя,
+// затем формирует DSN для подключения к ней.
 func createTestDB(conn *pgx.Conn) (string, error) {
 	const (
 		createUser = `CREATE USER %s PASSWORD '%s';`
