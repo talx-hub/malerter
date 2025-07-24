@@ -10,6 +10,7 @@ import (
 )
 
 func TestBuilder_LoadFromEnv(t *testing.T) {
+	_ = os.Setenv(EnvCryptoKeyPath, "/path/to/private.pem")
 	_ = os.Setenv(EnvAddress, "127.0.0.1:9001")
 	_ = os.Setenv(EnvLogLevel, "debug")
 	_ = os.Setenv(EnvFileStoragePath, "data/backup.db")
@@ -19,6 +20,7 @@ func TestBuilder_LoadFromEnv(t *testing.T) {
 	_ = os.Setenv(EnvSecretKey, "my-secret")
 
 	defer func() {
+		_ = os.Unsetenv(EnvCryptoKeyPath)
 		_ = os.Unsetenv(EnvAddress)
 		_ = os.Unsetenv(EnvLogLevel)
 		_ = os.Unsetenv(EnvFileStoragePath)
@@ -31,6 +33,7 @@ func TestBuilder_LoadFromEnv(t *testing.T) {
 	b := &Builder{}
 	b.LoadFromEnv()
 
+	assert.Equal(t, "/path/to/private.pem", b.CryptoKeyPath)
 	assert.Equal(t, "127.0.0.1:9001", b.RootAddress)
 	assert.Equal(t, "debug", b.LogLevel)
 	assert.Equal(t, "data/backup.db", b.FileStoragePath)
@@ -59,6 +62,7 @@ func TestBuilder_IsValid_Negative(t *testing.T) {
 
 func TestBuilder_Build(t *testing.T) {
 	b := &Builder{
+		CryptoKeyPath:   "/keys/private.pem",
 		RootAddress:     "localhost:8080",
 		LogLevel:        "info",
 		FileStoragePath: "backup.bk",
@@ -71,6 +75,7 @@ func TestBuilder_Build(t *testing.T) {
 	cfg, ok := b.Build().(Builder)
 	require.True(t, ok)
 
+	assert.Equal(t, b.CryptoKeyPath, cfg.CryptoKeyPath)
 	assert.Equal(t, b.RootAddress, cfg.RootAddress)
 	assert.Equal(t, b.LogLevel, cfg.LogLevel)
 	assert.Equal(t, b.FileStoragePath, cfg.FileStoragePath)

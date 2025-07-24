@@ -10,6 +10,7 @@ import (
 )
 
 func TestBuilder_LoadFromEnv(t *testing.T) {
+	_ = os.Setenv(EnvCryptoKeyPath, "/keys/public.pem")
 	_ = os.Setenv(EnvHost, "127.0.0.1:9000")
 	_ = os.Setenv(EnvSecretKey, "my-secret")
 	_ = os.Setenv(EnvPollInterval, "5")
@@ -17,6 +18,7 @@ func TestBuilder_LoadFromEnv(t *testing.T) {
 	_ = os.Setenv(EnvReportInterval, "15")
 
 	defer func() {
+		_ = os.Unsetenv(EnvCryptoKeyPath)
 		_ = os.Unsetenv(EnvHost)
 		_ = os.Unsetenv(EnvSecretKey)
 		_ = os.Unsetenv(EnvPollInterval)
@@ -27,6 +29,7 @@ func TestBuilder_LoadFromEnv(t *testing.T) {
 	b := &Builder{}
 	b.LoadFromEnv()
 
+	assert.Equal(t, "/keys/public.pem", b.CryptoKeyPath)
 	assert.Equal(t, "127.0.0.1:9000", b.ServerAddress)
 	assert.Equal(t, "my-secret", b.Secret)
 	assert.Equal(t, 10, b.RateLimit)
@@ -72,6 +75,7 @@ func TestBuilder_IsValid_Negative(t *testing.T) {
 
 func TestBuilder_Build(t *testing.T) {
 	b := &Builder{
+		CryptoKeyPath:  "/keys/public.pem",
 		LogLevel:       "info",
 		Secret:         "key",
 		ServerAddress:  "localhost:9000",
@@ -82,6 +86,7 @@ func TestBuilder_Build(t *testing.T) {
 	cfg, ok := b.Build().(Builder)
 	require.True(t, ok)
 
+	assert.Equal(t, b.CryptoKeyPath, cfg.CryptoKeyPath)
 	assert.Equal(t, b.LogLevel, cfg.LogLevel)
 	assert.Equal(t, b.Secret, cfg.Secret)
 	assert.Equal(t, b.ServerAddress, cfg.ServerAddress)
