@@ -20,6 +20,7 @@ const (
 
 const (
 	EnvAddress         = "ADDRESS"
+	EnvCryptoKeyPath   = "CRYPTO_KEY"
 	EnvDatabaseDSN     = "DATABASE_DSN"
 	EnvFileStoragePath = "FILE_STORAGE_PATH"
 	EnvLogLevel        = "LOG_LEVEL"
@@ -39,6 +40,7 @@ func NewDirector() *config.Director {
 }
 
 type Builder struct {
+	CryptoKeyPath   string
 	DatabaseDSN     string
 	FileStoragePath string
 	LogLevel        string
@@ -49,6 +51,7 @@ type Builder struct {
 }
 
 func (b *Builder) LoadFromFlags() config.Builder {
+	flag.StringVar(&b.CryptoKeyPath, "crypto-key", constants.EmptyPath, "absolute path to public crypto key")
 	flag.StringVar(&b.RootAddress, "a", AddressDefault, "server root address")
 	flag.StringVar(&b.LogLevel, "l", constants.LogLevelDefault, "server log level")
 	flag.StringVar(&b.FileStoragePath, "f", FileStorageDefault(), "backup file path")
@@ -64,6 +67,9 @@ func (b *Builder) LoadFromFlags() config.Builder {
 }
 
 func (b *Builder) LoadFromEnv() config.Builder {
+	if cryptoKeyPath, found := os.LookupEnv(EnvCryptoKeyPath); found {
+		b.CryptoKeyPath = cryptoKeyPath
+	}
 	if a, found := os.LookupEnv(EnvAddress); found {
 		b.RootAddress = a
 	}

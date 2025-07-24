@@ -20,6 +20,7 @@ const (
 )
 
 const (
+	EnvCryptoKeyPath  = "CRYPTO_KEY"
 	EnvHost           = "ADDRESS"
 	EnvSecretKey      = "KEY"
 	EnvPollInterval   = "POLL_INTERVAL"
@@ -34,6 +35,7 @@ func NewDirector() *config.Director {
 }
 
 type Builder struct {
+	CryptoKeyPath  string
 	LogLevel       string
 	Secret         string
 	ServerAddress  string
@@ -43,6 +45,7 @@ type Builder struct {
 }
 
 func (b *Builder) LoadFromFlags() config.Builder {
+	flag.StringVar(&b.CryptoKeyPath, "crypto-key", constants.EmptyPath, "absolute path to public crypto key")
 	flag.StringVar(&b.LogLevel, "ll", constants.LogLevelDefault, "server log level")
 	flag.StringVar(&b.ServerAddress, "a", HostDefault, "alert-host address")
 	flag.StringVar(&b.Secret, "k", constants.NoSecret, "secret key")
@@ -63,6 +66,9 @@ func (b *Builder) LoadFromFlags() config.Builder {
 }
 
 func (b *Builder) LoadFromEnv() config.Builder {
+	if cryptoKeyPath, found := os.LookupEnv(EnvCryptoKeyPath); found {
+		b.CryptoKeyPath = cryptoKeyPath
+	}
 	if addr, found := os.LookupEnv(EnvHost); found {
 		b.ServerAddress = addr
 	}
