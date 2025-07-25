@@ -14,9 +14,11 @@ import (
 	"github.com/talx-hub/malerter/pkg/crypto"
 )
 
-func writeTestKeyPair(t *testing.T) (privPath, pubPath string) {
+//nolint:unparam // для правильности
+func writeTestKeyPair(t *testing.T) (string, string) {
 	t.Helper()
 
+	//nolint:gosec // для тестов достаточно такого размера ключа
 	privateKey, err := rsa.GenerateKey(rand.Reader, 1024)
 	assert.NoError(t, err)
 
@@ -55,7 +57,9 @@ func writeTestKeyPair(t *testing.T) (privPath, pubPath string) {
 
 func TestNewDecrypter_ValidKey(t *testing.T) {
 	privPath, _ := writeTestKeyPair(t)
-	defer os.Remove(privPath)
+	defer func() {
+		_ = os.Remove(privPath)
+	}()
 
 	d, err := crypto.NewDecrypter(privPath)
 	assert.NoError(t, err)
@@ -71,7 +75,9 @@ func TestNewDecrypter_EmptyPath(t *testing.T) {
 
 func TestDecrypter_Decrypt_ShortData(t *testing.T) {
 	privPath, _ := writeTestKeyPair(t)
-	defer os.Remove(privPath)
+	defer func() {
+		_ = os.Remove(privPath)
+	}()
 
 	decrypter, err := crypto.NewDecrypter(privPath)
 	assert.NoError(t, err)
@@ -84,7 +90,9 @@ func TestDecrypter_Decrypt_ShortData(t *testing.T) {
 
 func TestDecrypter_Decrypt_CorruptedData(t *testing.T) {
 	privPath, _ := writeTestKeyPair(t)
-	defer os.Remove(privPath)
+	defer func() {
+		_ = os.Remove(privPath)
+	}()
 
 	decrypter, err := crypto.NewDecrypter(privPath)
 	assert.NoError(t, err)

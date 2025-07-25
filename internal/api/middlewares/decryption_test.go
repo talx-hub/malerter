@@ -17,7 +17,9 @@ import (
 	"github.com/talx-hub/malerter/pkg/crypto"
 )
 
+//nolint:unparam // для правильности
 func setupEncryption(t *testing.T) (enc *crypto.Encrypter, dec *crypto.Decrypter, cleanup func()) {
+	t.Helper()
 	privPath, pubPath := writeTestKeyPair(t)
 	enc, err := crypto.NewEncrypter(pubPath)
 	require.NoError(t, err)
@@ -33,6 +35,7 @@ func setupEncryption(t *testing.T) (enc *crypto.Encrypter, dec *crypto.Decrypter
 }
 
 func writeTestKeyPair(t *testing.T) (string, string) {
+	t.Helper()
 	privateKey, err := GenerateRSAKey()
 	require.NoError(t, err)
 

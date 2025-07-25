@@ -94,3 +94,104 @@ func TestBuilder_Build(t *testing.T) {
 	assert.Equal(t, b.ReportInterval, cfg.ReportInterval)
 	assert.Equal(t, b.PollInterval, cfg.PollInterval)
 }
+
+func TestBuilder_LoadFromFile_Success(t *testing.T) {
+	jsonData := `{
+		"crypto_key_path": "key.pem",
+		"log_level": "debug",
+		"secret": "supersecret",
+		"server_address": "192.168.0.1:9090",
+		"rate_limit": 10,
+		"report_interval": 15000000000,
+		"poll_interval": 5000000000
+	}`
+
+	tmpFile, err := os.CreateTemp("", "agent_config_*.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		_ = os.Remove(tmpFile.Name())
+	}()
+	_, _ = tmpFile.WriteString(jsonData)
+	_ = tmpFile.Close()
+
+	initial := &Builder{
+		Config:         tmpFile.Name(),
+		ServerAddress:  "localhost:8080",
+		RateLimit:      5,
+		PollInterval:   2 * time.Second,
+		ReportInterval: 5 * time.Second,
+		Secret:         "",
+	}
+
+	result, _ := initial.LoadFromFile().(*Builder)
+
+	if result.ServerAddress != "192.168.0.1:9090" {
+		t.Errorf("expected ServerAddress to be overridden, got %s", result.ServerAddress)
+	}
+	if result.RateLimit != 10 {
+		t.Errorf("expected RateLimit to be 10, got %d", result.RateLimit)
+	}
+	if result.PollInterval != 5*time.Second {
+		t.Errorf("expected PollInterval to be 5s, got %v", result.PollInterval)
+	}
+	if result.ReportInterval != 15*time.Second {
+		t.Errorf("expected ReportInterval to be 15s, got %v", result.ReportInterval)
+	}
+	if result.Secret != "supersecret" {
+		t.Errorf("expected Secret to be 'supersecret', got %s", result.Secret)
+	}
+}
+
+func TestBuilder_LoadFromFile_FileNotExists(t *testing.T) {
+	b := &Builder{
+		Config:         "/nonexistent/path.json",
+		ServerAddress:  "localhost:8080",
+		RateLimit:      3,
+		PollInterval:   2 * time.Second,
+		ReportInterval: 10 * time.Second,
+	}
+
+	result, _ := b.LoadFromFile().(*Builder)
+
+	if result.ServerAddress != "localhost:8080" {
+		t.Errorf("expected ServerAddress to stay the same, got %s", result.ServerAddress)
+	}
+	if result.RateLimit != 3 {
+		t.Errorf("expected RateLimit to stay the same, got %d", result.RateLimit)
+	}
+}
+
+func TestBuilder_LoadFromFile_PartialOverride(t *testing.T) {
+	jsonData := `{
+		"rate_limit": 20
+	}`
+
+	tmpFile, err := os.CreateTemp("", "agent_partial_config_*.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		_ = os.Remove(tmpFile.Name())
+	}()
+	_, _ = tmpFile.WriteString(jsonData)
+	_ = tmpFile.Close()
+
+	initial := &Builder{
+		Config:         tmpFile.Name(),
+		ServerAddress:  "localhost:8080",
+		RateLimit:      3,
+		PollInterval:   2 * time.Second,
+		ReportInterval: 10 * time.Second,
+	}
+
+	result, _ := initial.LoadFromFile().(*Builder)
+
+	if result.RateLimit != 20 {
+		t.Errorf("expected RateLimit to be updated to 20, got %d", result.RateLimit)
+	}
+	if result.ServerAddress != "localhost:8080" {
+		t.Errorf("expected ServerAddress to remain unchanged, got %s", result.ServerAddress)
+	}
+}

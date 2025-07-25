@@ -26,18 +26,20 @@ func TestLoggingMiddleware_LogsCorrectly(t *testing.T) {
 
 	testHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusCreated)
-		w.Write([]byte("OK"))
+		_, _ = w.Write([]byte("OK"))
 	})
 
 	loggedHandler := Logging(log)(testHandler)
 
-	req := httptest.NewRequest(http.MethodPost, "/test-logging", nil)
+	req := httptest.NewRequest(http.MethodPost, "/test-logging", http.NoBody)
 	rec := httptest.NewRecorder()
 
 	loggedHandler.ServeHTTP(rec, req)
 
 	res := rec.Result()
-	defer res.Body.Close()
+	defer func() {
+		_ = res.Body.Close()
+	}()
 
 	assert.Equal(t, http.StatusCreated, res.StatusCode)
 	assert.Equal(t, "OK", rec.Body.String())

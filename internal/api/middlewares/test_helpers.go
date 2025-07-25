@@ -54,7 +54,9 @@ func (h *sigStubHandler) ServeHTTP(w http.ResponseWriter, _ *http.Request) {
 }
 
 func GenerateRSAKey() (*rsa.PrivateKey, error) {
-	return rsa.GenerateKey(rand.Reader, 2048)
+	const bits = 2048
+	//nolint:wrapcheck // testhelper
+	return rsa.GenerateKey(rand.Reader, bits)
 }
 
 func MarshalPrivateKeyBase64(priv *rsa.PrivateKey) []byte {

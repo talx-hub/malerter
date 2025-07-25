@@ -62,11 +62,11 @@ func TestQueueCloseAndOpen(t *testing.T) {
 
 func TestQueuePopOrder(t *testing.T) {
 	q := queue.New[int]()
-	for i := 0; i < 5; i++ {
+	for i := range 5 {
 		q.Push(i)
 	}
 
-	for i := 0; i < 5; i++ {
+	for i := range 5 {
 		v := q.Pop()
 		if v != i {
 			t.Errorf("expected %d, got %d", i, v)
@@ -80,14 +80,14 @@ func TestQueueConcurrencySafety(t *testing.T) {
 
 	done := make(chan struct{})
 	go func() {
-		for i := 0; i < total; i++ {
+		for i := range total {
 			q.Push(i)
 		}
 		done <- struct{}{}
 	}()
 
 	go func() {
-		for i := 0; i < total; i++ {
+		for range total {
 			_ = q.Len()
 			_ = q.IsClosed()
 		}

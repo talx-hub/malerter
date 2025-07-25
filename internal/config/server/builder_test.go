@@ -90,3 +90,106 @@ func TestFileStorageDefault(t *testing.T) {
 	assert.Contains(t, path, ".bk")
 	assert.Greater(t, len(path), 10)
 }
+
+func TestBuilder_LoadFromFile_Success(t *testing.T) {
+	jsonData := `{
+		"crypto_key_path": "testkey.pem",
+		"database_dsn": "postgres://localhost/db",
+		"file_storage_path": "storage.bk",
+		"log_level": "debug",
+		"root_address": "0.0.0.0:9090",
+		"secret": "secretkey",
+		"store_interval": 120000000000,
+		"restore": true
+	}`
+
+	tmpFile, err := os.CreateTemp("", "config_*.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		_ = os.Remove(tmpFile.Name())
+	}()
+	_, _ = tmpFile.WriteString(jsonData)
+	_ = tmpFile.Close()
+
+	initial := &Builder{
+		Config:          tmpFile.Name(),
+		RootAddress:     "localhost:8080",
+		LogLevel:        "info",
+		FileStoragePath: "default.bk",
+		StoreInterval:   60 * time.Second,
+		Restore:         false,
+	}
+
+	updated, _ := initial.LoadFromFile().(*Builder)
+
+	if updated.RootAddress != "0.0.0.0:9090" {
+		t.Errorf("expected RootAddress to be updated, got %s", updated.RootAddress)
+	}
+	if updated.LogLevel != "debug" {
+		t.Errorf("expected LogLevel to be updated, got %s", updated.LogLevel)
+	}
+	if updated.StoreInterval != 120*time.Second {
+		t.Errorf("expected StoreInterval to be 120s, got %v", updated.StoreInterval)
+	}
+	if updated.Restore != true {
+		t.Errorf("expected Restore to be true, got %v", updated.Restore)
+	}
+	if updated.Secret != "secretkey" {
+		t.Errorf("expected Secret to be updated, got %s", updated.Secret)
+	}
+}
+
+func TestBuilder_LoadFromFile_FileDoesNotExist(t *testing.T) {
+	b := &Builder{
+		Config:        "/non/existent/path.json",
+		RootAddress:   "localhost:8080",
+		StoreInterval: 30 * time.Second,
+	}
+
+	result, _ := b.LoadFromFile().(*Builder)
+
+	if result.RootAddress != "localhost:8080" {
+		t.Errorf("expected RootAddress unchanged, got %s", result.RootAddress)
+	}
+	if result.StoreInterval != 30*time.Second {
+		t.Errorf("expected StoreInterval unchanged, got %v", result.StoreInterval)
+	}
+}
+
+func TestBuilder_LoadFromFile_PartialOverride(t *testing.T) {
+	jsonData := `{
+		"log_level": "error"
+	}`
+
+	tmpFile, err := os.CreateTemp("", "partial_config_*.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		_ = os.Remove(tmpFile.Name())
+	}()
+	_, _ = tmpFile.WriteString(jsonData)
+	_ = tmpFile.Close()
+
+	initial := &Builder{
+		Config:          tmpFile.Name(),
+		LogLevel:        "info",
+		RootAddress:     "localhost:8080",
+		StoreInterval:   45 * time.Second,
+		FileStoragePath: "default.bk",
+	}
+
+	updated, _ := initial.LoadFromFile().(*Builder)
+
+	if updated.LogLevel != "error" {
+		t.Errorf("expected LogLevel to be overridden to 'error', got %s", updated.LogLevel)
+	}
+	if updated.RootAddress != "localhost:8080" {
+		t.Errorf("expected RootAddress to stay the same, got %s", updated.RootAddress)
+	}
+	if updated.StoreInterval != 45*time.Second {
+		t.Errorf("expected StoreInterval to stay the same, got %v", updated.StoreInterval)
+	}
+}

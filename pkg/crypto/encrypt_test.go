@@ -11,12 +11,14 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
+	"github.com/talx-hub/malerter/internal/constants"
 	"github.com/talx-hub/malerter/pkg/crypto"
 )
 
 func generateRSAPublicKeyFile(t *testing.T) string {
 	t.Helper()
-	private, err := rsa.GenerateKey(rand.Reader, 1024)
+	const bits = 1024
+	private, err := rsa.GenerateKey(rand.Reader, bits)
 	assert.NoError(t, err)
 	pub := &private.PublicKey
 	pubDER := x509.MarshalPKCS1PublicKey(pub)
@@ -31,14 +33,16 @@ func generateRSAPublicKeyFile(t *testing.T) string {
 
 	err = pem.Encode(tmpFile, block)
 	assert.NoError(t, err)
-	tmpFile.Close()
+	_ = tmpFile.Close()
 
 	return tmpFile.Name()
 }
 
 func TestNewEncrypter_Success(t *testing.T) {
 	pubKeyFile := generateRSAPublicKeyFile(t)
-	defer os.Remove(pubKeyFile)
+	defer func() {
+		_ = os.Remove(pubKeyFile)
+	}()
 
 	encrypter, err := crypto.NewEncrypter(pubKeyFile)
 	assert.NoError(t, err)
@@ -54,8 +58,10 @@ func TestNewEncrypter_MissingPath(t *testing.T) {
 
 func TestNewEncrypter_InvalidFile(t *testing.T) {
 	tmp := filepath.Join(os.TempDir(), "invalid.pem")
-	os.WriteFile(tmp, []byte("not a key"), 0600)
-	defer os.Remove(tmp)
+	_ = os.WriteFile(tmp, []byte("not a key"), constants.PermissionFilePrivate)
+	defer func() {
+		_ = os.Remove(tmp)
+	}()
 
 	encrypter, err := crypto.NewEncrypter(tmp)
 	assert.Nil(t, encrypter)
@@ -64,7 +70,9 @@ func TestNewEncrypter_InvalidFile(t *testing.T) {
 
 func TestEncrypter_Encrypt_Success(t *testing.T) {
 	pubKeyFile := generateRSAPublicKeyFile(t)
-	defer os.Remove(pubKeyFile)
+	defer func() {
+		_ = os.Remove(pubKeyFile)
+	}()
 
 	encrypter, err := crypto.NewEncrypter(pubKeyFile)
 	assert.NoError(t, err)
@@ -73,6 +81,5 @@ func TestEncrypter_Encrypt_Success(t *testing.T) {
 	encrypted, err := encrypter.Encrypt(payload)
 	assert.NoError(t, err)
 
-	// Должен быть больше, чем просто payload
 	assert.True(t, len(encrypted) > len(payload))
 }

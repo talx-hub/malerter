@@ -24,10 +24,10 @@ import (
 type Sender struct {
 	client    *http.Client
 	log       *logger.ZeroLogger
+	encrypter *crypto.Encrypter
 	host      string
 	secret    string
 	compress  bool
-	encrypter *crypto.Encrypter
 }
 
 func (s *Sender) send(

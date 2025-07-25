@@ -11,6 +11,8 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+
+	"github.com/talx-hub/malerter/internal/constants"
 )
 
 func TestNewKey(t *testing.T) {
@@ -63,7 +65,7 @@ func writeTempPEMFile(t *testing.T, blockType string, derBytes []byte) string {
 		_, err = file.Write(pemBytes)
 	}
 	assert.NoError(t, err)
-	file.Close()
+	_ = file.Close()
 
 	return file.Name()
 }
@@ -74,7 +76,9 @@ func TestGetPrivateKey_Success(t *testing.T) {
 
 	der := x509.MarshalPKCS1PrivateKey(private)
 	path := writeTempPEMFile(t, "RSA PRIVATE KEY", der)
-	defer os.Remove(path)
+	defer func() {
+		_ = os.Remove(path)
+	}()
 
 	loadedKey, err := GetPrivateKey(path)
 	assert.NoError(t, err)
@@ -87,17 +91,21 @@ func TestGetPublicKey_Success(t *testing.T) {
 
 	pubDER := x509.MarshalPKCS1PublicKey(&private.PublicKey)
 	pubPath := writeTempPEMFile(t, PublicKeyTitle, pubDER)
-	defer os.Remove(pubPath)
+	defer func() {
+		_ = os.Remove(pubPath)
+	}()
 
 	pubKey, err := GetPublicKey(pubPath)
 	assert.NoError(t, err)
-	assert.Equal(t, private.PublicKey.N, pubKey.N)
+	assert.Equal(t, private.N, pubKey.N)
 }
 
 func TestGetPrivateKey_InvalidPEM(t *testing.T) {
 	path := filepath.Join(os.TempDir(), "invalid-priv.pem")
-	_ = os.WriteFile(path, []byte("not a key"), 0600)
-	defer os.Remove(path)
+	_ = os.WriteFile(path, []byte("not a key"), constants.PermissionFilePrivate)
+	defer func() {
+		_ = os.Remove(path)
+	}()
 
 	_, err := GetPrivateKey(path)
 	assert.Error(t, err)
@@ -105,8 +113,10 @@ func TestGetPrivateKey_InvalidPEM(t *testing.T) {
 
 func TestGetPublicKey_InvalidPEM(t *testing.T) {
 	path := filepath.Join(os.TempDir(), "invalid-pub.pem")
-	_ = os.WriteFile(path, []byte("not a key"), 0600)
-	defer os.Remove(path)
+	_ = os.WriteFile(path, []byte("not a key"), constants.PermissionFilePrivate)
+	defer func() {
+		_ = os.Remove(path)
+	}()
 
 	_, err := GetPublicKey(path)
 	assert.Error(t, err)

@@ -20,6 +20,7 @@ const (
 )
 
 const (
+	EnvConfig         = "CONFIG"
 	EnvCryptoKeyPath  = "CRYPTO_KEY"
 	EnvHost           = "ADDRESS"
 	EnvSecretKey      = "KEY"
@@ -35,16 +36,18 @@ func NewDirector() *config.Director {
 }
 
 type Builder struct {
-	CryptoKeyPath  string
-	LogLevel       string
-	Secret         string
-	ServerAddress  string
-	RateLimit      int
-	ReportInterval time.Duration
-	PollInterval   time.Duration
+	Config         string        `json:"config,omitempty"`
+	CryptoKeyPath  string        `json:"crypto_key_path,omitempty"`
+	LogLevel       string        `json:"log_level,omitempty"`
+	Secret         string        `json:"secret,omitempty"`
+	ServerAddress  string        `json:"server_address,omitempty"`
+	RateLimit      int           `json:"rate_limit,omitempty"`
+	ReportInterval time.Duration `json:"report_interval,omitempty"`
+	PollInterval   time.Duration `json:"poll_interval,omitempty"`
 }
 
 func (b *Builder) LoadFromFlags() config.Builder {
+	flag.StringVar(&b.Config, "config", constants.EmptyPath, "absolute path to config file")
 	flag.StringVar(&b.CryptoKeyPath, "crypto-key", constants.EmptyPath, "absolute path to public crypto key")
 	flag.StringVar(&b.LogLevel, "ll", constants.LogLevelDefault, "server log level")
 	flag.StringVar(&b.ServerAddress, "a", HostDefault, "alert-host address")
@@ -66,6 +69,9 @@ func (b *Builder) LoadFromFlags() config.Builder {
 }
 
 func (b *Builder) LoadFromEnv() config.Builder {
+	if cfg, found := os.LookupEnv(EnvConfig); found {
+		b.Config = cfg
+	}
 	if cryptoKeyPath, found := os.LookupEnv(EnvCryptoKeyPath); found {
 		b.CryptoKeyPath = cryptoKeyPath
 	}
@@ -96,6 +102,17 @@ func (b *Builder) LoadFromEnv() config.Builder {
 	if secret, found := os.LookupEnv(EnvSecretKey); found {
 		b.Secret = secret
 	}
+	return b
+}
+
+func (b *Builder) LoadFromFile() config.Builder {
+	newConfig := &Builder{}
+	err := config.ReadFromFile(b.Config, newConfig)
+	if err != nil {
+		return b
+	}
+	config.ReplaceValues(newConfig, b)
+
 	return b
 }
 
