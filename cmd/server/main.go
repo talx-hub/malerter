@@ -10,7 +10,7 @@ import (
 	"github.com/talx-hub/malerter/internal/api/handlers"
 	serverCfg "github.com/talx-hub/malerter/internal/config/server"
 	"github.com/talx-hub/malerter/internal/constants"
-	"github.com/talx-hub/malerter/internal/logger"
+	l "github.com/talx-hub/malerter/internal/logger"
 	"github.com/talx-hub/malerter/internal/model"
 	"github.com/talx-hub/malerter/internal/repository/db"
 	"github.com/talx-hub/malerter/internal/repository/memory"
@@ -27,7 +27,7 @@ func main() {
 		log.Fatal("unable to load server serverCfg")
 	}
 
-	zeroLogger, err := logger.New(cfg.LogLevel)
+	logger, err := l.New(cfg.LogLevel)
 	if err != nil {
 		log.Fatalf("unable to configure custom logger: %v", err)
 	}
@@ -38,11 +38,11 @@ func main() {
 	database, err := metricDB(
 		context.Background(),
 		cfg.DatabaseDSN,
-		zeroLogger,
+		logger,
 		&buffer)
 	if err != nil {
-		zeroLogger.Warn().Err(err).Msg("store metrics in memory")
-		storage = memory.New(zeroLogger, &buffer)
+		logger.Warn().Err(err).Msg("store metrics in memory")
+		storage = memory.New(logger, &buffer)
 	} else {
 		defer database.Close()
 		storage = database
@@ -50,14 +50,14 @@ func main() {
 
 	ctxBackup, cancelBackup := context.WithCancel(context.Background())
 	defer cancelBackup()
-	if bk := backup.New(&cfg, &buffer, storage, zeroLogger); bk != nil {
+	if bk := backup.New(&cfg, &buffer, storage, logger); bk != nil {
 		go bk.Run(ctxBackup)
 	} else {
-		zeroLogger.Warn().Msg("unable to load backup service")
+		logger.Warn().Msg("unable to load backup service")
 		buffer.Close()
 	}
 
-	zeroLogger.Info().
+	logger.Info().
 		Str(`"address"`, cfg.RootAddress).
 		Dur(`"backup interval"`, cfg.StoreInterval).
 		Bool(`"restore backup"`, cfg.Restore).
@@ -69,8 +69,8 @@ func main() {
 		Str("buildDate", buildinfo.Date).
 		Msg("Starting server")
 
-	chiRouter := router.New(zeroLogger, cfg.Secret)
-	chiRouter.SetRouter(handlers.NewHTTPHandler(storage, zeroLogger))
+	chiRouter := router.New(logger, cfg.Secret, cfg.CryptoKeyPath)
+	chiRouter.SetRouter(handlers.NewHTTPHandler(storage, logger))
 
 	srv := http.Server{
 		Addr:    cfg.RootAddress,
@@ -80,14 +80,14 @@ func main() {
 	idleConnectionsClosed := make(chan struct{})
 	go shutdown.IdleShutdown(
 		idleConnectionsClosed,
-		zeroLogger,
+		logger,
 		func(args ...any) error {
 			return shutdownServer(&srv, cancelBackup)
 		},
 	)
 
 	if err = srv.ListenAndServe(); !errors.Is(err, http.ErrServerClosed) {
-		zeroLogger.Fatal().
+		logger.Fatal().
 			Err(err).Msg("error during HTTP server ListenAndServe")
 	}
 	<-idleConnectionsClosed
@@ -96,14 +96,14 @@ func main() {
 func metricDB(
 	ctx context.Context,
 	dsn string,
-	loggr *logger.ZeroLogger,
+	logger *l.ZeroLogger,
 	buffer *queue.Queue[model.Metric],
 ) (*db.DB, error) {
 	if len(dsn) == 0 {
 		return nil, errors.New("DB DSN is empty")
 	}
 
-	database, err := db.New(ctx, dsn, loggr, buffer)
+	database, err := db.New(ctx, dsn, logger, buffer)
 	if err != nil {
 		return nil, fmt.Errorf("unable to create DB instance: %w", err)
 	}

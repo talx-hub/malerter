@@ -10,19 +10,31 @@ import (
 	"github.com/talx-hub/malerter/internal/api/middlewares"
 	"github.com/talx-hub/malerter/internal/constants"
 	"github.com/talx-hub/malerter/internal/logger"
+	"github.com/talx-hub/malerter/pkg/crypto"
 )
 
 type Router struct {
-	router *chi.Mux
-	log    *logger.ZeroLogger
-	secret string
+	decrypter *crypto.Decrypter
+	log       *logger.ZeroLogger
+	router    *chi.Mux
+	secret    string
 }
 
-func New(log *logger.ZeroLogger, secret string) *Router {
+func New(log *logger.ZeroLogger, secret, cryptoKeyPath string) *Router {
+	var decrypter *crypto.Decrypter
+	if cryptoKeyPath != constants.EmptyPath {
+		var err error
+		decrypter, err = crypto.NewDecrypter(cryptoKeyPath)
+		if err != nil {
+			log.Fatal().Err(err).Msg("failed to create decrypter")
+		}
+	}
+
 	return &Router{
-		router: chi.NewRouter(),
-		log:    log,
-		secret: secret,
+		decrypter: decrypter,
+		log:       log,
+		router:    chi.NewRouter(),
+		secret:    secret,
 	}
 }
 
@@ -61,6 +73,7 @@ func (r *Router) SetRouter(h Handler) {
 				With(middlewares.WriteSignature(r.secret)).
 				With(middlewares.Decompress(r.log)).
 				With(middlewares.Compress(r.log)).
+				With(middlewares.Decrypt(r.decrypter, r.log)).
 				Post("/", h.DumpMetricJSON)
 			c.Post("/{type}/{name}/{val}", h.DumpMetric)
 		})
@@ -75,6 +88,7 @@ func (r *Router) SetRouter(h Handler) {
 				With(middlewares.CheckSignature(r.secret)).
 				With(middlewares.Decompress(r.log)).
 				With(middlewares.Compress(r.log)).
+				With(middlewares.Decrypt(r.decrypter, r.log)).
 				Post("/", h.DumpMetricList)
 		})
 

@@ -30,7 +30,7 @@ func setupServices(t *testing.T) *httptest.Server {
 	rep := memory.New(zeroLogger, nil)
 	require.NotNil(t, rep)
 
-	chiRouter := router.New(zeroLogger, constants.NoSecret)
+	chiRouter := router.New(zeroLogger, constants.NoSecret, cfg.CryptoKeyPath)
 	chiRouter.SetRouter(handlers.NewHTTPHandler(rep, zeroLogger))
 	ts := httptest.NewServer(chiRouter.GetRouter())
 

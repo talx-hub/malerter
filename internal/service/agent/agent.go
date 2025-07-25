@@ -7,8 +7,10 @@ import (
 	"time"
 
 	"github.com/talx-hub/malerter/internal/config/agent"
+	"github.com/talx-hub/malerter/internal/constants"
 	"github.com/talx-hub/malerter/internal/logger"
 	"github.com/talx-hub/malerter/internal/model"
+	"github.com/talx-hub/malerter/pkg/crypto"
 )
 
 type Agent struct {
@@ -22,16 +24,26 @@ func NewAgent(
 	client *http.Client,
 	log *logger.ZeroLogger,
 ) *Agent {
+	var encrypter *crypto.Encrypter
+	if cfg.CryptoKeyPath != constants.EmptyPath {
+		var err error
+		encrypter, err = crypto.NewEncrypter(cfg.CryptoKeyPath)
+		if err != nil {
+			log.Error().Err(err).Msg("failed to add encryption to agent")
+		}
+	}
+
 	return &Agent{
 		config: cfg,
 		poller: Poller{
 			log: log},
 		sender: Sender{
-			host:     "http://" + cfg.ServerAddress,
-			client:   client,
-			compress: true,
-			log:      log,
-			secret:   cfg.Secret,
+			host:      "http://" + cfg.ServerAddress,
+			client:    client,
+			compress:  true,
+			log:       log,
+			secret:    cfg.Secret,
+			encrypter: encrypter,
 		},
 	}
 }

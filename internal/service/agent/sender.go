@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"strings"
 	"sync"
@@ -15,16 +16,18 @@ import (
 	"github.com/talx-hub/malerter/internal/logger"
 	"github.com/talx-hub/malerter/internal/model"
 	"github.com/talx-hub/malerter/pkg/compressor"
+	"github.com/talx-hub/malerter/pkg/crypto"
 	"github.com/talx-hub/malerter/pkg/retry"
 	"github.com/talx-hub/malerter/pkg/signature"
 )
 
 type Sender struct {
-	client   *http.Client
-	log      *logger.ZeroLogger
-	host     string
-	secret   string
-	compress bool
+	client    *http.Client
+	log       *logger.ZeroLogger
+	host      string
+	secret    string
+	compress  bool
+	encrypter *crypto.Encrypter
 }
 
 func (s *Sender) send(
@@ -111,6 +114,16 @@ func (s *Sender) batch(batch string) {
 	}
 	request.Header.Set(constants.KeyContentType, constants.ContentTypeJSON)
 	request.Header.Set(constants.KeyContentEncoding, constants.EncodingGzip)
+
+	if s.encrypter != nil {
+		encryptedPayload, err := s.encrypter.Encrypt(body.Bytes())
+		if err != nil {
+			s.log.Error().Err(err).Msgf(unableFormat, batch, s.host)
+			return
+		}
+		request.Body = io.NopCloser(bytes.NewBuffer(encryptedPayload))
+		request.Header.Set("X-Encrypted", "true")
+	}
 
 	wrappedDo := func(args ...any) (any, error) {
 		response, e := s.client.Do(request)
