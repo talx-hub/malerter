@@ -8,7 +8,6 @@ import (
 	"encoding/pem"
 	"errors"
 	"fmt"
-	"io"
 	"os"
 )
 
@@ -22,7 +21,7 @@ type Key []byte
 func NewKey() (Key, error) {
 	key, err := GenerateRandom(RandomSize)
 	if err != nil {
-		return key, fmt.Errorf("failed to generate random: %w", err)
+		return nil, fmt.Errorf("failed to generate random: %w", err)
 	}
 
 	return key, nil
@@ -58,22 +57,9 @@ const (
 	PublicKeyTitle = "RSA PUBLIC KEY"
 )
 
-func readFile(fname string) ([]byte, error) {
-	file, err := os.Open(fname)
-	if err != nil {
-		return nil, fmt.Errorf("failed to open file: %w", err)
-	}
-	defer func() {
-		err = file.Close()
-	}()
-	bytes, err := io.ReadAll(file)
-
-	return bytes, nil
-}
-
 func GetPrivateKey(fileName string) (*rsa.PrivateKey, error) {
 	op := "GetPrivateKey"
-	b, err := readFile(fileName)
+	b, err := os.ReadFile(fileName)
 	if err != nil {
 		return nil, fmt.Errorf("%s failed with an error: %w", op, err)
 	}
@@ -96,7 +82,7 @@ func GetPrivateKey(fileName string) (*rsa.PrivateKey, error) {
 }
 
 func GetPublicKey(publicKeyPath string) (*rsa.PublicKey, error) {
-	publicKeyBytes, err := readFile(publicKeyPath)
+	publicKeyBytes, err := os.ReadFile(publicKeyPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed with an error: %w", err)
 	}

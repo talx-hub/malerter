@@ -106,12 +106,12 @@ func (b *Builder) LoadFromEnv() config.Builder {
 }
 
 func (b *Builder) LoadFromFile() config.Builder {
-	newConfig := &Builder{}
-	err := config.ReadFromFile(b.Config, newConfig)
+	newConfig := *b
+	err := config.ReadFromFile(b.Config, &newConfig)
 	if err != nil {
 		return b
 	}
-	config.ReplaceValues(newConfig, b)
+	*b = newConfig
 
 	return b
 }

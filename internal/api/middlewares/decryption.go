@@ -21,6 +21,8 @@ func Decrypt(decryption *crypto.Decrypter, log *logger.ZeroLogger,
 			bodyBytes, err := io.ReadAll(r.Body)
 			if err != nil {
 				log.Warn().Err(err).Msg("failed to read body")
+				w.WriteHeader(http.StatusInternalServerError)
+				return
 			}
 			if err := r.Body.Close(); err != nil {
 				log.Error().Err(err).Msg("failed to close body")

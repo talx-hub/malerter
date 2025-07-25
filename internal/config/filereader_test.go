@@ -79,31 +79,3 @@ func TestReadFromFile_InvalidJSON(t *testing.T) {
 		t.Fatal("expected error on invalid JSON, got nil")
 	}
 }
-
-func TestReplaceValues(t *testing.T) {
-	source := &TestConfig{
-		StringField: "override",
-		IntField:    0, // zero value
-		BoolField:   true,
-		TimeField:   10 * time.Second,
-	}
-	target := &TestConfig{
-		StringField: "original",
-		IntField:    123,
-		BoolField:   false,
-		TimeField:   0,
-	}
-
-	config.ReplaceValues(source, target)
-
-	expected := &TestConfig{
-		StringField: "override",
-		IntField:    123, // should stay the same
-		BoolField:   true,
-		TimeField:   10 * time.Second,
-	}
-
-	if !reflect.DeepEqual(target, expected) {
-		t.Errorf("expected %+v, got %+v", expected, target)
-	}
-}

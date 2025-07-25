@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"net/http"
 	"strings"
 	"sync"
@@ -50,8 +49,20 @@ func (s *Sender) send(
 		}
 		m.Unlock()
 
-		batch := join(s.toJSONs(j))
-		s.batch(batch)
+		batch := []byte(join(s.toJSONs(j)))
+		compressed, err := s.tryCompress(batch)
+		if err != nil {
+			s.log.Error().Err(err).Msg("failed to send data")
+			continue
+		}
+		sig := s.trySign(compressed)
+		encrypted, err := s.tryEncrypt(compressed)
+		if err != nil {
+			s.log.Error().Err(err).Msg("failed to send data")
+			continue
+		}
+
+		s.batch(encrypted, sig, s.compress, s.encrypter != nil)
 	}
 }
 
@@ -82,46 +93,60 @@ func join(ch <-chan string) string {
 	return "[" + strings.Join(jsons, ",") + "]"
 }
 
-func (s *Sender) batch(batch string) {
-	const unableFormat = "unable to send json %s to %s"
-	var body *bytes.Buffer
-	var err error
-	if s.compress {
-		body, err = compressor.Compress([]byte(batch))
-		if err != nil {
-			s.log.Error().Err(err).
-				Msgf("unable to compress json %s", batch)
-			return
-		}
-	} else {
-		body = bytes.NewBufferString(batch)
+func (s *Sender) tryCompress(data []byte) ([]byte, error) {
+	if !s.compress {
+		return data, nil
 	}
+	body, err := compressor.Compress(data)
+	if err != nil {
+		s.log.Error().Err(err).
+			Msgf("unable to compress json %s", string(data))
+		return nil, fmt.Errorf("failed to compress data: %w", err)
+	}
+	return body.Bytes(), nil
+}
+
+func (s *Sender) trySign(data []byte) string {
+	if s.secret != constants.NoSecret {
+		return signature.Hash(data, s.secret)
+	}
+	return ""
+}
+
+func (s *Sender) tryEncrypt(data []byte) ([]byte, error) {
+	if s.encrypter == nil {
+		return data, nil
+	}
+	encryptedPayload, err := s.encrypter.Encrypt(data)
+	if err != nil {
+		s.log.Error().Err(err).Msg("failed to encrypt data")
+		return nil, fmt.Errorf("failed to encrypt data: %w", err)
+	}
+	return encryptedPayload, nil
+}
+
+func (s *Sender) batch(batch []byte, sig string, isCompressed, isEncrypted bool) {
+	const unableFormat = "unable to send json %s to %s"
 
 	ctx, cancel := context.WithTimeout(
 		context.Background(), constants.TimeoutAgentRequest)
 	defer cancel()
 
 	request, err := http.NewRequestWithContext(
-		ctx, http.MethodPost, s.host+"/updates/", body)
+		ctx, http.MethodPost, s.host+"/updates/", bytes.NewBuffer(batch))
 	if err != nil {
 		s.log.Error().Err(err).Msgf(unableFormat, batch, s.host)
 		return
 	}
-
-	if s.secret != constants.NoSecret {
-		sign := signature.Hash(body.Bytes(), s.secret)
-		request.Header.Set(constants.KeyHashSHA256, sign)
-	}
 	request.Header.Set(constants.KeyContentType, constants.ContentTypeJSON)
-	request.Header.Set(constants.KeyContentEncoding, constants.EncodingGzip)
 
-	if s.encrypter != nil {
-		encryptedPayload, err := s.encrypter.Encrypt(body.Bytes())
-		if err != nil {
-			s.log.Error().Err(err).Msgf(unableFormat, batch, s.host)
-			return
-		}
-		request.Body = io.NopCloser(bytes.NewBuffer(encryptedPayload))
+	if sig != "" {
+		request.Header.Set(constants.KeyHashSHA256, sig)
+	}
+	if isCompressed {
+		request.Header.Set(constants.KeyContentEncoding, constants.EncodingGzip)
+	}
+	if isEncrypted {
 		request.Header.Set("X-Encrypted", "true")
 	}
 
