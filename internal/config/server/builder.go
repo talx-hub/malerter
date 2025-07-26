@@ -20,6 +20,8 @@ const (
 
 const (
 	EnvAddress         = "ADDRESS"
+	EnvConfig          = "CONFIG"
+	EnvCryptoKeyPath   = "CRYPTO_KEY"
 	EnvDatabaseDSN     = "DATABASE_DSN"
 	EnvFileStoragePath = "FILE_STORAGE_PATH"
 	EnvLogLevel        = "LOG_LEVEL"
@@ -39,16 +41,20 @@ func NewDirector() *config.Director {
 }
 
 type Builder struct {
-	DatabaseDSN     string
-	FileStoragePath string
-	LogLevel        string
-	RootAddress     string
-	Secret          string
-	StoreInterval   time.Duration
-	Restore         bool
+	Config          string        `json:"config,omitempty"`
+	CryptoKeyPath   string        `json:"crypto_key_path,omitempty"`
+	DatabaseDSN     string        `json:"database_dsn,omitempty"`
+	FileStoragePath string        `json:"file_storage_path,omitempty"`
+	LogLevel        string        `json:"log_level,omitempty"`
+	RootAddress     string        `json:"root_address,omitempty"`
+	Secret          string        `json:"secret,omitempty"`
+	StoreInterval   time.Duration `json:"store_interval,omitempty"`
+	Restore         bool          `json:"restore,omitempty"`
 }
 
 func (b *Builder) LoadFromFlags() config.Builder {
+	flag.StringVar(&b.Config, "config", constants.EmptyPath, "absolute path to config file")
+	flag.StringVar(&b.CryptoKeyPath, "crypto-key", constants.EmptyPath, "absolute path to public crypto key")
 	flag.StringVar(&b.RootAddress, "a", AddressDefault, "server root address")
 	flag.StringVar(&b.LogLevel, "l", constants.LogLevelDefault, "server log level")
 	flag.StringVar(&b.FileStoragePath, "f", FileStorageDefault(), "backup file path")
@@ -64,6 +70,12 @@ func (b *Builder) LoadFromFlags() config.Builder {
 }
 
 func (b *Builder) LoadFromEnv() config.Builder {
+	if cfg, found := os.LookupEnv(EnvConfig); found {
+		b.Config = cfg
+	}
+	if cryptoKeyPath, found := os.LookupEnv(EnvCryptoKeyPath); found {
+		b.CryptoKeyPath = cryptoKeyPath
+	}
 	if a, found := os.LookupEnv(EnvAddress); found {
 		b.RootAddress = a
 	}
@@ -93,6 +105,17 @@ func (b *Builder) LoadFromEnv() config.Builder {
 	if k, found := os.LookupEnv(EnvSecretKey); found {
 		b.Secret = k
 	}
+	return b
+}
+
+func (b *Builder) LoadFromFile() config.Builder {
+	newConfig := *b
+	err := config.ReadFromFile(b.Config, &newConfig)
+	if err != nil {
+		return b
+	}
+	*b = newConfig
+
 	return b
 }
 

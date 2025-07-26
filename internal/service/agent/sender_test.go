@@ -158,7 +158,7 @@ func TestSender_batch_Success(t *testing.T) {
 	defer ts.Close()
 
 	s := newTestSender(ts.URL, "", false)
-	s.batch(`[{"id":"1"}]`)
+	s.batch([]byte(`[{"id":"1"}]`), "", false, false)
 
 	assert.Contains(t, string(receivedBody), `"id":"1"`)
 }
@@ -177,7 +177,9 @@ func TestSender_batch_Compress(t *testing.T) {
 	defer ts.Close()
 
 	s := newTestSender(ts.URL, "", true)
-	s.batch(`[{"id":"2"}]`)
+	compressed, err := s.tryCompress([]byte(`[{"id":"2"}]`))
+	require.NoError(t, err)
+	s.batch(compressed, "", true, false)
 }
 
 func TestSender_batch_Signature(t *testing.T) {
@@ -188,12 +190,14 @@ func TestSender_batch_Signature(t *testing.T) {
 	defer ts.Close()
 
 	s := newTestSender(ts.URL, "super-secret", false)
-	s.batch(`[{"name":"metric"}]`)
+	data := []byte(`[{"name":"metric"}]`)
+	sig := s.trySign(data)
+	s.batch(data, sig, false, false)
 }
 
 func TestSender_batch_HTTPError(t *testing.T) {
 	s := newTestSender("http://localhost:9999", "", false) // Unused port to simulate error
-	s.batch(`[{"bad":"json"}]`)
+	s.batch([]byte(`[{"bad":"json"}]`), "", false, false)
 	// No panic/assert — we just check it doesn't crash
 }
 

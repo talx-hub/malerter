@@ -49,7 +49,7 @@ func (testHandler) Ping(w http.ResponseWriter, r *http.Request) { stubHandler{"P
 
 func newTestServer() *httptest.Server {
 	log := logger.NewNopLogger()
-	r := router.New(log, testSecret)
+	r := router.New(log, testSecret, constants.EmptyPath)
 	r.SetRouter(testHandler{})
 	return httptest.NewServer(r.GetRouter())
 }

@@ -1,11 +1,17 @@
 package middlewares
 
 import (
+	"bytes"
+	"crypto/rand"
+	"crypto/rsa"
+	"crypto/x509"
+	"encoding/pem"
 	"io"
 	"net/http"
 
 	"github.com/talx-hub/malerter/internal/constants"
 	"github.com/talx-hub/malerter/internal/logger"
+	"github.com/talx-hub/malerter/pkg/crypto"
 )
 
 const key = "very-secret-super-key"
@@ -45,4 +51,24 @@ func (h *sigStubHandler) ServeHTTP(w http.ResponseWriter, _ *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+}
+
+func GenerateRSAKey() (*rsa.PrivateKey, error) {
+	const bits = 2048
+	//nolint:wrapcheck // testhelper
+	return rsa.GenerateKey(rand.Reader, bits)
+}
+
+func MarshalPrivateKeyBase64(priv *rsa.PrivateKey) []byte {
+	der := x509.MarshalPKCS1PrivateKey(priv)
+	block := &pem.Block{Type: "RSA PRIVATE KEY", Bytes: der}
+	pemData := pem.EncodeToMemory(block)
+	pemData = bytes.TrimPrefix(pemData, []byte("-----BEGIN RSA PRIVATE KEY-----\n"))
+	pemData = bytes.TrimSuffix(pemData, []byte("-----END RSA PRIVATE KEY-----\n"))
+	return pemData
+}
+
+func MarshalPublicKeyPEM(pub *rsa.PublicKey) []byte {
+	pubDER := x509.MarshalPKCS1PublicKey(pub)
+	return pem.EncodeToMemory(&pem.Block{Type: crypto.PublicKeyTitle, Bytes: pubDER})
 }

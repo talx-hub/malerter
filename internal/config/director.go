@@ -12,6 +12,7 @@ func (d *Director) Build() Config {
 	cfg, err := d.Builder.
 		LoadFromFlags().
 		LoadFromEnv().
+		LoadFromFile().
 		IsValid()
 
 	if err != nil {
