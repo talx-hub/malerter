@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"net"
 	"net/http"
 
 	"github.com/talx-hub/malerter/internal/api/handlers"
@@ -22,60 +23,28 @@ import (
 )
 
 func main() {
-	cfg, ok := serverCfg.NewDirector().Build().(serverCfg.Builder)
-	if !ok {
-		log.Fatal("unable to load server serverCfg")
-	}
-
-	logger, err := l.New(cfg.LogLevel)
+	cfg := loadConfig()
+	logger := initLogger(&cfg)
+	agentSubnet, err := parseTrustedSubnet(&cfg)
 	if err != nil {
-		log.Fatalf("unable to configure custom logger: %v", err)
+		logger.Fatal().Err(err).Msg("failed to parse trusted subnet")
+		return
 	}
 
-	var storage handlers.Storage
 	buffer := queue.New[model.Metric]()
 	defer buffer.Close()
-	database, err := metricDB(
-		context.Background(),
-		cfg.DatabaseDSN,
-		logger,
-		&buffer)
-	if err != nil {
-		logger.Warn().Err(err).Msg("store metrics in memory")
-		storage = memory.New(logger, &buffer)
-	} else {
-		defer database.Close()
-		storage = database
-	}
+
+	storage := initStorage(&cfg, logger, &buffer)
+	defer closeDatabase(storage)
 
 	ctxBackup, cancelBackup := context.WithCancel(context.Background())
 	defer cancelBackup()
-	if bk := backup.New(&cfg, &buffer, storage, logger); bk != nil {
-		go bk.Run(ctxBackup)
-	} else {
-		logger.Warn().Msg("unable to load backup service")
-		buffer.Close()
-	}
 
-	logger.Info().
-		Str(`"address"`, cfg.RootAddress).
-		Dur(`"backup interval"`, cfg.StoreInterval).
-		Bool(`"restore backup"`, cfg.Restore).
-		Str(`"backup path"`, cfg.FileStoragePath).
-		Bool(`"signature check"'`, cfg.Secret != constants.NoSecret).
-		Str(`dsn`, cfg.DatabaseDSN).
-		Str("buildVersion", buildinfo.Version).
-		Str("buildCommit", buildinfo.Commit).
-		Str("buildDate", buildinfo.Date).
-		Msg("Starting server")
+	startBackupService(ctxBackup, &cfg, &buffer, storage, logger)
 
-	chiRouter := router.New(logger, cfg.Secret, cfg.CryptoKeyPath)
-	chiRouter.SetRouter(handlers.NewHTTPHandler(storage, logger))
+	printStartupInfo(&cfg, logger)
 
-	srv := http.Server{
-		Addr:    cfg.RootAddress,
-		Handler: chiRouter.GetRouter(),
-	}
+	srv := initHTTPServer(&cfg, logger, agentSubnet, storage)
 
 	idleConnectionsClosed := make(chan struct{})
 	go shutdown.IdleShutdown(
@@ -86,11 +55,104 @@ func main() {
 		},
 	)
 
-	if err = srv.ListenAndServe(); !errors.Is(err, http.ErrServerClosed) {
-		logger.Fatal().
-			Err(err).Msg("error during HTTP server ListenAndServe")
+	if err := srv.ListenAndServe(); !errors.Is(err, http.ErrServerClosed) {
+		logger.Fatal().Err(err).Msg("error during HTTP server ListenAndServe")
 	}
 	<-idleConnectionsClosed
+}
+
+func loadConfig() serverCfg.Builder {
+	cfg, ok := serverCfg.NewDirector().Build().(serverCfg.Builder)
+	if !ok {
+		log.Fatal("unable to load server config")
+	}
+	return cfg
+}
+
+func initLogger(cfg *serverCfg.Builder) *l.ZeroLogger {
+	logger, err := l.New(cfg.LogLevel)
+	if err != nil {
+		log.Fatalf("unable to configure custom logger: %v", err)
+	}
+	return logger
+}
+
+func parseTrustedSubnet(cfg *serverCfg.Builder) (*net.IPNet, error) {
+	if cfg.TrustedSubnet == "" {
+		//nolint:nilnil // *net.IPNet == nil is useful
+		return nil, nil
+	}
+
+	_, subnet, err := net.ParseCIDR(cfg.TrustedSubnet)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse trusted subnet: %w", err)
+	}
+	return subnet, nil
+}
+
+func initStorage(
+	cfg *serverCfg.Builder,
+	logger *l.ZeroLogger,
+	buffer *queue.Queue[model.Metric],
+) handlers.Storage {
+	dbStorage, err := metricDB(context.Background(), cfg.DatabaseDSN, logger, buffer)
+	if err != nil {
+		logger.Warn().Err(err).Msg("store metrics in memory")
+		return memory.New(logger, buffer)
+	}
+	return dbStorage
+}
+
+func closeDatabase(storage handlers.Storage) {
+	if dbStorage, ok := storage.(*db.DB); ok {
+		dbStorage.Close()
+	}
+}
+
+func startBackupService(
+	ctx context.Context,
+	cfg *serverCfg.Builder,
+	buffer *queue.Queue[model.Metric],
+	storage handlers.Storage,
+	logger *l.ZeroLogger,
+) {
+	bk := backup.New(cfg, buffer, storage, logger)
+	if bk != nil {
+		go bk.Run(ctx)
+	} else {
+		logger.Warn().Msg("unable to load backup service")
+		buffer.Close()
+	}
+}
+
+func printStartupInfo(cfg *serverCfg.Builder, logger *l.ZeroLogger) {
+	logger.Info().
+		Str("address", cfg.RootAddress).
+		Str("trusted subnet", cfg.TrustedSubnet).
+		Dur("backup interval", cfg.StoreInterval).
+		Bool("restore backup", cfg.Restore).
+		Str("backup path", cfg.FileStoragePath).
+		Bool("signature check", cfg.Secret != constants.NoSecret).
+		Str("dsn", cfg.DatabaseDSN).
+		Str("buildVersion", buildinfo.Version).
+		Str("buildCommit", buildinfo.Commit).
+		Str("buildDate", buildinfo.Date).
+		Msg("Starting server")
+}
+
+func initHTTPServer(
+	cfg *serverCfg.Builder,
+	logger *l.ZeroLogger,
+	subnet *net.IPNet,
+	storage handlers.Storage,
+) http.Server {
+	chiRouter := router.New(logger, subnet, cfg.Secret, cfg.CryptoKeyPath)
+	chiRouter.SetRouter(handlers.NewHTTPHandler(storage, logger))
+
+	return http.Server{
+		Addr:    cfg.RootAddress,
+		Handler: chiRouter.GetRouter(),
+	}
 }
 
 func metricDB(
