@@ -32,12 +32,13 @@ func TestNewAgent(t *testing.T) {
 	log := logger.NewNopLogger()
 
 	a := NewAgent(cfg, client, log)
+	sender := a.sender.(*HTTPSender)
 
 	assert.Equal(t, cfg, a.config)
 	assert.NotNil(t, a.poller)
 	assert.NotNil(t, a.sender)
-	assert.Equal(t, "http://localhost:8080", a.sender.host)
-	assert.Equal(t, client, a.sender.client)
-	assert.True(t, a.sender.compress)
-	assert.Equal(t, "test-secret", a.sender.secret)
+	assert.Equal(t, "http://localhost:8080", sender.host)
+	assert.Equal(t, client, sender.client)
+	assert.True(t, sender.compress)
+	assert.Equal(t, "test-secret", sender.secret)
 }

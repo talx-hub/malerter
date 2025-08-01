@@ -13,6 +13,10 @@ import (
 	"github.com/talx-hub/malerter/pkg/crypto"
 )
 
+type Sender interface {
+	Send(jobs <-chan chan model.Metric, m *sync.Mutex, wg *sync.WaitGroup)
+}
+
 type Agent struct {
 	config *agent.Builder
 	poller Poller
@@ -37,7 +41,7 @@ func NewAgent(
 		config: cfg,
 		poller: Poller{
 			log: log},
-		sender: Sender{
+		sender: &HTTPSender{
 			host:      "http://" + cfg.ServerAddress,
 			client:    client,
 			compress:  true,
@@ -68,7 +72,7 @@ func (a *Agent) Run(ctx context.Context) {
 		case <-reportTicker.C:
 			for range a.config.RateLimit {
 				wg.Add(1)
-				go a.sender.send(jobs, &m, &wg)
+				go a.sender.Send(jobs, &m, &wg)
 			}
 		}
 	}

@@ -19,7 +19,7 @@ import (
 func TestToJSONs(t *testing.T) {
 	log, err := logger.New(constants.LogLevelDefault)
 	require.NoError(t, err)
-	sender := Sender{host: "", log: log}
+	sender := HTTPSender{host: "", log: log}
 
 	tests := []struct {
 		name    string
@@ -113,8 +113,8 @@ func TestJoin(t *testing.T) {
 	}
 }
 
-func newTestSender(serverURL string, secret string, compress bool) *Sender {
-	return &Sender{
+func newTestSender(serverURL string, secret string, compress bool) *HTTPSender {
+	return &HTTPSender{
 		client:   &http.Client{Timeout: 1 * time.Second},
 		log:      logger.NewNopLogger(),
 		host:     serverURL,
@@ -220,7 +220,7 @@ func TestSender_send(t *testing.T) {
 
 	s := newTestSender(ts.URL, "", false)
 	wg.Add(1)
-	go s.send(chJobs, &mu, &wg)
+	go s.Send(chJobs, &mu, &wg)
 
 	wg.Wait()
 }

@@ -20,7 +20,7 @@ import (
 	"github.com/talx-hub/malerter/pkg/signature"
 )
 
-type Sender struct {
+type HTTPSender struct {
 	client    *http.Client
 	log       *logger.ZeroLogger
 	encrypter *crypto.Encrypter
@@ -29,7 +29,7 @@ type Sender struct {
 	compress  bool
 }
 
-func (s *Sender) send(
+func (s *HTTPSender) Send(
 	jobs <-chan chan model.Metric, m *sync.Mutex, wg *sync.WaitGroup,
 ) {
 	defer wg.Done()
@@ -66,7 +66,7 @@ func (s *Sender) send(
 	}
 }
 
-func (s *Sender) toJSONs(ch <-chan model.Metric) chan string {
+func (s *HTTPSender) toJSONs(ch <-chan model.Metric) chan string {
 	jsons := make(chan string)
 
 	go func() {
@@ -93,7 +93,7 @@ func join(ch <-chan string) string {
 	return "[" + strings.Join(jsons, ",") + "]"
 }
 
-func (s *Sender) tryCompress(data []byte) ([]byte, error) {
+func (s *HTTPSender) tryCompress(data []byte) ([]byte, error) {
 	if !s.compress {
 		return data, nil
 	}
@@ -106,14 +106,14 @@ func (s *Sender) tryCompress(data []byte) ([]byte, error) {
 	return body.Bytes(), nil
 }
 
-func (s *Sender) trySign(data []byte) string {
+func (s *HTTPSender) trySign(data []byte) string {
 	if s.secret != constants.NoSecret {
 		return signature.Hash(data, s.secret)
 	}
 	return ""
 }
 
-func (s *Sender) tryEncrypt(data []byte) ([]byte, error) {
+func (s *HTTPSender) tryEncrypt(data []byte) ([]byte, error) {
 	if s.encrypter == nil {
 		return data, nil
 	}
@@ -125,7 +125,7 @@ func (s *Sender) tryEncrypt(data []byte) ([]byte, error) {
 	return encryptedPayload, nil
 }
 
-func (s *Sender) batch(batch []byte, sig string, isCompressed, isEncrypted bool) {
+func (s *HTTPSender) batch(batch []byte, sig string, isCompressed, isEncrypted bool) {
 	const unableFormat = "unable to send json %s to %s"
 
 	ctx, cancel := context.WithTimeout(

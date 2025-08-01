@@ -1,9 +1,12 @@
-package grpc
+package grpc_server
 
 import (
 	"context"
 	"errors"
+	"fmt"
+	"net"
 
+	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
@@ -78,4 +81,17 @@ func fromGRPC(pbMetric *proto.Metric) (model.Metric, error) {
 		return model.Metric{}, errors.New(
 			"metric has unspecified type")
 	}
+}
+
+func Serve(addr string, srv *Server) (net.Listener, error) {
+	lis, err := net.Listen("tcp", addr)
+	if err != nil {
+		errMsg := "failed to start listening " + addr
+		srv.log.Fatal().Err(err).Msg(errMsg)
+		return nil, fmt.Errorf("%s: %w", errMsg, err)
+	}
+	grpcServer := grpc.NewServer()
+	proto.RegisterMetricsServer(grpcServer, srv)
+
+	return lis, grpcServer.Serve(lis)
 }
