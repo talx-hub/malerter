@@ -29,41 +29,39 @@ type HTTPSender struct {
 	compress  bool
 }
 
-func (s *HTTPSender) Send(
-	jobs <-chan chan model.Metric, m *sync.Mutex, wg *sync.WaitGroup,
+func (s *HTTPSender) Send(ctx context.Context,
+	jobs <-chan chan model.Metric, wg *sync.WaitGroup,
 ) {
 	defer wg.Done()
 
 	for {
-		m.Lock()
-		jobCount := len(jobs)
-		if jobCount == 0 {
-			m.Unlock()
+		select {
+		case metrics, ok := <-jobs:
+			if !ok {
+				return
+			}
+			s.doJob(metrics)
+		case <-ctx.Done():
 			return
 		}
-
-		j, ok := <-jobs
-		if !ok {
-			m.Unlock()
-			return
-		}
-		m.Unlock()
-
-		batch := []byte(join(s.toJSONs(j)))
-		compressed, err := s.tryCompress(batch)
-		if err != nil {
-			s.log.Error().Err(err).Msg("failed to send data")
-			continue
-		}
-		sig := s.trySign(compressed)
-		encrypted, err := s.tryEncrypt(compressed)
-		if err != nil {
-			s.log.Error().Err(err).Msg("failed to send data")
-			continue
-		}
-
-		s.batch(encrypted, sig, s.compress, s.encrypter != nil)
 	}
+}
+
+func (s *HTTPSender) doJob(metrics chan model.Metric) {
+	batch := []byte(join(s.toJSONs(metrics)))
+	compressed, err := s.tryCompress(batch)
+	if err != nil {
+		s.log.Error().Err(err).Msg("failed to send data")
+		return
+	}
+	sig := s.trySign(compressed)
+	encrypted, err := s.tryEncrypt(compressed)
+	if err != nil {
+		s.log.Error().Err(err).Msg("failed to send data")
+		return
+	}
+
+	s.batch(encrypted, sig, s.compress, s.encrypter != nil)
 }
 
 func (s *HTTPSender) toJSONs(ch <-chan model.Metric) chan string {

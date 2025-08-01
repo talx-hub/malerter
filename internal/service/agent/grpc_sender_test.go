@@ -66,11 +66,15 @@ func TestGRPCSender_Send(t *testing.T) {
 	require.NoError(t, err)
 	wg := sync.WaitGroup{}
 	wg.Add(1)
-	go sender.Send(jobs, &sync.Mutex{}, &wg)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	go sender.Send(ctx, jobs, &wg)
 	defer func() {
 		err := sender.Close()
 		require.NoError(t, err)
 	}()
+	time.Sleep(2 * time.Second)
+	cancel()
 	wg.Wait()
 
 	result, err := storage.Get(context.Background())

@@ -41,40 +41,37 @@ func NewGRPCSender(log *logger.ZeroLogger, host, secret string, compress bool) (
 	}, nil
 }
 
-func (s *GRPCSender) Send(
-	jobs <-chan chan model.Metric, m *sync.Mutex, wg *sync.WaitGroup,
+func (s *GRPCSender) Send(ctx context.Context,
+	jobs <-chan chan model.Metric, wg *sync.WaitGroup,
 ) {
 	defer wg.Done()
 
 	for {
-		m.Lock()
-		jobCount := len(jobs)
-		if jobCount == 0 {
-			m.Unlock()
-			return
-		}
-
-		j, ok := <-jobs
-		if !ok {
-			m.Unlock()
-			return
-		}
-		m.Unlock()
-
-		batch := toProtoMetrics(j)
-
-		ctx, cancel := context.WithTimeout(
-			context.Background(), constants.TimeoutAgentRequest)
-		_, err := s.client.Batch(ctx, &proto.BatchRequest{
-			Metrics: batch,
-		})
-		cancel()
-		if err != nil {
-			if e, ok := status.FromError(err); ok {
-				s.log.Error().Err(e.Err()).Msg(e.Message())
-			} else {
-				s.log.Error().Err(err).Msg("failed to parse error")
+		select {
+		case metrics, ok := <-jobs:
+			if !ok {
+				return
 			}
+			s.doJob(metrics)
+		case <-ctx.Done():
+			return
+		}
+	}
+}
+
+func (s *GRPCSender) doJob(metrics chan model.Metric) {
+	batch := toProtoMetrics(metrics)
+	ctx, cancel := context.WithTimeout(
+		context.Background(), constants.TimeoutAgentRequest)
+	_, err := s.client.Batch(ctx, &proto.BatchRequest{
+		Metrics: batch,
+	})
+	cancel()
+	if err != nil {
+		if e, ok := status.FromError(err); ok {
+			s.log.Error().Err(e.Err()).Msg(e.Message())
+		} else {
+			s.log.Error().Err(err).Msg("failed to parse error")
 		}
 	}
 }

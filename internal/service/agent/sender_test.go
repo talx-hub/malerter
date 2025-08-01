@@ -1,6 +1,7 @@
 package agent
 
 import (
+	"context"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -202,7 +203,6 @@ func TestSender_batch_HTTPError(t *testing.T) {
 }
 
 func TestSender_send(t *testing.T) {
-	var mu sync.Mutex
 	var wg sync.WaitGroup
 
 	chMetrics := make(chan model.Metric, 1)
@@ -220,7 +220,11 @@ func TestSender_send(t *testing.T) {
 
 	s := newTestSender(ts.URL, "", false)
 	wg.Add(1)
-	go s.Send(chJobs, &mu, &wg)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	go s.Send(ctx, chJobs, &wg)
 
+	time.Sleep(2 * time.Second)
+	cancel()
 	wg.Wait()
 }

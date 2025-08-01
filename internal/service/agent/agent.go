@@ -14,7 +14,7 @@ import (
 )
 
 type Sender interface {
-	Send(jobs <-chan chan model.Metric, m *sync.Mutex, wg *sync.WaitGroup)
+	Send(ctx context.Context, jobs <-chan chan model.Metric, wg *sync.WaitGroup)
 }
 
 type Agent struct {
@@ -56,7 +56,6 @@ func (a *Agent) Run(ctx context.Context) {
 	pollTicker := time.NewTicker(a.config.PollInterval)
 	reportTicker := time.NewTicker(a.config.ReportInterval)
 	jobs := makeJobsCh(a.config)
-	var m sync.Mutex
 	var wg sync.WaitGroup
 	for {
 		select {
@@ -66,13 +65,11 @@ func (a *Agent) Run(ctx context.Context) {
 			return
 		case <-pollTicker.C:
 			temp := a.poller.update()
-			m.Lock()
 			jobs <- temp
-			m.Unlock()
 		case <-reportTicker.C:
 			for range a.config.RateLimit {
 				wg.Add(1)
-				go a.sender.Send(jobs, &m, &wg)
+				go a.sender.Send(ctx, jobs, &wg)
 			}
 		}
 	}
