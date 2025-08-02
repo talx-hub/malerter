@@ -27,8 +27,7 @@ type GRPCSender struct {
 
 func NewGRPCSender(log *logger.ZeroLogger, encrypter *crypto.Encrypter, host, secret string,
 ) (*GRPCSender, error) {
-	//nolint:staticcheck //i'm tired boss
-	conn, err := grpc.Dial(host, grpc.WithTransportCredentials(insecure.NewCredentials()),
+	conn, err := grpc.NewClient(host, grpc.WithTransportCredentials(insecure.NewCredentials()),
 		grpc.WithChainUnaryInterceptor(
 			NewSigningInterceptor(secret, log),
 			NewEncryptingInterceptor(encrypter, log),

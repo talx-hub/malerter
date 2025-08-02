@@ -81,6 +81,31 @@ func (s *Server) Batch(ctx context.Context, r *pb.BatchRequest,
 	return &pb.BatchResponse{}, nil
 }
 
+func (s *Server) ListenAndServe() error {
+	lis, err := net.Listen("tcp", s.address)
+	if err != nil {
+		errMsg := "failed to start listening " + s.address
+		s.log.Fatal().Err(err).Msg(errMsg)
+		return fmt.Errorf("%s: %w", errMsg, err)
+	}
+	s.grpcServer = grpc.NewServer(
+		grpc.ChainUnaryInterceptor(
+			NewCheckNetworkInterceptor(s.subnet, s.log),
+			NewVerifySignatureInterceptor(s.secret, s.log),
+			NewDecryptingInterceptor(s.decrypter, s.log),
+		))
+	pb.RegisterMetricsServer(s.grpcServer, s)
+
+	errCh := make(chan error)
+	defer close(errCh)
+
+	go func() {
+		errCh <- s.grpcServer.Serve(lis)
+	}()
+
+	return <-errCh
+}
+
 func (s *Server) Shutdown(ctx context.Context) error {
 	done := make(chan struct{})
 	defer close(done)
@@ -118,31 +143,6 @@ func fromGRPC(pbMetric *pb.Metric) (model.Metric, error) {
 		return model.Metric{}, errors.New(
 			"metric has unspecified type")
 	}
-}
-
-func (s *Server) ListenAndServe() error {
-	lis, err := net.Listen("tcp", s.address)
-	if err != nil {
-		errMsg := "failed to start listening " + s.address
-		s.log.Fatal().Err(err).Msg(errMsg)
-		return fmt.Errorf("%s: %w", errMsg, err)
-	}
-	s.grpcServer = grpc.NewServer(
-		grpc.ChainUnaryInterceptor(
-			NewCheckNetworkInterceptor(s.subnet, s.log),
-			NewVerifySignatureInterceptor(s.secret, s.log),
-			NewDecryptingInterceptor(s.decrypter, s.log),
-		))
-	pb.RegisterMetricsServer(s.grpcServer, s)
-
-	errCh := make(chan error)
-	defer close(errCh)
-
-	go func() {
-		errCh <- s.grpcServer.Serve(lis)
-	}()
-
-	return <-errCh
 }
 
 func NewDecryptingInterceptor(decrypter *crypto.Decrypter, log *logger.ZeroLogger,

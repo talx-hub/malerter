@@ -8,12 +8,17 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/metadata"
+	"google.golang.org/grpc/status"
 
 	"github.com/talx-hub/malerter/internal/constants"
 	"github.com/talx-hub/malerter/internal/logger"
 	"github.com/talx-hub/malerter/internal/model"
 	"github.com/talx-hub/malerter/internal/repository/memory"
 	"github.com/talx-hub/malerter/internal/service/server/customgrpc"
+	pb "github.com/talx-hub/malerter/proto"
 )
 
 func ptrFloat64(v float64) *float64 {
@@ -48,7 +53,7 @@ func TestGRPCSender_Send(t *testing.T) {
 	close(jobs)
 
 	storage := memory.New(logger.NewNopLogger(), nil)
-	const addr = ":8081"
+	const addr = "localhost:8081"
 	srv := customgrpc.New(
 		storage,
 		logger.NewNopLogger(),
@@ -94,4 +99,94 @@ func TestGRPCSender_Send(t *testing.T) {
 	result, err := storage.Get(context.Background())
 	require.NoError(t, err)
 	assert.Equal(t, wantCount, len(result))
+}
+func TestMarshalMessage_Valid(t *testing.T) {
+	msg1 := &pb.BatchRequest{}
+	data, err := marshalMessage(msg1)
+	require.NoError(t, err)
+	assert.Empty(t, data)
+
+	msg2 := &pb.BatchRequest{
+		Payload: &pb.BatchRequest_MetricList{
+			MetricList: &pb.MetricList{
+				Metrics: []*pb.Metric{
+					{}, {},
+				},
+			}},
+	}
+	data, err = marshalMessage(msg2)
+	require.NoError(t, err)
+	assert.NotEmpty(t, data)
+}
+
+func TestMarshalMessage_Invalid(t *testing.T) {
+	data, err := marshalMessage("not a proto message")
+	assert.Error(t, err)
+	assert.Nil(t, data)
+}
+
+func TestSigningInterceptor_NoSecret(t *testing.T) {
+	log := logger.NewNopLogger()
+	interceptor := NewSigningInterceptor(constants.NoSecret, log)
+
+	called := false
+	err := interceptor(context.Background(), "/pb.Metrics/Send", &pb.BatchRequest{}, nil, nil,
+		func(ctx context.Context, method string, req, reply interface{}, cc *grpc.ClientConn, opts ...grpc.CallOption) error {
+			called = true
+			return nil
+		},
+	)
+
+	require.NoError(t, err)
+	assert.True(t, called)
+}
+
+func TestSigningInterceptor_WithSecret(t *testing.T) {
+	log := logger.NewNopLogger()
+	interceptor := NewSigningInterceptor("my-secret", log)
+
+	var signature string
+	err := interceptor(context.Background(), "/pb.Metrics/Send", &pb.BatchRequest{}, nil, nil,
+		func(ctx context.Context, method string, req, reply interface{}, cc *grpc.ClientConn, opts ...grpc.CallOption) error {
+			md, ok := metadata.FromOutgoingContext(ctx)
+			require.True(t, ok)
+			signature = md.Get("signature")[0]
+			return nil
+		},
+	)
+
+	require.NoError(t, err)
+	assert.NotEmpty(t, signature)
+}
+
+func TestSigningInterceptor_MarshalFails(t *testing.T) {
+	log := logger.NewNopLogger()
+	interceptor := NewSigningInterceptor("secret", log)
+
+	err := interceptor(context.Background(), "/pb.Metrics/Send", "invalid req", nil, nil,
+		func(ctx context.Context, method string, req, reply interface{}, cc *grpc.ClientConn, opts ...grpc.CallOption) error {
+			return nil
+		},
+	)
+
+	require.Error(t, err)
+	s, ok := status.FromError(err)
+	require.True(t, ok)
+	assert.Equal(t, codes.Internal, s.Code())
+}
+
+func TestEncryptingInterceptor_NilEncrypter(t *testing.T) {
+	log := logger.NewNopLogger()
+	interceptor := NewEncryptingInterceptor(nil, log)
+
+	called := false
+	err := interceptor(context.Background(), "/pb.Metrics/Send", &pb.BatchRequest{}, nil, nil,
+		func(ctx context.Context, method string, req, reply interface{}, cc *grpc.ClientConn, opts ...grpc.CallOption) error {
+			called = true
+			return nil
+		},
+	)
+
+	require.NoError(t, err)
+	assert.True(t, called)
 }
