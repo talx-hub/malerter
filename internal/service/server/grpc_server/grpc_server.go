@@ -36,9 +36,10 @@ func New(storage Storage, log *logger.ZeroLogger) *Server {
 
 func (s Server) Batch(ctx context.Context, r *proto.BatchRequest,
 ) (*proto.BatchResponse, error) {
-	metrics := make([]model.Metric, len(r.Metrics))
+	protoMetrics := r.GetMetricList().GetMetrics()
+	metrics := make([]model.Metric, len(protoMetrics))
 	var j = 0
-	for _, protoMetric := range r.Metrics {
+	for _, protoMetric := range protoMetrics {
 		m, err := fromGRPC(protoMetric)
 		if err != nil {
 			s.log.Error().Err(err).Msg("failed to parse metric")

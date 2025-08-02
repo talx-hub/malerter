@@ -16,8 +16,15 @@ message Metric {
   int64 delta = 4;
 }
 
-message BatchRequest{
+message MetricList {
   repeated Metric metrics = 1;
+}
+
+message BatchRequest{
+  oneof payload{
+    MetricList metric_list = 1;
+    bytes encrypted_payload = 2;
+  }
 }
 
 message BatchResponse{

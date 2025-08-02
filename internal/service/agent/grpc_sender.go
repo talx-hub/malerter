@@ -23,13 +23,14 @@ type GRPCSender struct {
 	client pb.MetricsClient
 	conn   *grpc.ClientConn
 	log    *logger.ZeroLogger
-	secret string
 }
 
-func NewGRPCSender(log *logger.ZeroLogger, host, secret string) (*GRPCSender, error) {
+func NewGRPCSender(log *logger.ZeroLogger, encrypter *crypto.Encrypter, host, secret string,
+) (*GRPCSender, error) {
 	conn, err := grpc.Dial(host, grpc.WithTransportCredentials(insecure.NewCredentials()),
 		grpc.WithChainUnaryInterceptor(
 			NewSigningInterceptor(secret, log),
+			NewEncryptingInterceptor(encrypter, log),
 		))
 	if err != nil {
 		errMsg := "failed to init gRPC connection"
@@ -42,7 +43,6 @@ func NewGRPCSender(log *logger.ZeroLogger, host, secret string) (*GRPCSender, er
 		conn:   conn,
 		client: client,
 		log:    log,
-		secret: secret,
 	}, nil
 }
 
@@ -70,7 +70,11 @@ func (s *GRPCSender) doTheJob(metrics chan model.Metric) {
 	ctx, cancel := context.WithTimeout(
 		context.Background(), constants.TimeoutAgentRequest)
 	_, err := s.client.Batch(ctx, &pb.BatchRequest{
-		Metrics: batch,
+		Payload: &pb.BatchRequest_MetricList{
+			MetricList: &pb.MetricList{
+				Metrics: batch,
+			},
+		},
 	})
 	cancel()
 	if err != nil {
@@ -124,13 +128,13 @@ func (s *GRPCSender) Close() error {
 }
 
 func marshalMessage(grpcRequest any) ([]byte, error) {
-	protoMsg, ok := grpcRequest.(pb.BatchRequest)
+	protoMsg, ok := grpcRequest.(*pb.BatchRequest)
 	if !ok {
 		return nil, fmt.Errorf(
 			"request does not implement pb.Message: got %T", grpcRequest)
 	}
 
-	data, err := proto.Marshal(&protoMsg)
+	data, err := proto.Marshal(protoMsg)
 	if err != nil {
 		return nil, fmt.Errorf(
 			"error in marshalling req to bytes: %v", err)
@@ -149,6 +153,10 @@ func NewSigningInterceptor(secret string, log *logger.ZeroLogger,
 		invoker grpc.UnaryInvoker,
 		opts ...grpc.CallOption,
 	) error {
+		if secret == constants.NoSecret {
+			return invoker(ctx, method, req, reply, cc, opts...)
+		}
+
 		data, err := marshalMessage(req)
 		if err != nil {
 			log.Error().Err(err).Msg("signing failed")
@@ -161,6 +169,48 @@ func NewSigningInterceptor(secret string, log *logger.ZeroLogger,
 		mdCtx := metadata.NewOutgoingContext(ctx, md)
 
 		return invoker(mdCtx, method, req, reply, cc, opts...)
+	}
+
+	return interceptor
+}
+
+func NewEncryptingInterceptor(encrypter *crypto.Encrypter, log *logger.ZeroLogger,
+) grpc.UnaryClientInterceptor {
+	interceptor := func(
+		ctx context.Context,
+		method string,
+		req, reply interface{},
+		cc *grpc.ClientConn,
+		invoker grpc.UnaryInvoker,
+		opts ...grpc.CallOption,
+	) error {
+		if encrypter == nil {
+			return invoker(ctx, method, req, reply, cc, opts...)
+		}
+
+		data, err := marshalMessage(req)
+		if err != nil {
+			log.Error().Err(err).Msg("encrypting failed")
+			return status.Errorf(
+				codes.Internal, "encrypting failed: %v", err)
+		}
+
+		encrypted, err := tryEncrypt(data, encrypter)
+		if err != nil {
+			log.Error().Err(err).Msg("encrypting failed")
+			return status.Errorf(
+				codes.Internal, "encrypting failed: %v", err)
+		}
+		md := metadata.Pairs("x-encrypted", "true")
+		mdCtx := metadata.NewOutgoingContext(ctx, md)
+
+		return invoker(mdCtx, method,
+			&pb.BatchRequest{
+				Payload: &pb.BatchRequest_EncryptedPayload{
+					EncryptedPayload: encrypted,
+				},
+			},
+			reply, cc, opts...)
 	}
 
 	return interceptor

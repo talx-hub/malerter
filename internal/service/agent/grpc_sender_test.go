@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/talx-hub/malerter/internal/constants"
 	"github.com/talx-hub/malerter/internal/logger"
 	"github.com/talx-hub/malerter/internal/model"
 	"github.com/talx-hub/malerter/internal/repository/memory"
@@ -34,6 +35,7 @@ func TestGRPCSender_Send(t *testing.T) {
 		{Name: "m6", Type: model.MetricTypeCounter, Delta: ptrInt64(42)},
 		{Name: "m7", Type: model.MetricTypeCounter, Delta: ptrInt64(21)},
 	}
+	wantCount := 6
 
 	var j = make(chan model.Metric, len(metrics))
 	for _, m := range metrics {
@@ -57,11 +59,12 @@ func TestGRPCSender_Send(t *testing.T) {
 		}()
 	}()
 
-	time.Sleep(5 * time.Second)
+	time.Sleep(1 * time.Second)
 	sender, err := NewGRPCSender(
 		logger.NewNopLogger(),
+		nil,
 		addr,
-		"",
+		constants.NoSecret,
 	)
 	require.NoError(t, err)
 	wg := sync.WaitGroup{}
@@ -73,11 +76,11 @@ func TestGRPCSender_Send(t *testing.T) {
 		err := sender.Close()
 		require.NoError(t, err)
 	}()
-	time.Sleep(2 * time.Second)
+	time.Sleep(200 * time.Millisecond)
 	cancel()
 	wg.Wait()
 
 	result, err := storage.Get(context.Background())
 	require.NoError(t, err)
-	assert.Equal(t, len(metrics)-2, len(result))
+	assert.Equal(t, wantCount, len(result))
 }

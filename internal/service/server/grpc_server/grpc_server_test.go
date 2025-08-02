@@ -30,8 +30,9 @@ func TestServer_Batch(t *testing.T) {
 
 	client := proto.NewMetricsClient(conn)
 	tests := []struct {
-		metrics  []*proto.Metric
-		wantCode codes.Code
+		metrics     []*proto.Metric
+		wantMetrics int
+		wantCode    codes.Code
 	}{
 		{
 			metrics: []*proto.Metric{
@@ -40,7 +41,8 @@ func TestServer_Batch(t *testing.T) {
 				{Name: "m3", Type: proto.Metric_Counter, Value: 42},
 				{Name: "m3", Type: proto.Metric_Counter, Value: 42},
 			},
-			wantCode: codes.OK},
+			wantMetrics: 3,
+			wantCode:    codes.OK},
 	}
 
 	storage := memory.New(logger.NewNopLogger(), nil)
@@ -53,12 +55,18 @@ func TestServer_Batch(t *testing.T) {
 			require.NoError(t, err)
 		}()
 	}()
-	time.Sleep(5 * time.Second)
+	time.Sleep(1 * time.Second)
 
 	for _, tt := range tests {
 		_, err := client.Batch(context.Background(), &proto.BatchRequest{
-			Metrics: tt.metrics,
+			Payload: &proto.BatchRequest_MetricList{
+				MetricList: &proto.MetricList{
+					Metrics: tt.metrics,
+				},
+			},
 		})
 		assert.NoError(t, err)
+		result, err := storage.Get(context.Background())
+		assert.Equal(t, tt.wantMetrics, len(result))
 	}
 }

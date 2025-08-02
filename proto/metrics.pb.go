@@ -7,12 +7,11 @@
 package proto
 
 import (
+	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
+	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	reflect "reflect"
 	sync "sync"
 	unsafe "unsafe"
-
-	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
-	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 )
 
 const (
@@ -139,16 +138,64 @@ func (x *Metric) GetDelta() int64 {
 	return 0
 }
 
-type BatchRequest struct {
+type MetricList struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Metrics       []*Metric              `protobuf:"bytes,1,rep,name=metrics,proto3" json:"metrics,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
+func (x *MetricList) Reset() {
+	*x = MetricList{}
+	mi := &file_proto_metrics_proto_msgTypes[1]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *MetricList) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*MetricList) ProtoMessage() {}
+
+func (x *MetricList) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_metrics_proto_msgTypes[1]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use MetricList.ProtoReflect.Descriptor instead.
+func (*MetricList) Descriptor() ([]byte, []int) {
+	return file_proto_metrics_proto_rawDescGZIP(), []int{1}
+}
+
+func (x *MetricList) GetMetrics() []*Metric {
+	if x != nil {
+		return x.Metrics
+	}
+	return nil
+}
+
+type BatchRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Types that are valid to be assigned to Payload:
+	//
+	//	*BatchRequest_MetricList
+	//	*BatchRequest_EncryptedPayload
+	Payload       isBatchRequest_Payload `protobuf_oneof:"payload"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
 func (x *BatchRequest) Reset() {
 	*x = BatchRequest{}
-	mi := &file_proto_metrics_proto_msgTypes[1]
+	mi := &file_proto_metrics_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -160,7 +207,7 @@ func (x *BatchRequest) String() string {
 func (*BatchRequest) ProtoMessage() {}
 
 func (x *BatchRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_metrics_proto_msgTypes[1]
+	mi := &file_proto_metrics_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -173,15 +220,49 @@ func (x *BatchRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BatchRequest.ProtoReflect.Descriptor instead.
 func (*BatchRequest) Descriptor() ([]byte, []int) {
-	return file_proto_metrics_proto_rawDescGZIP(), []int{1}
+	return file_proto_metrics_proto_rawDescGZIP(), []int{2}
 }
 
-func (x *BatchRequest) GetMetrics() []*Metric {
+func (x *BatchRequest) GetPayload() isBatchRequest_Payload {
 	if x != nil {
-		return x.Metrics
+		return x.Payload
 	}
 	return nil
 }
+
+func (x *BatchRequest) GetMetricList() *MetricList {
+	if x != nil {
+		if x, ok := x.Payload.(*BatchRequest_MetricList); ok {
+			return x.MetricList
+		}
+	}
+	return nil
+}
+
+func (x *BatchRequest) GetEncryptedPayload() []byte {
+	if x != nil {
+		if x, ok := x.Payload.(*BatchRequest_EncryptedPayload); ok {
+			return x.EncryptedPayload
+		}
+	}
+	return nil
+}
+
+type isBatchRequest_Payload interface {
+	isBatchRequest_Payload()
+}
+
+type BatchRequest_MetricList struct {
+	MetricList *MetricList `protobuf:"bytes,1,opt,name=metric_list,json=metricList,proto3,oneof"`
+}
+
+type BatchRequest_EncryptedPayload struct {
+	EncryptedPayload []byte `protobuf:"bytes,2,opt,name=encrypted_payload,json=encryptedPayload,proto3,oneof"`
+}
+
+func (*BatchRequest_MetricList) isBatchRequest_Payload() {}
+
+func (*BatchRequest_EncryptedPayload) isBatchRequest_Payload() {}
 
 type BatchResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
@@ -192,7 +273,7 @@ type BatchResponse struct {
 
 func (x *BatchResponse) Reset() {
 	*x = BatchResponse{}
-	mi := &file_proto_metrics_proto_msgTypes[2]
+	mi := &file_proto_metrics_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -204,7 +285,7 @@ func (x *BatchResponse) String() string {
 func (*BatchResponse) ProtoMessage() {}
 
 func (x *BatchResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_metrics_proto_msgTypes[2]
+	mi := &file_proto_metrics_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -217,7 +298,7 @@ func (x *BatchResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BatchResponse.ProtoReflect.Descriptor instead.
 func (*BatchResponse) Descriptor() ([]byte, []int) {
-	return file_proto_metrics_proto_rawDescGZIP(), []int{2}
+	return file_proto_metrics_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *BatchResponse) GetError() string {
@@ -240,9 +321,15 @@ const file_proto_metrics_proto_rawDesc = "" +
 	"\x04Type\x12\x0f\n" +
 	"\vUnspecified\x10\x00\x12\t\n" +
 	"\x05Gauge\x10\x01\x12\v\n" +
-	"\aCounter\x10\x02\"9\n" +
-	"\fBatchRequest\x12)\n" +
-	"\ametrics\x18\x01 \x03(\v2\x0f.metrics.MetricR\ametrics\"%\n" +
+	"\aCounter\x10\x02\"7\n" +
+	"\n" +
+	"MetricList\x12)\n" +
+	"\ametrics\x18\x01 \x03(\v2\x0f.metrics.MetricR\ametrics\"\x80\x01\n" +
+	"\fBatchRequest\x126\n" +
+	"\vmetric_list\x18\x01 \x01(\v2\x13.metrics.MetricListH\x00R\n" +
+	"metricList\x12-\n" +
+	"\x11encrypted_payload\x18\x02 \x01(\fH\x00R\x10encryptedPayloadB\t\n" +
+	"\apayload\"%\n" +
 	"\rBatchResponse\x12\x14\n" +
 	"\x05error\x18\x01 \x01(\tR\x05error2A\n" +
 	"\aMetrics\x126\n" +
@@ -261,23 +348,25 @@ func file_proto_metrics_proto_rawDescGZIP() []byte {
 }
 
 var file_proto_metrics_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_proto_metrics_proto_msgTypes = make([]protoimpl.MessageInfo, 3)
+var file_proto_metrics_proto_msgTypes = make([]protoimpl.MessageInfo, 4)
 var file_proto_metrics_proto_goTypes = []any{
 	(Metric_Type)(0),      // 0: metrics.Metric.Type
 	(*Metric)(nil),        // 1: metrics.Metric
-	(*BatchRequest)(nil),  // 2: metrics.BatchRequest
-	(*BatchResponse)(nil), // 3: metrics.BatchResponse
+	(*MetricList)(nil),    // 2: metrics.MetricList
+	(*BatchRequest)(nil),  // 3: metrics.BatchRequest
+	(*BatchResponse)(nil), // 4: metrics.BatchResponse
 }
 var file_proto_metrics_proto_depIdxs = []int32{
 	0, // 0: metrics.Metric.type:type_name -> metrics.Metric.Type
-	1, // 1: metrics.BatchRequest.metrics:type_name -> metrics.Metric
-	2, // 2: metrics.Metrics.Batch:input_type -> metrics.BatchRequest
-	3, // 3: metrics.Metrics.Batch:output_type -> metrics.BatchResponse
-	3, // [3:4] is the sub-list for method output_type
-	2, // [2:3] is the sub-list for method input_type
-	2, // [2:2] is the sub-list for extension type_name
-	2, // [2:2] is the sub-list for extension extendee
-	0, // [0:2] is the sub-list for field type_name
+	1, // 1: metrics.MetricList.metrics:type_name -> metrics.Metric
+	2, // 2: metrics.BatchRequest.metric_list:type_name -> metrics.MetricList
+	3, // 3: metrics.Metrics.Batch:input_type -> metrics.BatchRequest
+	4, // 4: metrics.Metrics.Batch:output_type -> metrics.BatchResponse
+	4, // [4:5] is the sub-list for method output_type
+	3, // [3:4] is the sub-list for method input_type
+	3, // [3:3] is the sub-list for extension type_name
+	3, // [3:3] is the sub-list for extension extendee
+	0, // [0:3] is the sub-list for field type_name
 }
 
 func init() { file_proto_metrics_proto_init() }
@@ -285,13 +374,17 @@ func file_proto_metrics_proto_init() {
 	if File_proto_metrics_proto != nil {
 		return
 	}
+	file_proto_metrics_proto_msgTypes[2].OneofWrappers = []any{
+		(*BatchRequest_MetricList)(nil),
+		(*BatchRequest_EncryptedPayload)(nil),
+	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_proto_metrics_proto_rawDesc), len(file_proto_metrics_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   3,
+			NumMessages:   4,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
