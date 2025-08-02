@@ -2,6 +2,7 @@ package agent
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"sync"
 	"time"
@@ -15,6 +16,7 @@ import (
 
 type Sender interface {
 	Send(ctx context.Context, jobs <-chan chan model.Metric, wg *sync.WaitGroup)
+	Close() error
 }
 
 type Agent struct {
@@ -25,7 +27,6 @@ type Agent struct {
 
 func NewAgent(
 	cfg *agent.Builder,
-	client *http.Client,
 	log *logger.ZeroLogger,
 ) *Agent {
 	var encrypter *crypto.Encrypter
@@ -36,6 +37,25 @@ func NewAgent(
 			log.Error().Err(err).Msg("failed to add encryption to agent")
 		}
 	}
+	if cfg.UseGRPC {
+		sender, err := NewGRPCSender(
+			log,
+			encrypter,
+			cfg.ServerAddress,
+			cfg.Secret,
+		)
+		if err != nil {
+			log.Fatal().Err(err).Msg("failed to start grpc agent")
+			return nil
+		}
+
+		return &Agent{
+			config: cfg,
+			poller: Poller{
+				log: log},
+			sender: sender,
+		}
+	}
 
 	return &Agent{
 		config: cfg,
@@ -43,7 +63,7 @@ func NewAgent(
 			log: log},
 		sender: &HTTPSender{
 			host:      "http://" + cfg.ServerAddress,
-			client:    client,
+			client:    &http.Client{},
 			compress:  true,
 			log:       log,
 			secret:    cfg.Secret,
@@ -73,6 +93,14 @@ func (a *Agent) Run(ctx context.Context) {
 			}
 		}
 	}
+}
+
+func (a *Agent) Close() error {
+	err := a.sender.Close()
+	if err != nil {
+		return fmt.Errorf("failed to close agent: %w", err)
+	}
+	return nil
 }
 
 func makeJobsCh(cfg *agent.Builder) chan chan model.Metric {

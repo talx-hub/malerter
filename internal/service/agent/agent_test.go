@@ -1,7 +1,6 @@
 package agent
 
 import (
-	"net/http"
 	"testing"
 	"time"
 
@@ -28,17 +27,15 @@ func TestNewAgent(t *testing.T) {
 		ReportInterval: 2 * time.Second,
 		Secret:         "test-secret",
 	}
-	client := &http.Client{}
 	log := logger.NewNopLogger()
 
-	a := NewAgent(cfg, client, log)
+	a := NewAgent(cfg, log)
 	sender := a.sender.(*HTTPSender)
 
 	assert.Equal(t, cfg, a.config)
 	assert.NotNil(t, a.poller)
 	assert.NotNil(t, a.sender)
 	assert.Equal(t, "http://localhost:8080", sender.host)
-	assert.Equal(t, client, sender.client)
 	assert.True(t, sender.compress)
 	assert.Equal(t, "test-secret", sender.secret)
 }

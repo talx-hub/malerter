@@ -136,3 +136,7 @@ func (s *HTTPSender) batch(batch []byte, sig string, isCompressed, isEncrypted b
 		return
 	}
 }
+
+func (s *HTTPSender) Close() error {
+	return nil
+}
