@@ -192,7 +192,7 @@ func TestSender_batch_Signature(t *testing.T) {
 
 	s := newTestSender(ts.URL, "super-secret", false)
 	data := []byte(`[{"name":"metric"}]`)
-	sig := s.trySign(data)
+	sig := trySign(data, s.secret)
 	s.batch(data, sig, false, false)
 }
 

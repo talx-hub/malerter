@@ -6,38 +6,43 @@ import (
 	"sync"
 
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/proto"
 
 	"github.com/talx-hub/malerter/internal/constants"
 	"github.com/talx-hub/malerter/internal/logger"
 	"github.com/talx-hub/malerter/internal/model"
-	"github.com/talx-hub/malerter/proto"
+	"github.com/talx-hub/malerter/pkg/crypto"
+	pb "github.com/talx-hub/malerter/proto"
 )
 
 type GRPCSender struct {
-	client   proto.MetricsClient
-	conn     *grpc.ClientConn
-	log      *logger.ZeroLogger
-	secret   string
-	compress bool
+	client pb.MetricsClient
+	conn   *grpc.ClientConn
+	log    *logger.ZeroLogger
+	secret string
 }
 
-func NewGRPCSender(log *logger.ZeroLogger, host, secret string, compress bool) (*GRPCSender, error) {
-	conn, err := grpc.Dial(host, grpc.WithTransportCredentials(insecure.NewCredentials()))
+func NewGRPCSender(log *logger.ZeroLogger, host, secret string) (*GRPCSender, error) {
+	conn, err := grpc.Dial(host, grpc.WithTransportCredentials(insecure.NewCredentials()),
+		grpc.WithChainUnaryInterceptor(
+			NewSigningInterceptor(secret, log),
+		))
 	if err != nil {
 		errMsg := "failed to init gRPC connection"
 		log.Fatal().Err(err).Msg(errMsg)
 		return nil, fmt.Errorf("%s: %w", errMsg, err)
 	}
-	client := proto.NewMetricsClient(conn)
+	client := pb.NewMetricsClient(conn)
 
 	return &GRPCSender{
-		conn:     conn,
-		client:   client,
-		log:      log,
-		secret:   secret,
-		compress: compress,
+		conn:   conn,
+		client: client,
+		log:    log,
+		secret: secret,
 	}, nil
 }
 
@@ -52,18 +57,19 @@ func (s *GRPCSender) Send(ctx context.Context,
 			if !ok {
 				return
 			}
-			s.doJob(metrics)
+			s.doTheJob(metrics)
 		case <-ctx.Done():
 			return
 		}
 	}
 }
 
-func (s *GRPCSender) doJob(metrics chan model.Metric) {
+func (s *GRPCSender) doTheJob(metrics chan model.Metric) {
 	batch := toProtoMetrics(metrics)
+
 	ctx, cancel := context.WithTimeout(
 		context.Background(), constants.TimeoutAgentRequest)
-	_, err := s.client.Batch(ctx, &proto.BatchRequest{
+	_, err := s.client.Batch(ctx, &pb.BatchRequest{
 		Metrics: batch,
 	})
 	cancel()
@@ -76,27 +82,27 @@ func (s *GRPCSender) doJob(metrics chan model.Metric) {
 	}
 }
 
-func toProtoMetrics(ch <-chan model.Metric) []*proto.Metric {
-	batch := make([]*proto.Metric, len(ch))
+func toProtoMetrics(ch <-chan model.Metric) []*pb.Metric {
+	batch := make([]*pb.Metric, len(ch))
 	var i int
 	for m := range ch {
-		protoM := &proto.Metric{}
+		protoM := &pb.Metric{}
 		protoM.Name = m.Name
 		switch m.Type {
 		case model.MetricTypeCounter:
 			if m.Delta == nil {
 				continue
 			}
-			protoM.Type = proto.Metric_Counter
+			protoM.Type = pb.Metric_Counter
 			protoM.Delta = *m.Delta
 		case model.MetricTypeGauge:
 			if m.Value == nil {
 				continue
 			}
-			protoM.Type = proto.Metric_Gauge
+			protoM.Type = pb.Metric_Gauge
 			protoM.Value = *m.Value
 		default:
-			protoM.Type = proto.Metric_Unspecified
+			protoM.Type = pb.Metric_Unspecified
 		}
 
 		batch[i] = protoM
@@ -115,4 +121,47 @@ func (s *GRPCSender) Close() error {
 	}
 
 	return nil
+}
+
+func marshalMessage(grpcRequest any) ([]byte, error) {
+	protoMsg, ok := grpcRequest.(pb.BatchRequest)
+	if !ok {
+		return nil, fmt.Errorf(
+			"request does not implement pb.Message: got %T", grpcRequest)
+	}
+
+	data, err := proto.Marshal(&protoMsg)
+	if err != nil {
+		return nil, fmt.Errorf(
+			"error in marshalling req to bytes: %v", err)
+	}
+
+	return data, nil
+}
+
+func NewSigningInterceptor(secret string, log *logger.ZeroLogger,
+) grpc.UnaryClientInterceptor {
+	interceptor := func(
+		ctx context.Context,
+		method string,
+		req, reply interface{},
+		cc *grpc.ClientConn,
+		invoker grpc.UnaryInvoker,
+		opts ...grpc.CallOption,
+	) error {
+		data, err := marshalMessage(req)
+		if err != nil {
+			log.Error().Err(err).Msg("signing failed")
+			return status.Errorf(
+				codes.Internal, "signing failed: %v", err)
+		}
+
+		sig := trySign(data, secret)
+		md := metadata.Pairs("signature", sig)
+		mdCtx := metadata.NewOutgoingContext(ctx, md)
+
+		return invoker(mdCtx, method, req, reply, cc, opts...)
+	}
+
+	return interceptor
 }

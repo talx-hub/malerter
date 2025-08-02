@@ -61,7 +61,7 @@ func TestGRPCSender_Send(t *testing.T) {
 	sender, err := NewGRPCSender(
 		logger.NewNopLogger(),
 		addr,
-		"", false,
+		"",
 	)
 	require.NoError(t, err)
 	wg := sync.WaitGroup{}
