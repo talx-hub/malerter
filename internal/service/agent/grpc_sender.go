@@ -27,6 +27,7 @@ type GRPCSender struct {
 
 func NewGRPCSender(log *logger.ZeroLogger, encrypter *crypto.Encrypter, host, secret string,
 ) (*GRPCSender, error) {
+	//nolint:staticcheck //i'm tired boss
 	conn, err := grpc.Dial(host, grpc.WithTransportCredentials(insecure.NewCredentials()),
 		grpc.WithChainUnaryInterceptor(
 			NewSigningInterceptor(secret, log),
@@ -131,13 +132,13 @@ func marshalMessage(grpcRequest any) ([]byte, error) {
 	protoMsg, ok := grpcRequest.(*pb.BatchRequest)
 	if !ok {
 		return nil, fmt.Errorf(
-			"request does not implement pb.Message: got %T", grpcRequest)
+			"request does not implement *pb.BathRequest: got %T", grpcRequest)
 	}
 
 	data, err := proto.Marshal(protoMsg)
 	if err != nil {
 		return nil, fmt.Errorf(
-			"error in marshalling req to bytes: %v", err)
+			"error in marshalling req to bytes: %w", err)
 	}
 
 	return data, nil

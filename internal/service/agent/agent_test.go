@@ -30,7 +30,7 @@ func TestNewAgent(t *testing.T) {
 	log := logger.NewNopLogger()
 
 	a := NewAgent(cfg, log)
-	sender := a.sender.(*HTTPSender)
+	sender, _ := a.sender.(*HTTPSender)
 
 	assert.Equal(t, cfg, a.config)
 	assert.NotNil(t, a.poller)

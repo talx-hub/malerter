@@ -77,7 +77,7 @@ func Test_initHTTPServer(t *testing.T) {
 	buffer := queue.New[model.Metric]()
 	defer buffer.Close()
 	storage := initStorage(&cfg, logger, &buffer)
-	srv := initHTTPServer(&cfg, logger, nil, storage)
+	srv := initHTTPServer(&cfg, logger, nil, storage, nil)
 	assert.Equal(t, cfg.RootAddress, srv.Addr)
 	assert.NotNil(t, srv.Handler)
 }

@@ -16,6 +16,7 @@ const (
 	AddressDefault       = "localhost:8080"
 	RestoreDefault       = true
 	StoreIntervalDefault = 300
+	UseGRPCDefault       = false
 )
 
 const (
@@ -29,6 +30,7 @@ const (
 	EnvSecretKey       = "KEY"
 	EnvStoreInterval   = "STORE_INTERVAL"
 	EnvTrustedSubnet   = "TRUSTED_SUBNET"
+	EnvUseGRPC         = "USE_GRPC"
 )
 
 func FileStorageDefault() string {
@@ -52,6 +54,7 @@ type Builder struct {
 	TrustedSubnet   string        `json:"trusted_subnet"`
 	StoreInterval   time.Duration `json:"store_interval,omitempty"`
 	Restore         bool          `json:"restore,omitempty"`
+	UseGRPC         bool          `json:"use_grpc,omitempty"`
 }
 
 func (b *Builder) LoadFromFlags() config.Builder {
@@ -65,6 +68,7 @@ func (b *Builder) LoadFromFlags() config.Builder {
 	var backupInterval int64
 	flag.Int64Var(&backupInterval, "i", StoreIntervalDefault, "interval in seconds of repository backup")
 	flag.BoolVar(&b.Restore, "r", RestoreDefault, "restore backup while start")
+	flag.BoolVar(&b.UseGRPC, "grpc", UseGRPCDefault, "use grpc protocol instead of http")
 	flag.StringVar(&b.DatabaseDSN, "d", "", "database source name")
 	flag.StringVar(&b.Secret, "k", constants.NoSecret, "secret key")
 	flag.Parse()
@@ -111,6 +115,9 @@ func (b *Builder) LoadFromEnv() config.Builder {
 	}
 	if subnet, found := os.LookupEnv(EnvTrustedSubnet); found {
 		b.TrustedSubnet = subnet
+	}
+	if _, found := os.LookupEnv(EnvUseGRPC); found {
+		b.UseGRPC = true
 	}
 	return b
 }

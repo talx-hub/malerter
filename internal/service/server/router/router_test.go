@@ -55,7 +55,7 @@ func newTestServer(t *testing.T) *httptest.Server {
 	_, subnet, err := net.ParseCIDR(testTrustedSubnet)
 	require.NoError(t, err)
 
-	r := router.New(logger.NewNopLogger(), subnet, testSecret, constants.EmptyPath)
+	r := router.New(logger.NewNopLogger(), subnet, testSecret, nil)
 	r.SetRouter(testHandler{})
 	return httptest.NewServer(r.GetRouter())
 }
@@ -110,7 +110,7 @@ func TestRouter_HappyRoutes(t *testing.T) {
 }
 
 func TestRouter_not_check_network(t *testing.T) {
-	r := router.New(logger.NewNopLogger(), nil, testSecret, constants.EmptyPath)
+	r := router.New(logger.NewNopLogger(), nil, testSecret, nil)
 	r.SetRouter(testHandler{})
 	srv := httptest.NewServer(r.GetRouter())
 	defer srv.Close()

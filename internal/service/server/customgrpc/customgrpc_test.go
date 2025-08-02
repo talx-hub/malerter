@@ -1,4 +1,4 @@
-package grpc_server
+package customgrpc
 
 import (
 	"context"
@@ -11,13 +11,19 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials/insecure"
 
+	"github.com/talx-hub/malerter/internal/constants"
 	"github.com/talx-hub/malerter/internal/logger"
 	"github.com/talx-hub/malerter/internal/repository/memory"
 	"github.com/talx-hub/malerter/proto"
 )
 
+const addr = ":8085"
+
 func initConn() (*grpc.ClientConn, error) {
-	return grpc.Dial(":8082", grpc.WithTransportCredentials(insecure.NewCredentials()))
+	//nolint:staticcheck,wrapcheck //i'm tired boss
+	return grpc.Dial(
+		addr,
+		grpc.WithTransportCredentials(insecure.NewCredentials()))
 }
 
 func TestServer_Batch(t *testing.T) {
@@ -46,14 +52,23 @@ func TestServer_Batch(t *testing.T) {
 	}
 
 	storage := memory.New(logger.NewNopLogger(), nil)
-	srv := New(storage, logger.NewNopLogger())
+	srv := New(
+		storage,
+		logger.NewNopLogger(),
+		nil,
+		addr,
+		constants.NoSecret,
+		nil)
+	defer func() {
+		ctxTO, cancel := context.WithTimeout(
+			context.Background(),
+			constants.TimeoutShutdown)
+		defer cancel()
+		_ = srv.Shutdown(ctxTO)
+	}()
 	go func() {
-		lis, err := Serve(":8082", srv)
+		err := srv.ListenAndServe()
 		require.NoError(t, err)
-		defer func() {
-			err = lis.Close()
-			require.NoError(t, err)
-		}()
 	}()
 	time.Sleep(1 * time.Second)
 
@@ -65,8 +80,9 @@ func TestServer_Batch(t *testing.T) {
 				},
 			},
 		})
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		result, err := storage.Get(context.Background())
+		require.NoError(t, err)
 		assert.Equal(t, tt.wantMetrics, len(result))
 	}
 }

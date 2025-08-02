@@ -22,16 +22,12 @@ type Router struct {
 	secret    string
 }
 
-func New(log *logger.ZeroLogger, ipNet *net.IPNet, secret, cryptoKeyPath string) *Router {
-	var decrypter *crypto.Decrypter
-	if cryptoKeyPath != constants.EmptyPath {
-		var err error
-		decrypter, err = crypto.NewDecrypter(cryptoKeyPath)
-		if err != nil {
-			log.Fatal().Err(err).Msg("failed to create decrypter")
-		}
-	}
-
+func New(
+	log *logger.ZeroLogger,
+	ipNet *net.IPNet,
+	secret string,
+	decrypter *crypto.Decrypter,
+) *Router {
 	return &Router{
 		decrypter: decrypter,
 		log:       log,

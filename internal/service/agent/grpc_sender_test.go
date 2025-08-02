@@ -13,7 +13,7 @@ import (
 	"github.com/talx-hub/malerter/internal/logger"
 	"github.com/talx-hub/malerter/internal/model"
 	"github.com/talx-hub/malerter/internal/repository/memory"
-	"github.com/talx-hub/malerter/internal/service/server/grpc_server"
+	"github.com/talx-hub/malerter/internal/service/server/customgrpc"
 )
 
 func ptrFloat64(v float64) *float64 {
@@ -48,15 +48,26 @@ func TestGRPCSender_Send(t *testing.T) {
 	close(jobs)
 
 	storage := memory.New(logger.NewNopLogger(), nil)
-	srv := grpc_server.New(storage, logger.NewNopLogger())
 	const addr = ":8081"
-	go func() {
-		lis, err := grpc_server.Serve(addr, srv)
+	srv := customgrpc.New(
+		storage,
+		logger.NewNopLogger(),
+		nil,
+		addr,
+		constants.NoSecret,
+		nil,
+	)
+	defer func() {
+		ctxTO, cancel := context.WithTimeout(
+			context.Background(),
+			constants.TimeoutShutdown)
+		defer cancel()
+		err := srv.Shutdown(ctxTO)
 		require.NoError(t, err)
-		defer func() {
-			err = lis.Close()
-			require.NoError(t, err)
-		}()
+	}()
+	go func() {
+		err := srv.ListenAndServe()
+		require.NoError(t, err)
 	}()
 
 	time.Sleep(1 * time.Second)

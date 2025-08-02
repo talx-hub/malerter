@@ -17,10 +17,17 @@ import (
 	"github.com/talx-hub/malerter/internal/repository/memory"
 	"github.com/talx-hub/malerter/internal/service/server/backup"
 	"github.com/talx-hub/malerter/internal/service/server/buildinfo"
+	"github.com/talx-hub/malerter/internal/service/server/customgrpc"
 	"github.com/talx-hub/malerter/internal/service/server/router"
+	"github.com/talx-hub/malerter/pkg/crypto"
 	"github.com/talx-hub/malerter/pkg/queue"
 	"github.com/talx-hub/malerter/pkg/shutdown"
 )
+
+type Server interface {
+	ListenAndServe() error
+	Shutdown(context.Context) error
+}
 
 func main() {
 	cfg := loadConfig()
@@ -44,19 +51,33 @@ func main() {
 
 	printStartupInfo(&cfg, logger)
 
-	srv := initHTTPServer(&cfg, logger, agentSubnet, storage)
+	var decrypter *crypto.Decrypter
+	if cfg.CryptoKeyPath != constants.EmptyPath {
+		var err error
+		decrypter, err = crypto.NewDecrypter(cfg.CryptoKeyPath)
+		if err != nil {
+			logger.Fatal().Err(err).Msg("failed to create decrypter")
+		}
+	}
+
+	var srv Server
+	if cfg.UseGRPC {
+		srv = initGRPCServer(&cfg, logger, agentSubnet, storage, decrypter)
+	} else {
+		srv = initHTTPServer(&cfg, logger, agentSubnet, storage, decrypter)
+	}
 
 	idleConnectionsClosed := make(chan struct{})
 	go shutdown.IdleShutdown(
 		idleConnectionsClosed,
 		logger,
 		func(args ...any) error {
-			return shutdownServer(&srv, cancelBackup)
+			return shutdownServer(srv, cancelBackup)
 		},
 	)
 
-	if err := srv.ListenAndServe(); !errors.Is(err, http.ErrServerClosed) {
-		logger.Fatal().Err(err).Msg("error during HTTP server ListenAndServe")
+	if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+		logger.Fatal().Err(err).Msg("error during server ListenAndServe")
 	}
 	<-idleConnectionsClosed
 }
@@ -145,14 +166,26 @@ func initHTTPServer(
 	logger *l.ZeroLogger,
 	subnet *net.IPNet,
 	storage handlers.Storage,
-) http.Server {
-	chiRouter := router.New(logger, subnet, cfg.Secret, cfg.CryptoKeyPath)
+	decrypter *crypto.Decrypter,
+) *http.Server {
+	chiRouter := router.New(logger, subnet, cfg.Secret, decrypter)
 	chiRouter.SetRouter(handlers.NewHTTPHandler(storage, logger))
 
-	return http.Server{
+	return &http.Server{
 		Addr:    cfg.RootAddress,
 		Handler: chiRouter.GetRouter(),
 	}
+}
+
+func initGRPCServer(
+	cfg *serverCfg.Builder,
+	logger *l.ZeroLogger,
+	subnet *net.IPNet,
+	storage handlers.Storage,
+	decrypter *crypto.Decrypter,
+) *customgrpc.Server {
+	return customgrpc.New(
+		storage, logger, decrypter, cfg.RootAddress, cfg.Secret, subnet)
 }
 
 func metricDB(
@@ -172,7 +205,7 @@ func metricDB(
 	return database, nil
 }
 
-func shutdownServer(s *http.Server, cancelBackup context.CancelFunc) error {
+func shutdownServer(s Server, cancelBackup context.CancelFunc) error {
 	ctxServer, cancelSrv := context.WithTimeout(
 		context.Background(), constants.TimeoutShutdown)
 	defer cancelSrv()
