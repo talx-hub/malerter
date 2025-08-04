@@ -12,6 +12,7 @@ import (
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/proto"
 
+	"github.com/talx-hub/malerter/internal/api/handlers"
 	"github.com/talx-hub/malerter/internal/constants"
 	"github.com/talx-hub/malerter/internal/logger"
 	"github.com/talx-hub/malerter/internal/model"
@@ -21,13 +22,9 @@ import (
 	pb "github.com/talx-hub/malerter/proto"
 )
 
-type Storage interface {
-	Batch(context.Context, []model.Metric) error
-}
-
 type Server struct {
 	pb.UnimplementedMetricsServer
-	storage    Storage
+	storage    handlers.Storage
 	log        *logger.ZeroLogger
 	decrypter  *crypto.Decrypter
 	grpcServer *grpc.Server
@@ -37,7 +34,7 @@ type Server struct {
 }
 
 func New(
-	storage Storage,
+	storage handlers.Storage,
 	log *logger.ZeroLogger,
 	decrypter *crypto.Decrypter,
 	address, secret string,
@@ -55,33 +52,16 @@ func New(
 
 func (s *Server) Batch(ctx context.Context, r *pb.BatchRequest,
 ) (*pb.BatchResponse, error) {
-	protoMetrics := r.GetMetricList().GetMetrics()
-	metrics := make([]model.Metric, len(protoMetrics))
-	var j = 0
-	for _, protoMetric := range protoMetrics {
-		m, err := fromGRPC(protoMetric)
-		if err != nil {
-			s.log.Error().Err(err).Msg("failed to parse metric")
-			continue
-		}
-		metrics[j] = m
-		j++
-	}
-	metrics = metrics[:j]
+	metrics := s.parseMetrics(r)
 
-	ctxTO, cancel := context.WithTimeout(ctx, constants.TimeoutStorage)
-	defer cancel()
-	wrappedBatch := func(args ...any) (any, error) {
-		return nil, s.storage.Batch(ctxTO, metrics)
+	if err := s.storeMetrics(ctx, metrics); err != nil {
+		return nil, status.Errorf(codes.Internal, "storage error: %v", err)
 	}
-	if _, err := db.WithConnectionCheck(wrappedBatch); err != nil {
-		s.log.Error().Err(err).Msg("failed to batch metrics in repo")
-		return nil, status.Errorf(codes.Internal, "failed to batch metrics in repo: %v", err)
-	}
+
 	return &pb.BatchResponse{}, nil
 }
 
-func (s *Server) ListenAndServe() error {
+func (s *Server) Start() error {
 	lis, err := net.Listen("tcp", s.address)
 	if err != nil {
 		errMsg := "failed to start listening " + s.address
@@ -106,7 +86,7 @@ func (s *Server) ListenAndServe() error {
 	return <-errCh
 }
 
-func (s *Server) Shutdown(ctx context.Context) error {
+func (s *Server) Stop(ctx context.Context) error {
 	done := make(chan struct{})
 	defer close(done)
 
@@ -121,6 +101,36 @@ func (s *Server) Shutdown(ctx context.Context) error {
 	case <-done:
 		return nil
 	}
+}
+
+func (s *Server) parseMetrics(r *pb.BatchRequest) []model.Metric {
+	protoMetrics := r.GetMetricList().GetMetrics()
+	metrics := make([]model.Metric, len(protoMetrics))
+	var j = 0
+	for _, protoMetric := range protoMetrics {
+		m, err := fromGRPC(protoMetric)
+		if err != nil {
+			s.log.Error().Err(err).Msg("failed to parse metric")
+			continue
+		}
+		metrics[j] = m
+		j++
+	}
+	return metrics[:j]
+}
+
+func (s *Server) storeMetrics(ctx context.Context, batch []model.Metric) error {
+	ctxTO, cancel := context.WithTimeout(ctx, constants.TimeoutStorage)
+	defer cancel()
+	wrappedBatch := func(args ...any) (any, error) {
+		return nil, s.storage.Batch(ctxTO, batch)
+	}
+	if _, err := db.WithConnectionCheck(wrappedBatch); err != nil {
+		errMsg := "failed to store batch in repo"
+		s.log.Error().Err(err).Msg(errMsg)
+		return status.Errorf(codes.Internal, "%s: %v", errMsg, err)
+	}
+	return nil
 }
 
 func fromGRPC(pbMetric *pb.Metric) (model.Metric, error) {

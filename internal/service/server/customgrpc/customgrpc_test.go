@@ -69,10 +69,10 @@ func TestServer_Batch(t *testing.T) {
 			context.Background(),
 			constants.TimeoutShutdown)
 		defer cancel()
-		_ = srv.Shutdown(ctxTO)
+		_ = srv.Stop(ctxTO)
 	}()
 	go func() {
-		err := srv.ListenAndServe()
+		err := srv.Start()
 		require.NoError(t, err)
 	}()
 	time.Sleep(1 * time.Second)

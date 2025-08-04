@@ -5,8 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"log"
-	"net"
-	"net/http"
 
 	"github.com/talx-hub/malerter/internal/api/handlers"
 	serverCfg "github.com/talx-hub/malerter/internal/config/server"
@@ -15,28 +13,16 @@ import (
 	"github.com/talx-hub/malerter/internal/model"
 	"github.com/talx-hub/malerter/internal/repository/db"
 	"github.com/talx-hub/malerter/internal/repository/memory"
+	"github.com/talx-hub/malerter/internal/service/server"
 	"github.com/talx-hub/malerter/internal/service/server/backup"
 	"github.com/talx-hub/malerter/internal/service/server/buildinfo"
-	"github.com/talx-hub/malerter/internal/service/server/customgrpc"
-	"github.com/talx-hub/malerter/internal/service/server/router"
-	"github.com/talx-hub/malerter/pkg/crypto"
 	"github.com/talx-hub/malerter/pkg/queue"
 	"github.com/talx-hub/malerter/pkg/shutdown"
 )
 
-type Server interface {
-	ListenAndServe() error
-	Shutdown(context.Context) error
-}
-
 func main() {
 	cfg := loadConfig()
 	logger := initLogger(&cfg)
-	agentSubnet, err := parseTrustedSubnet(&cfg)
-	if err != nil {
-		logger.Fatal().Err(err).Msg("failed to parse trusted subnet")
-		return
-	}
 
 	buffer := queue.New[model.Metric]()
 	defer buffer.Close()
@@ -46,25 +32,14 @@ func main() {
 
 	ctxBackup, cancelBackup := context.WithCancel(context.Background())
 	defer cancelBackup()
-
 	startBackupService(ctxBackup, &cfg, &buffer, storage, logger)
 
 	printStartupInfo(&cfg, logger)
 
-	var decrypter *crypto.Decrypter
-	if cfg.CryptoKeyPath != constants.EmptyPath {
-		var err error
-		decrypter, err = crypto.NewDecrypter(cfg.CryptoKeyPath)
-		if err != nil {
-			logger.Fatal().Err(err).Msg("failed to create decrypter")
-		}
-	}
-
-	var srv Server
-	if cfg.UseGRPC {
-		srv = initGRPCServer(&cfg, logger, agentSubnet, storage, decrypter)
-	} else {
-		srv = initHTTPServer(&cfg, logger, agentSubnet, storage, decrypter)
+	srv := server.Init(&cfg, storage, logger)
+	if srv == nil {
+		logger.Fatal().Msg("Unable to start server. Exit")
+		return
 	}
 
 	idleConnectionsClosed := make(chan struct{})
@@ -76,8 +51,8 @@ func main() {
 		},
 	)
 
-	if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-		logger.Fatal().Err(err).Msg("error during server ListenAndServe")
+	if err := srv.Start(); err != nil {
+		logger.Fatal().Err(err).Msg("error during server start")
 	}
 	<-idleConnectionsClosed
 }
@@ -96,19 +71,6 @@ func initLogger(cfg *serverCfg.Builder) *l.ZeroLogger {
 		log.Fatalf("unable to configure custom logger: %v", err)
 	}
 	return logger
-}
-
-func parseTrustedSubnet(cfg *serverCfg.Builder) (*net.IPNet, error) {
-	if cfg.TrustedSubnet == "" {
-		//nolint:nilnil // *net.IPNet == nil is useful
-		return nil, nil
-	}
-
-	_, subnet, err := net.ParseCIDR(cfg.TrustedSubnet)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse trusted subnet: %w", err)
-	}
-	return subnet, nil
 }
 
 func initStorage(
@@ -161,33 +123,6 @@ func printStartupInfo(cfg *serverCfg.Builder, logger *l.ZeroLogger) {
 		Msg("Starting server")
 }
 
-func initHTTPServer(
-	cfg *serverCfg.Builder,
-	logger *l.ZeroLogger,
-	subnet *net.IPNet,
-	storage handlers.Storage,
-	decrypter *crypto.Decrypter,
-) *http.Server {
-	chiRouter := router.New(logger, subnet, cfg.Secret, decrypter)
-	chiRouter.SetRouter(handlers.NewHTTPHandler(storage, logger))
-
-	return &http.Server{
-		Addr:    cfg.RootAddress,
-		Handler: chiRouter.GetRouter(),
-	}
-}
-
-func initGRPCServer(
-	cfg *serverCfg.Builder,
-	logger *l.ZeroLogger,
-	subnet *net.IPNet,
-	storage handlers.Storage,
-	decrypter *crypto.Decrypter,
-) *customgrpc.Server {
-	return customgrpc.New(
-		storage, logger, decrypter, cfg.RootAddress, cfg.Secret, subnet)
-}
-
 func metricDB(
 	ctx context.Context,
 	dsn string,
@@ -205,13 +140,14 @@ func metricDB(
 	return database, nil
 }
 
-func shutdownServer(s Server, cancelBackup context.CancelFunc) error {
-	ctxServer, cancelSrv := context.WithTimeout(
+func shutdownServer(s server.Server, cancelBackup context.CancelFunc) error {
+	ctxTO, cancelSrv := context.WithTimeout(
 		context.Background(), constants.TimeoutShutdown)
 	defer cancelSrv()
 
-	if err := s.Shutdown(ctxServer); err != nil {
-		return fmt.Errorf("server shutdown failed: %w", err)
+	if err := s.Stop(ctxTO); err != nil {
+		cancelBackup()
+		return fmt.Errorf("server stop failed: %w", err)
 	}
 	cancelBackup()
 	return nil

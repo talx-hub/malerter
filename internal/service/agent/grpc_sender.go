@@ -65,19 +65,9 @@ func (s *GRPCSender) Send(ctx context.Context,
 }
 
 func (s *GRPCSender) doTheJob(metrics chan model.Metric) {
-	batch := toProtoMetrics(metrics)
+	batch := marshalBatch(metrics)
 
-	ctx, cancel := context.WithTimeout(
-		context.Background(), constants.TimeoutAgentRequest)
-	_, err := s.client.Batch(ctx, &pb.BatchRequest{
-		Payload: &pb.BatchRequest_MetricList{
-			MetricList: &pb.MetricList{
-				Metrics: batch,
-			},
-		},
-	})
-	cancel()
-	if err != nil {
+	if err := s.sendBatch(batch); err != nil {
 		if e, ok := status.FromError(err); ok {
 			s.log.Error().Err(e.Err()).Msg(e.Message())
 		} else {
@@ -86,7 +76,7 @@ func (s *GRPCSender) doTheJob(metrics chan model.Metric) {
 	}
 }
 
-func toProtoMetrics(ch <-chan model.Metric) []*pb.Metric {
+func marshalBatch(ch <-chan model.Metric) *pb.BatchRequest {
 	batch := make([]*pb.Metric, len(ch))
 	var i int
 	for m := range ch {
@@ -113,7 +103,25 @@ func toProtoMetrics(ch <-chan model.Metric) []*pb.Metric {
 		i++
 	}
 
-	return batch[:i]
+	return &pb.BatchRequest{
+		Payload: &pb.BatchRequest_MetricList{
+			MetricList: &pb.MetricList{
+				Metrics: batch[:i],
+			},
+		},
+	}
+}
+
+func (s *GRPCSender) sendBatch(batch *pb.BatchRequest) error {
+	ctx, cancel := context.WithTimeout(
+		context.Background(), constants.TimeoutAgentRequest)
+	defer cancel()
+
+	_, err := s.client.Batch(ctx, batch)
+	if err != nil {
+		return fmt.Errorf("failed to send batch: %w", err)
+	}
+	return nil
 }
 
 func (s *GRPCSender) Close() error {

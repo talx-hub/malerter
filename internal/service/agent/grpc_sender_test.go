@@ -67,11 +67,11 @@ func TestGRPCSender_Send(t *testing.T) {
 			context.Background(),
 			constants.TimeoutShutdown)
 		defer cancel()
-		err := srv.Shutdown(ctxTO)
+		err := srv.Stop(ctxTO)
 		require.NoError(t, err)
 	}()
 	go func() {
-		err := srv.ListenAndServe()
+		err := srv.Start()
 		require.NoError(t, err)
 	}()
 
