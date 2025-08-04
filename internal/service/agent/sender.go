@@ -14,6 +14,7 @@ import (
 	"github.com/talx-hub/malerter/internal/constants"
 	"github.com/talx-hub/malerter/internal/logger"
 	"github.com/talx-hub/malerter/internal/model"
+	"github.com/talx-hub/malerter/pkg/compressor"
 	"github.com/talx-hub/malerter/pkg/crypto"
 	"github.com/talx-hub/malerter/pkg/retry"
 )
@@ -139,4 +140,17 @@ func (s *HTTPSender) batch(batch []byte, sig string, isCompressed, isEncrypted b
 
 func (s *HTTPSender) Close() error {
 	return nil
+}
+
+func (s *HTTPSender) tryCompress(data []byte) ([]byte, error) {
+	if !s.compress {
+		return data, nil
+	}
+	body, err := compressor.Compress(data)
+	if err != nil {
+		s.log.Error().Err(err).
+			Msgf("unable to compress json %s", string(data))
+		return nil, fmt.Errorf("failed to compress data: %w", err)
+	}
+	return body.Bytes(), nil
 }

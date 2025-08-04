@@ -228,3 +228,30 @@ func TestSender_send(t *testing.T) {
 	cancel()
 	wg.Wait()
 }
+
+func TestTryCompress_CompressionDisabled(t *testing.T) {
+	s := &HTTPSender{
+		compress: false,
+		log:      logger.NewNopLogger(),
+	}
+	data := []byte(`{"test":"value"}`)
+
+	result, err := s.tryCompress(data)
+
+	assert.NoError(t, err)
+	assert.Equal(t, data, result)
+}
+
+func TestTryCompress_CompressionEnabled_Success(t *testing.T) {
+	s := &HTTPSender{
+		compress: true,
+		log:      logger.NewNopLogger(),
+	}
+	data := []byte(`{"test":"value"}`)
+
+	result, err := s.tryCompress(data)
+
+	assert.NoError(t, err)
+	assert.NotEmpty(t, result)
+	assert.NotEqual(t, data, result)
+}
