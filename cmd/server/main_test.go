@@ -35,7 +35,6 @@ func (m *mockStorage) Find(_ context.Context, _ string) (model.Metric, error) {
 }
 
 func (m *mockStorage) Get(_ context.Context) ([]model.Metric, error) {
-	//nolint:nilnil // it's tests
 	return nil, nil
 }
 
