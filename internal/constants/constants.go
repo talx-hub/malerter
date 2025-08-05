@@ -24,6 +24,7 @@ const (
 
 const TimeoutShutdown = 2 * time.Second
 const TimeoutAgentRequest = 3 * time.Second
+const TimeoutStorage = 1 * time.Second
 
 const NoSecret = ""
 const EmptyPath = ""

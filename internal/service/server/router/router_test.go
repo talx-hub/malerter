@@ -1,6 +1,7 @@
 package router_test
 
 import (
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -15,6 +16,7 @@ import (
 )
 
 const testSecret = "test-secret"
+const testTrustedSubnet = "127.0.0.0/24"
 
 type stubHandler struct {
 	name string
@@ -47,31 +49,38 @@ func (testHandler) DumpMetricList(w http.ResponseWriter, r *http.Request) {
 }
 func (testHandler) Ping(w http.ResponseWriter, r *http.Request) { stubHandler{"Ping"}.ServeHTTP(w, r) }
 
-func newTestServer() *httptest.Server {
-	log := logger.NewNopLogger()
-	r := router.New(log, testSecret, constants.EmptyPath)
+func newTestServer(t *testing.T) *httptest.Server {
+	t.Helper()
+
+	_, subnet, err := net.ParseCIDR(testTrustedSubnet)
+	require.NoError(t, err)
+
+	r := router.New(logger.NewNopLogger(), subnet, testSecret, nil)
 	r.SetRouter(testHandler{})
 	return httptest.NewServer(r.GetRouter())
 }
 
 func TestRouter_HappyRoutes(t *testing.T) {
-	srv := newTestServer()
+	srv := newTestServer(t)
 	defer srv.Close()
 
 	tests := []struct {
-		name      string
-		method    string
-		path      string
-		wantCode  int
-		wantXHead string
+		name           string
+		method         string
+		path           string
+		fromNotTrusted bool
+		wantCode       int
+		wantXHead      string
 	}{
-		{"GET /", http.MethodGet, "/", http.StatusTeapot, "GetAll"},
-		{"GET /ping", http.MethodGet, "/ping", http.StatusTeapot, "Ping"},
-		{"POST /value", http.MethodPost, "/value", http.StatusTeapot, "GetMetricJSON"},
-		{"GET /value/gauge/ram", http.MethodGet, "/value/gauge/ram", http.StatusTeapot, "GetMetric"},
-		{"POST /update", http.MethodPost, "/update", http.StatusTeapot, "DumpMetricJSON"},
-		{"POST /update/gauge/ram/123", http.MethodPost, "/update/gauge/ram/123", http.StatusTeapot, "DumpMetric"},
-		{"POST /updates", http.MethodPost, "/updates", http.StatusTeapot, "DumpMetricList"},
+		{"GET /", http.MethodGet, "/", false, http.StatusTeapot, "GetAll"},
+		{"GET /ping", http.MethodGet, "/ping", false, http.StatusTeapot, "Ping"},
+		{"POST /value", http.MethodPost, "/value", false, http.StatusTeapot, "GetMetricJSON"},
+		{"GET /value/gauge/ram", http.MethodGet, "/value/gauge/ram", false, http.StatusTeapot, "GetMetric"},
+		{"POST /update", http.MethodPost, "/update", false, http.StatusTeapot, "DumpMetricJSON"},
+		{"POST /update", http.MethodPost, "/update", true, http.StatusForbidden, ""},
+		{"POST /update/gauge/ram/123", http.MethodPost, "/update/gauge/ram/123", false, http.StatusTeapot, "DumpMetric"},
+		{"POST /updates", http.MethodPost, "/updates", false, http.StatusTeapot, "DumpMetricList"},
+		{"POST /updates", http.MethodPost, "/updates", true, http.StatusForbidden, ""},
 	}
 
 	for _, tt := range tests {
@@ -83,6 +92,62 @@ func TestRouter_HappyRoutes(t *testing.T) {
 				req.Header.Set("Content-Type", "application/json")
 				sig := signature.Hash([]byte(""), testSecret)
 				req.Header.Set(constants.KeyHashSHA256, sig)
+				if !tt.fromNotTrusted {
+					req.Header.Set("X-Real-IP", "127.0.0.2")
+				}
+			}
+
+			resp, err := http.DefaultClient.Do(req)
+			require.NoError(t, err)
+			defer func() {
+				_ = resp.Body.Close()
+			}()
+
+			assert.Equal(t, tt.wantCode, resp.StatusCode)
+			assert.Equal(t, tt.wantXHead, resp.Header.Get("X-Handler"))
+		})
+	}
+}
+
+func TestRouter_not_check_network(t *testing.T) {
+	r := router.New(logger.NewNopLogger(), nil, testSecret, nil)
+	r.SetRouter(testHandler{})
+	srv := httptest.NewServer(r.GetRouter())
+	defer srv.Close()
+
+	tests := []struct {
+		name           string
+		method         string
+		path           string
+		fromNotTrusted bool
+		wantCode       int
+		wantXHead      string
+	}{
+		{"GET /", http.MethodGet, "/", false, http.StatusTeapot, "GetAll"},
+		{"GET /ping", http.MethodGet, "/ping", false, http.StatusTeapot, "Ping"},
+		{"POST /value", http.MethodPost, "/value", false, http.StatusTeapot, "GetMetricJSON"},
+		{"GET /value/gauge/ram", http.MethodGet, "/value/gauge/ram", false, http.StatusTeapot, "GetMetric"},
+		{"POST /update", http.MethodPost, "/update", false, http.StatusTeapot, "DumpMetricJSON"},
+		{"POST /update", http.MethodPost, "/update", true, http.StatusTeapot, "DumpMetricJSON"},
+		{"POST /update/gauge/ram/123", http.MethodPost, "/update/gauge/ram/123", false, http.StatusTeapot, "DumpMetric"},
+		{"POST /updates", http.MethodPost, "/updates", false, http.StatusTeapot, "DumpMetricList"},
+		{"POST /updates", http.MethodPost, "/updates", true, http.StatusTeapot, "DumpMetricList"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req, err := http.NewRequest(tt.method, srv.URL+tt.path, http.NoBody)
+			require.NoError(t, err)
+
+			if tt.method == http.MethodPost {
+				req.Header.Set("Content-Type", "application/json")
+				sig := signature.Hash([]byte(""), testSecret)
+				req.Header.Set(constants.KeyHashSHA256, sig)
+				if tt.fromNotTrusted {
+					req.Header.Set("X-Real-IP", "1.0.0.2")
+				} else {
+					req.Header.Set("X-Real-IP", "127.0.0.2")
+				}
 			}
 
 			resp, err := http.DefaultClient.Do(req)
@@ -98,7 +163,7 @@ func TestRouter_HappyRoutes(t *testing.T) {
 }
 
 func TestRouter_WrongRoutes(t *testing.T) {
-	srv := newTestServer()
+	srv := newTestServer(t)
 	defer srv.Close()
 
 	tests := []struct {

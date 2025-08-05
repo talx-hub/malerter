@@ -18,6 +18,7 @@ func TestBuilder_LoadFromEnv(t *testing.T) {
 	_ = os.Setenv(EnvRestore, "true")
 	_ = os.Setenv(EnvDatabaseDSN, "user:pass@tcp(localhost:3306)/dbname")
 	_ = os.Setenv(EnvSecretKey, "my-secret")
+	_ = os.Setenv(EnvTrustedSubnet, "127.0.0.0/24")
 
 	defer func() {
 		_ = os.Unsetenv(EnvCryptoKeyPath)
@@ -28,6 +29,7 @@ func TestBuilder_LoadFromEnv(t *testing.T) {
 		_ = os.Unsetenv(EnvRestore)
 		_ = os.Unsetenv(EnvDatabaseDSN)
 		_ = os.Unsetenv(EnvSecretKey)
+		_ = os.Unsetenv(EnvTrustedSubnet)
 	}()
 
 	b := &Builder{}
@@ -41,6 +43,7 @@ func TestBuilder_LoadFromEnv(t *testing.T) {
 	assert.True(t, b.Restore)
 	assert.Equal(t, "user:pass@tcp(localhost:3306)/dbname", b.DatabaseDSN)
 	assert.Equal(t, "my-secret", b.Secret)
+	assert.Equal(t, "127.0.0.0/24", b.TrustedSubnet)
 }
 
 func TestBuilder_IsValid_Positive(t *testing.T) {
@@ -70,6 +73,7 @@ func TestBuilder_Build(t *testing.T) {
 		Restore:         true,
 		DatabaseDSN:     "dsn",
 		Secret:          "secret",
+		TrustedSubnet:   "127.0.0.0/24",
 	}
 
 	cfg, ok := b.Build().(Builder)
@@ -83,6 +87,7 @@ func TestBuilder_Build(t *testing.T) {
 	assert.Equal(t, b.Restore, cfg.Restore)
 	assert.Equal(t, b.DatabaseDSN, cfg.DatabaseDSN)
 	assert.Equal(t, b.Secret, cfg.Secret)
+	assert.Equal(t, b.TrustedSubnet, cfg.TrustedSubnet)
 }
 
 func TestFileStorageDefault(t *testing.T) {
@@ -95,6 +100,7 @@ func TestBuilder_LoadFromFile_Success(t *testing.T) {
 	jsonData := `{
 		"crypto_key_path": "testkey.pem",
 		"database_dsn": "postgres://localhost/db",
+		"trusted_subnet": "127.0.0.0/24",
 		"file_storage_path": "storage.bk",
 		"log_level": "debug",
 		"root_address": "0.0.0.0:9090",
@@ -138,6 +144,9 @@ func TestBuilder_LoadFromFile_Success(t *testing.T) {
 	}
 	if updated.Secret != "secretkey" {
 		t.Errorf("expected Secret to be updated, got %s", updated.Secret)
+	}
+	if updated.TrustedSubnet != "127.0.0.0/24" {
+		t.Errorf("expected TrustedSubnet to be updated, got %s", updated.TrustedSubnet)
 	}
 }
 

@@ -1,157 +1,90 @@
 package main
 
 import (
-	"bytes"
-	"fmt"
-	"net/http"
-	"net/http/httptest"
+	"context"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
+	"github.com/stretchr/testify/mock"
 
-	"github.com/talx-hub/malerter/internal/api/handlers"
 	serverCfg "github.com/talx-hub/malerter/internal/config/server"
-	"github.com/talx-hub/malerter/internal/constants"
-	"github.com/talx-hub/malerter/internal/logger"
+	l "github.com/talx-hub/malerter/internal/logger"
+	"github.com/talx-hub/malerter/internal/model"
 	"github.com/talx-hub/malerter/internal/repository/memory"
-	"github.com/talx-hub/malerter/internal/service/server/router"
+	"github.com/talx-hub/malerter/internal/service/server"
+	"github.com/talx-hub/malerter/pkg/queue"
 )
 
-func setupServices(t *testing.T) *httptest.Server {
-	t.Helper()
-
-	cfg, ok := serverCfg.NewDirector().Build().(serverCfg.Builder)
-	require.True(t, ok)
-
-	zeroLogger, err := logger.New(cfg.LogLevel)
-	require.NoError(t, err)
-
-	rep := memory.New(zeroLogger, nil)
-	require.NotNil(t, rep)
-
-	chiRouter := router.New(zeroLogger, constants.NoSecret, cfg.CryptoKeyPath)
-	chiRouter.SetRouter(handlers.NewHTTPHandler(rep, zeroLogger))
-	ts := httptest.NewServer(chiRouter.GetRouter())
-
-	return ts
+type mockStorage struct {
+	mock.Mock
 }
 
-func TestMetricRouter(t *testing.T) {
-	ts := setupServices(t)
-	defer ts.Close()
-
-	tests := []struct {
-		method          string
-		url             string
-		body            string
-		contentType     string
-		statusWant      int
-		encoding        string
-		contentTypeWant string
-	}{
-		{
-			method: http.MethodGet, url: "/",
-			statusWant:      http.StatusOK,
-			encoding:        constants.EncodingGzip,
-			contentTypeWant: constants.ContentTypeHTML,
-		},
-		{
-			method: http.MethodPost, url: "/",
-			statusWant:      http.StatusMethodNotAllowed,
-			encoding:        "",
-			contentTypeWant: "",
-		},
-		{
-			method: http.MethodPost, url: "/value/",
-			contentType:     constants.ContentTypeJSON,
-			body:            `{"id":"m1","type":"gauge","value":3.14}`,
-			statusWant:      http.StatusNotFound,
-			encoding:        "",
-			contentTypeWant: "",
-		},
-		{
-			method: http.MethodPost, url: "/value",
-			contentType:     constants.ContentTypeJSON,
-			body:            `{"id":"m1","type":"gauge","value":3.14}`,
-			statusWant:      http.StatusNotFound,
-			encoding:        "",
-			contentTypeWant: "",
-		},
-		{
-			method: http.MethodDelete, url: "/value",
-			contentType:     constants.ContentTypeJSON,
-			body:            `{"id":"m1","type":"gauge","value":3.14}`,
-			statusWant:      http.StatusMethodNotAllowed,
-			encoding:        "",
-			contentTypeWant: "",
-		},
-		{
-			method: http.MethodGet, url: "/value/",
-			statusWant:      http.StatusMethodNotAllowed,
-			encoding:        "",
-			contentTypeWant: "",
-		},
-		{
-			method: http.MethodGet, url: "/value",
-			statusWant:      http.StatusMethodNotAllowed,
-			encoding:        "",
-			contentTypeWant: "",
-		},
-		{
-			method: http.MethodGet, url: "/value/m1/gauge/",
-			statusWant:      http.StatusNotFound,
-			encoding:        "",
-			contentTypeWant: "",
-		},
-		{
-			method: http.MethodPost, url: "/value/m1/gauge",
-			contentType:     constants.ContentTypeJSON,
-			body:            `{"id":"m1","type":"gauge","value":3.14}`,
-			statusWant:      http.StatusMethodNotAllowed,
-			encoding:        "",
-			contentTypeWant: "",
-		},
-	}
-
-	for _, test := range tests {
-		t.Run(fmt.Sprintf("%s %s", test.method, test.url), func(t *testing.T) {
-			resp := testRequest(t, ts, test.method, test.url,
-				test.body, test.contentType, test.encoding)
-			defer func() {
-				err := resp.Body.Close()
-				require.NoError(t, err)
-			}()
-
-			assert.Equal(t, test.statusWant, resp.StatusCode)
-			if test.statusWant != http.StatusOK {
-				return
-			}
-			assert.Contains(
-				t, resp.Header.Values(constants.KeyContentType), test.contentTypeWant)
-			if test.encoding != "" {
-				assert.Contains(
-					t, resp.Header.Values(constants.KeyContentEncoding), test.encoding)
-			}
-		})
-	}
+func (m *mockStorage) Add(ctx context.Context, metric model.Metric) error {
+	args := m.Called(ctx, metric)
+	//nolint:wrapcheck // it's tests
+	return args.Error(0)
 }
 
-func testRequest(t *testing.T, ts *httptest.Server,
-	method, url, body, contentType, encoding string) *http.Response {
-	t.Helper()
+func (m *mockStorage) Batch(_ context.Context, _ []model.Metric) error {
+	return nil
+}
 
-	req, err := http.NewRequest(method, ts.URL+url, bytes.NewBufferString(body))
-	require.NoError(t, err)
-	if contentType != "" {
-		req.Header.Set(constants.KeyContentType, contentType)
+func (m *mockStorage) Find(_ context.Context, _ string) (model.Metric, error) {
+	return model.Metric{}, nil
+}
+
+func (m *mockStorage) Get(_ context.Context) ([]model.Metric, error) {
+	return nil, nil
+}
+
+func (m *mockStorage) Ping(_ context.Context) error {
+	return nil
+}
+
+func Test_metricDB_emptyDSN(t *testing.T) {
+	logger := l.NewNopLogger()
+	buffer := queue.New[model.Metric]()
+	defer buffer.Close()
+
+	database, err := metricDB(context.Background(), "", logger, &buffer)
+	assert.Nil(t, database)
+	assert.ErrorContains(t, err, "DB DSN is empty")
+}
+
+func Test_initStorage_fallbackToMemory(t *testing.T) {
+	cfg := testConfig()
+	cfg.DatabaseDSN = "bad-dsn"
+	logger := l.NewNopLogger()
+	buffer := queue.New[model.Metric]()
+	defer buffer.Close()
+
+	storage := initStorage(&cfg, logger, &buffer)
+	_, ok := storage.(*memory.Memory)
+	assert.True(t, ok)
+}
+
+func Test_shutdownServer_ok(t *testing.T) {
+	storage := new(mockStorage)
+	cfg := testConfig()
+	logger := l.NewNopLogger()
+	srv := server.Init(&cfg, storage, logger)
+	cancelCalled := false
+	err := shutdownServer(srv, func() { cancelCalled = true })
+	assert.NoError(t, err)
+	assert.True(t, cancelCalled)
+}
+
+func testConfig() serverCfg.Builder {
+	return serverCfg.Builder{
+		LogLevel:        "debug",
+		TrustedSubnet:   "",
+		DatabaseDSN:     "",
+		RootAddress:     ":8080",
+		StoreInterval:   time.Second * 10,
+		FileStoragePath: "/tmp/test.json",
+		Restore:         true,
+		Secret:          "",
+		CryptoKeyPath:   "",
 	}
-	if encoding != "" {
-		req.Header.Set(constants.KeyAcceptEncoding, encoding)
-	}
-
-	resp, err := ts.Client().Do(req)
-	require.NoError(t, err)
-
-	return resp
 }

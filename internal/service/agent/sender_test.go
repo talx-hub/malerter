@@ -1,6 +1,7 @@
 package agent
 
 import (
+	"context"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -19,7 +20,7 @@ import (
 func TestToJSONs(t *testing.T) {
 	log, err := logger.New(constants.LogLevelDefault)
 	require.NoError(t, err)
-	sender := Sender{host: "", log: log}
+	sender := HTTPSender{host: "", log: log}
 
 	tests := []struct {
 		name    string
@@ -113,8 +114,8 @@ func TestJoin(t *testing.T) {
 	}
 }
 
-func newTestSender(serverURL string, secret string, compress bool) *Sender {
-	return &Sender{
+func newTestSender(serverURL string, secret string, compress bool) *HTTPSender {
+	return &HTTPSender{
 		client:   &http.Client{Timeout: 1 * time.Second},
 		log:      logger.NewNopLogger(),
 		host:     serverURL,
@@ -191,7 +192,7 @@ func TestSender_batch_Signature(t *testing.T) {
 
 	s := newTestSender(ts.URL, "super-secret", false)
 	data := []byte(`[{"name":"metric"}]`)
-	sig := s.trySign(data)
+	sig := trySign(data, s.secret)
 	s.batch(data, sig, false, false)
 }
 
@@ -202,7 +203,6 @@ func TestSender_batch_HTTPError(t *testing.T) {
 }
 
 func TestSender_send(t *testing.T) {
-	var mu sync.Mutex
 	var wg sync.WaitGroup
 
 	chMetrics := make(chan model.Metric, 1)
@@ -220,7 +220,38 @@ func TestSender_send(t *testing.T) {
 
 	s := newTestSender(ts.URL, "", false)
 	wg.Add(1)
-	go s.send(chJobs, &mu, &wg)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	go s.Send(ctx, chJobs, &wg)
 
+	time.Sleep(2 * time.Second)
+	cancel()
 	wg.Wait()
+}
+
+func TestTryCompress_CompressionDisabled(t *testing.T) {
+	s := &HTTPSender{
+		compress: false,
+		log:      logger.NewNopLogger(),
+	}
+	data := []byte(`{"test":"value"}`)
+
+	result, err := s.tryCompress(data)
+
+	assert.NoError(t, err)
+	assert.Equal(t, data, result)
+}
+
+func TestTryCompress_CompressionEnabled_Success(t *testing.T) {
+	s := &HTTPSender{
+		compress: true,
+		log:      logger.NewNopLogger(),
+	}
+	data := []byte(`{"test":"value"}`)
+
+	result, err := s.tryCompress(data)
+
+	assert.NoError(t, err)
+	assert.NotEmpty(t, result)
+	assert.NotEqual(t, data, result)
 }

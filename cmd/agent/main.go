@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"log"
-	"net/http"
 
 	agentCfg "github.com/talx-hub/malerter/internal/config/agent"
 	"github.com/talx-hub/malerter/internal/logger"
@@ -27,7 +26,17 @@ func main() {
 		Str("buildCommit", buildinfo.Commit).
 		Str("buildDate", buildinfo.Date).
 		Msg("Starting agent")
-	agt := agent.NewAgent(&cfg, &http.Client{}, zeroLogger)
+	agt := agent.NewAgent(&cfg, zeroLogger)
+	if agt == nil {
+		zeroLogger.Fatal().Msg("agent failed. Exit")
+		return
+	}
+	defer func() {
+		err = agt.Close()
+		if err != nil {
+			zeroLogger.Fatal().Err(err).Msg("failed to close agent properly")
+		}
+	}()
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()

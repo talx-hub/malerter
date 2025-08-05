@@ -17,10 +17,9 @@ import (
 	"github.com/talx-hub/malerter/pkg/compressor"
 	"github.com/talx-hub/malerter/pkg/crypto"
 	"github.com/talx-hub/malerter/pkg/retry"
-	"github.com/talx-hub/malerter/pkg/signature"
 )
 
-type Sender struct {
+type HTTPSender struct {
 	client    *http.Client
 	log       *logger.ZeroLogger
 	encrypter *crypto.Encrypter
@@ -29,44 +28,42 @@ type Sender struct {
 	compress  bool
 }
 
-func (s *Sender) send(
-	jobs <-chan chan model.Metric, m *sync.Mutex, wg *sync.WaitGroup,
+func (s *HTTPSender) Send(ctx context.Context,
+	jobs <-chan chan model.Metric, wg *sync.WaitGroup,
 ) {
 	defer wg.Done()
 
 	for {
-		m.Lock()
-		jobCount := len(jobs)
-		if jobCount == 0 {
-			m.Unlock()
+		select {
+		case metrics, ok := <-jobs:
+			if !ok {
+				return
+			}
+			s.doTheJob(metrics)
+		case <-ctx.Done():
 			return
 		}
-
-		j, ok := <-jobs
-		if !ok {
-			m.Unlock()
-			return
-		}
-		m.Unlock()
-
-		batch := []byte(join(s.toJSONs(j)))
-		compressed, err := s.tryCompress(batch)
-		if err != nil {
-			s.log.Error().Err(err).Msg("failed to send data")
-			continue
-		}
-		sig := s.trySign(compressed)
-		encrypted, err := s.tryEncrypt(compressed)
-		if err != nil {
-			s.log.Error().Err(err).Msg("failed to send data")
-			continue
-		}
-
-		s.batch(encrypted, sig, s.compress, s.encrypter != nil)
 	}
 }
 
-func (s *Sender) toJSONs(ch <-chan model.Metric) chan string {
+func (s *HTTPSender) doTheJob(metrics chan model.Metric) {
+	batch := []byte(join(s.toJSONs(metrics)))
+	compressed, err := s.tryCompress(batch)
+	if err != nil {
+		s.log.Error().Err(err).Msg("failed to compress")
+		return
+	}
+	sig := trySign(compressed, s.secret)
+	encrypted, err := tryEncrypt(compressed, s.encrypter)
+	if err != nil {
+		s.log.Error().Err(err).Msg("failed to encrypt")
+		return
+	}
+
+	s.batch(encrypted, sig, s.compress, s.encrypter != nil)
+}
+
+func (s *HTTPSender) toJSONs(ch <-chan model.Metric) chan string {
 	jsons := make(chan string)
 
 	go func() {
@@ -93,39 +90,7 @@ func join(ch <-chan string) string {
 	return "[" + strings.Join(jsons, ",") + "]"
 }
 
-func (s *Sender) tryCompress(data []byte) ([]byte, error) {
-	if !s.compress {
-		return data, nil
-	}
-	body, err := compressor.Compress(data)
-	if err != nil {
-		s.log.Error().Err(err).
-			Msgf("unable to compress json %s", string(data))
-		return nil, fmt.Errorf("failed to compress data: %w", err)
-	}
-	return body.Bytes(), nil
-}
-
-func (s *Sender) trySign(data []byte) string {
-	if s.secret != constants.NoSecret {
-		return signature.Hash(data, s.secret)
-	}
-	return ""
-}
-
-func (s *Sender) tryEncrypt(data []byte) ([]byte, error) {
-	if s.encrypter == nil {
-		return data, nil
-	}
-	encryptedPayload, err := s.encrypter.Encrypt(data)
-	if err != nil {
-		s.log.Error().Err(err).Msg("failed to encrypt data")
-		return nil, fmt.Errorf("failed to encrypt data: %w", err)
-	}
-	return encryptedPayload, nil
-}
-
-func (s *Sender) batch(batch []byte, sig string, isCompressed, isEncrypted bool) {
+func (s *HTTPSender) batch(batch []byte, sig string, isCompressed, isEncrypted bool) {
 	const unableFormat = "unable to send json %s to %s"
 
 	ctx, cancel := context.WithTimeout(
@@ -171,4 +136,21 @@ func (s *Sender) batch(batch []byte, sig string, isCompressed, isEncrypted bool)
 		s.log.Error().Err(err).Msgf(unableFormat, batch, s.host)
 		return
 	}
+}
+
+func (s *HTTPSender) Close() error {
+	return nil
+}
+
+func (s *HTTPSender) tryCompress(data []byte) ([]byte, error) {
+	if !s.compress {
+		return data, nil
+	}
+	body, err := compressor.Compress(data)
+	if err != nil {
+		s.log.Error().Err(err).
+			Msgf("unable to compress json %s", string(data))
+		return nil, fmt.Errorf("failed to compress data: %w", err)
+	}
+	return body.Bytes(), nil
 }

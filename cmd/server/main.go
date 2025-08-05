@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"log"
-	"net/http"
 
 	"github.com/talx-hub/malerter/internal/api/handlers"
 	serverCfg "github.com/talx-hub/malerter/internal/config/server"
@@ -14,67 +13,33 @@ import (
 	"github.com/talx-hub/malerter/internal/model"
 	"github.com/talx-hub/malerter/internal/repository/db"
 	"github.com/talx-hub/malerter/internal/repository/memory"
+	"github.com/talx-hub/malerter/internal/service/server"
 	"github.com/talx-hub/malerter/internal/service/server/backup"
 	"github.com/talx-hub/malerter/internal/service/server/buildinfo"
-	"github.com/talx-hub/malerter/internal/service/server/router"
 	"github.com/talx-hub/malerter/pkg/queue"
 	"github.com/talx-hub/malerter/pkg/shutdown"
 )
 
 func main() {
-	cfg, ok := serverCfg.NewDirector().Build().(serverCfg.Builder)
-	if !ok {
-		log.Fatal("unable to load server serverCfg")
-	}
+	cfg := loadConfig()
+	logger := initLogger(&cfg)
 
-	logger, err := l.New(cfg.LogLevel)
-	if err != nil {
-		log.Fatalf("unable to configure custom logger: %v", err)
-	}
-
-	var storage handlers.Storage
 	buffer := queue.New[model.Metric]()
 	defer buffer.Close()
-	database, err := metricDB(
-		context.Background(),
-		cfg.DatabaseDSN,
-		logger,
-		&buffer)
-	if err != nil {
-		logger.Warn().Err(err).Msg("store metrics in memory")
-		storage = memory.New(logger, &buffer)
-	} else {
-		defer database.Close()
-		storage = database
-	}
+
+	storage := initStorage(&cfg, logger, &buffer)
+	defer closeDatabase(storage)
 
 	ctxBackup, cancelBackup := context.WithCancel(context.Background())
 	defer cancelBackup()
-	if bk := backup.New(&cfg, &buffer, storage, logger); bk != nil {
-		go bk.Run(ctxBackup)
-	} else {
-		logger.Warn().Msg("unable to load backup service")
-		buffer.Close()
-	}
+	startBackupService(ctxBackup, &cfg, &buffer, storage, logger)
 
-	logger.Info().
-		Str(`"address"`, cfg.RootAddress).
-		Dur(`"backup interval"`, cfg.StoreInterval).
-		Bool(`"restore backup"`, cfg.Restore).
-		Str(`"backup path"`, cfg.FileStoragePath).
-		Bool(`"signature check"'`, cfg.Secret != constants.NoSecret).
-		Str(`dsn`, cfg.DatabaseDSN).
-		Str("buildVersion", buildinfo.Version).
-		Str("buildCommit", buildinfo.Commit).
-		Str("buildDate", buildinfo.Date).
-		Msg("Starting server")
+	printStartupInfo(&cfg, logger)
 
-	chiRouter := router.New(logger, cfg.Secret, cfg.CryptoKeyPath)
-	chiRouter.SetRouter(handlers.NewHTTPHandler(storage, logger))
-
-	srv := http.Server{
-		Addr:    cfg.RootAddress,
-		Handler: chiRouter.GetRouter(),
+	srv := server.Init(&cfg, storage, logger)
+	if srv == nil {
+		logger.Fatal().Msg("Unable to start server. Exit")
+		return
 	}
 
 	idleConnectionsClosed := make(chan struct{})
@@ -82,15 +47,80 @@ func main() {
 		idleConnectionsClosed,
 		logger,
 		func(args ...any) error {
-			return shutdownServer(&srv, cancelBackup)
+			return shutdownServer(srv, cancelBackup)
 		},
 	)
 
-	if err = srv.ListenAndServe(); !errors.Is(err, http.ErrServerClosed) {
-		logger.Fatal().
-			Err(err).Msg("error during HTTP server ListenAndServe")
+	if err := srv.Start(); err != nil {
+		logger.Fatal().Err(err).Msg("error during server start")
 	}
 	<-idleConnectionsClosed
+}
+
+func loadConfig() serverCfg.Builder {
+	cfg, ok := serverCfg.NewDirector().Build().(serverCfg.Builder)
+	if !ok {
+		log.Fatal("unable to load server config")
+	}
+	return cfg
+}
+
+func initLogger(cfg *serverCfg.Builder) *l.ZeroLogger {
+	logger, err := l.New(cfg.LogLevel)
+	if err != nil {
+		log.Fatalf("unable to configure custom logger: %v", err)
+	}
+	return logger
+}
+
+func initStorage(
+	cfg *serverCfg.Builder,
+	logger *l.ZeroLogger,
+	buffer *queue.Queue[model.Metric],
+) handlers.Storage {
+	dbStorage, err := metricDB(context.Background(), cfg.DatabaseDSN, logger, buffer)
+	if err != nil {
+		logger.Warn().Err(err).Msg("store metrics in memory")
+		return memory.New(logger, buffer)
+	}
+	return dbStorage
+}
+
+func closeDatabase(storage handlers.Storage) {
+	if dbStorage, ok := storage.(*db.DB); ok {
+		dbStorage.Close()
+	}
+}
+
+func startBackupService(
+	ctx context.Context,
+	cfg *serverCfg.Builder,
+	buffer *queue.Queue[model.Metric],
+	storage handlers.Storage,
+	logger *l.ZeroLogger,
+) {
+	bk := backup.New(cfg, buffer, storage, logger)
+	if bk != nil {
+		go bk.Run(ctx)
+	} else {
+		logger.Warn().Msg("unable to load backup service")
+		buffer.Close()
+	}
+}
+
+func printStartupInfo(cfg *serverCfg.Builder, logger *l.ZeroLogger) {
+	logger.Info().
+		Str("address", cfg.RootAddress).
+		Str("trusted subnet", cfg.TrustedSubnet).
+		Dur("backup interval", cfg.StoreInterval).
+		Bool("restore backup", cfg.Restore).
+		Str("backup path", cfg.FileStoragePath).
+		Bool("signature check", cfg.Secret != constants.NoSecret).
+		Str("dsn", cfg.DatabaseDSN).
+		Str("buildVersion", buildinfo.Version).
+		Str("buildCommit", buildinfo.Commit).
+		Str("buildDate", buildinfo.Date).
+		Msg("Starting server")
 }
 
 func metricDB(
@@ -110,13 +140,14 @@ func metricDB(
 	return database, nil
 }
 
-func shutdownServer(s *http.Server, cancelBackup context.CancelFunc) error {
-	ctxServer, cancelSrv := context.WithTimeout(
+func shutdownServer(s server.Server, cancelBackup context.CancelFunc) error {
+	ctxTO, cancelSrv := context.WithTimeout(
 		context.Background(), constants.TimeoutShutdown)
 	defer cancelSrv()
 
-	if err := s.Shutdown(ctxServer); err != nil {
-		return fmt.Errorf("server shutdown failed: %w", err)
+	if err := s.Stop(ctxTO); err != nil {
+		cancelBackup()
+		return fmt.Errorf("server stop failed: %w", err)
 	}
 	cancelBackup()
 	return nil

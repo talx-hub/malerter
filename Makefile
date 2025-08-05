@@ -69,7 +69,7 @@ fmt:
 
 .PHONY : lint
 lint:
-	golangci-lint run -c .golangci.yml > ./golangci-lint/report-unformatted.json
+	golangci-lint run --fix -c .golangci.yml > ./golangci-lint/report-unformatted.json
 
 .PHONY : _golangci-lint-format-report
 _golangci-lint-format-report:

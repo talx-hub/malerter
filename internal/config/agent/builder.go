@@ -17,6 +17,7 @@ const (
 	PoolIntervalDefault   = 2
 	RateLimitDefault      = 3
 	ReportIntervalDefault = 10
+	UseGRPCDefault        = false
 )
 
 const (
@@ -27,6 +28,7 @@ const (
 	EnvPollInterval   = "POLL_INTERVAL"
 	EnvRateLimit      = "RATE_LIMIT"
 	EnvReportInterval = "REPORT_INTERVAL"
+	EnvUseGRPC        = "USE_GRPC"
 )
 
 func NewDirector() *config.Director {
@@ -44,6 +46,7 @@ type Builder struct {
 	RateLimit      int           `json:"rate_limit,omitempty"`
 	ReportInterval time.Duration `json:"report_interval,omitempty"`
 	PollInterval   time.Duration `json:"poll_interval,omitempty"`
+	UseGRPC        bool          `json:"use_grpc,omitempty"`
 }
 
 func (b *Builder) LoadFromFlags() config.Builder {
@@ -60,6 +63,8 @@ func (b *Builder) LoadFromFlags() config.Builder {
 
 	var ri int64
 	flag.Int64Var(&ri, "r", ReportIntervalDefault, "interval in seconds of sending metrics to alert server")
+
+	flag.BoolVar(&b.UseGRPC, "grpc", UseGRPCDefault, "use grpc protocol instead of http")
 
 	flag.Parse()
 
@@ -101,6 +106,9 @@ func (b *Builder) LoadFromEnv() config.Builder {
 	}
 	if secret, found := os.LookupEnv(EnvSecretKey); found {
 		b.Secret = secret
+	}
+	if _, found := os.LookupEnv(EnvUseGRPC); found {
+		b.UseGRPC = true
 	}
 	return b
 }

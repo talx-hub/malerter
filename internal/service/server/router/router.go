@@ -1,6 +1,7 @@
 package router
 
 import (
+	"net"
 	"net/http"
 	"net/http/pprof"
 
@@ -17,23 +18,21 @@ type Router struct {
 	decrypter *crypto.Decrypter
 	log       *logger.ZeroLogger
 	router    *chi.Mux
+	IPNet     *net.IPNet
 	secret    string
 }
 
-func New(log *logger.ZeroLogger, secret, cryptoKeyPath string) *Router {
-	var decrypter *crypto.Decrypter
-	if cryptoKeyPath != constants.EmptyPath {
-		var err error
-		decrypter, err = crypto.NewDecrypter(cryptoKeyPath)
-		if err != nil {
-			log.Fatal().Err(err).Msg("failed to create decrypter")
-		}
-	}
-
+func New(
+	log *logger.ZeroLogger,
+	ipNet *net.IPNet,
+	secret string,
+	decrypter *crypto.Decrypter,
+) *Router {
 	return &Router{
 		decrypter: decrypter,
 		log:       log,
 		router:    chi.NewRouter(),
+		IPNet:     ipNet,
 		secret:    secret,
 	}
 }
@@ -69,6 +68,7 @@ func (r *Router) SetRouter(h Handler) {
 
 		c.Route("/update", func(c chi.Router) {
 			c.
+				With(middlewares.CheckNetwork(r.IPNet, r.log)).
 				With(middleware.AllowContentType(constants.ContentTypeJSON)).
 				With(middlewares.WriteSignature(r.secret)).
 				With(middlewares.Decompress(r.log)).
@@ -84,6 +84,7 @@ func (r *Router) SetRouter(h Handler) {
 
 		c.Route("/updates", func(c chi.Router) {
 			c.
+				With(middlewares.CheckNetwork(r.IPNet, r.log)).
 				With(middleware.AllowContentType(constants.ContentTypeJSON)).
 				With(middlewares.CheckSignature(r.secret)).
 				With(middlewares.Decompress(r.log)).
